@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import logo from '@/assets/logo.jpg';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Mail, Lock, User, Loader2 } from 'lucide-react';
@@ -42,10 +43,8 @@ export function Auth() {
       <div className="w-full max-w-md">
         {/* Logo / Branding */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-500 mb-4">
-            <span className="text-white font-bold text-xl">VZ</span>
-          </div>
-          <h1 className="text-2xl font-bold text-white">Vanto Zazi CRM</h1>
+          <img src={logo} alt="Vanto Zazi logo" className="w-14 h-14 rounded-xl mx-auto mb-4 object-cover" />
+          <h1 className="text-2xl font-bold text-white">Vanto Zazi</h1>
           <p className="text-slate-400 mt-1">
             {isSignUp ? 'Create your account' : 'Sign in to your account'}
           </p>
