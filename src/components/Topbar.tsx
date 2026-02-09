@@ -1,6 +1,10 @@
-import { Search, Bell, UserPlus, ClipboardList } from 'lucide-react';
+import { Search, Bell, UserPlus, ClipboardList, LogOut } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 export function Topbar() {
+  const { user, signOut } = useAuth();
+  const displayEmail = user?.email ?? '';
+  const initials = displayEmail.slice(0, 2).toUpperCase();
   return (
     <header className="fixed top-0 left-56 right-0 h-14 bg-slate-800 border-b border-slate-700 flex items-center justify-between px-6 z-10">
       {/* Search */}
@@ -42,14 +46,23 @@ export function Topbar() {
           <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full" />
         </button>
 
+        {/* Sign Out */}
+        <button
+          type="button"
+          onClick={signOut}
+          className="p-2 rounded-lg text-slate-400 hover:bg-slate-700 hover:text-slate-200 transition-colors"
+          title="Sign out"
+        >
+          <LogOut className="w-5 h-5" />
+        </button>
+
         {/* User avatar */}
         <div className="flex items-center gap-3 ml-1">
           <div className="text-right hidden sm:block">
-            <p className="text-sm font-medium text-slate-200">Alex Morgan</p>
-            <p className="text-xs text-slate-500">Sales Manager</p>
+            <p className="text-sm font-medium text-slate-200">{displayEmail}</p>
           </div>
           <div className="w-9 h-9 rounded-full bg-gradient-to-br from-teal-500 to-cyan-500 flex items-center justify-center text-white font-semibold text-sm">
-            AM
+            {initials}
           </div>
         </div>
       </div>
