@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom';
+import logo from '@/assets/logo.jpg';
 import {
   LayoutDashboard,
   Users,
@@ -26,10 +27,8 @@ export function Sidebar() {
       {/* Logo */}
       <div className="h-14 flex items-center px-5 border-b border-slate-800">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-400 to-cyan-500 flex items-center justify-center">
-            <span className="text-white font-bold text-sm">N</span>
-          </div>
-          <span className="font-semibold text-lg text-white tracking-tight">NexusCRM</span>
+          <img src={logo} alt="Vanto Zazi logo" className="w-8 h-8 rounded-lg object-cover" />
+          <span className="font-semibold text-lg text-white tracking-tight">Vanto Zazi</span>
         </div>
       </div>
 
