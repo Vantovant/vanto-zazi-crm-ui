@@ -5,9 +5,12 @@ import {
   Columns3,
   UserPlus,
   X,
+  Loader2,
 } from 'lucide-react';
-import { prospects, prospectColumns, filterOptions, type Prospect } from '../data/mockData';
+import { prospectColumns, filterOptions, type Prospect } from '../data/mockData';
 import { ContactDrawer } from '../components/ContactDrawer';
+import { DataStatusBanner } from '../components/DataStatusBanner';
+import { useCrm } from '@/contexts/CrmContext';
 
 type FilterKey = keyof typeof filterOptions;
 
@@ -50,27 +53,24 @@ export function Contacts() {
     LeadPath: '',
   });
   const [openFilter, setOpenFilter] = useState<FilterKey | null>(null);
+  const { contacts: prospects, contactsLoading, contactsDbActive } = useCrm();
   const [selectedProspect, setSelectedProspect] = useState<Prospect | null>(null);
 
   const filteredProspects = useMemo(() => {
     return prospects.filter((prospect) => {
-      // Search across all columns
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
         const searchableValues = Object.values(prospect).join(' ').toLowerCase();
         if (!searchableValues.includes(query)) return false;
       }
-
-      // Apply filters
       for (const [key, value] of Object.entries(activeFilters)) {
         if (value && prospect[key as keyof Prospect] !== value) {
           return false;
         }
       }
-
       return true;
     });
-  }, [searchQuery, activeFilters]);
+  }, [searchQuery, activeFilters, prospects]);
 
   const toggleColumn = (key: string) => {
     const newVisible = new Set(visibleColumns);
@@ -136,12 +136,15 @@ export function Contacts() {
 
   return (
     <div className="space-y-4">
+      {/* Data Status Banner */}
+      <DataStatusBanner dbActive={contactsDbActive} />
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-white">Prospects</h1>
           <p className="text-sm text-slate-400 mt-0.5">
-            {filteredProspects.length} of {prospects.length} prospects
+            {contactsLoading ? 'Loading...' : `${filteredProspects.length} of ${prospects.length} prospects`}
           </p>
         </div>
         <button

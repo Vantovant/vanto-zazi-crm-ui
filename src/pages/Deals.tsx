@@ -8,8 +8,9 @@ import {
   X,
   Filter,
 } from 'lucide-react';
-import { prospects, orders, type Prospect } from '../data/mockData';
+import { type Prospect, type Order } from '../data/mockData';
 import { ContactDrawer } from '../components/ContactDrawer';
+import { useCrm } from '@/contexts/CrmContext';
 
 // Derive Deal Status from contact and order data
 type DealStatus = 'registered-no-purchase' | 'activated-no-status' | 'activated-with-status';
@@ -23,7 +24,7 @@ interface Deal {
   lastOrderDate: string | null;
 }
 
-function deriveDealStatus(contact: Prospect, contactOrders: typeof orders): Deal {
+function deriveDealStatus(contact: Prospect, contactOrders: Order[]): Deal {
   const hasOrders = contactOrders.length > 0;
   const totalOrderValue = contactOrders.reduce((sum, o) => sum + o.amount, 0);
   const lastOrder = contactOrders.sort((a, b) => b.orderDate.localeCompare(a.orderDate))[0];
@@ -74,6 +75,7 @@ const statusIcons: Record<DealStatus, typeof Users> = {
 type StatusFilter = 'all' | DealStatus;
 
 export function Deals() {
+  const { contacts: prospects, orders } = useCrm();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
@@ -85,7 +87,7 @@ export function Deals() {
       const contactOrders = orders.filter((o) => o.contactName === contact.FullName);
       return deriveDealStatus(contact, contactOrders);
     });
-  }, []);
+  }, [prospects, orders]);
 
   // Filter deals
   const filteredDeals = useMemo(() => {
