@@ -242,20 +242,32 @@ export function ImportExport() {
     };
 
     // Build all insert rows
+    console.log('Column mapping:', JSON.stringify(columnMapping));
+    console.log('CSV headers:', JSON.stringify(csvHeaders));
+    console.log('Mapped fields:', mappedFields.map(f => f.key));
+    console.log('First CSV row sample:', JSON.stringify(csvRows[0]));
+
     const allRows: Record<string, unknown>[] = [];
     for (const row of csvRows) {
       const record: Record<string, string> = {};
       for (const field of mappedFields) {
-        const colIdx = csvHeaders.indexOf(columnMapping[field.key]);
+        const csvHeader = columnMapping[field.key];
+        const colIdx = csvHeaders.indexOf(csvHeader);
         if (colIdx !== -1 && row[colIdx]) record[field.key] = row[colIdx];
       }
-      if (!record.FullName) { failed++; continue; }
+      if (!record.FullName) {
+        // Log the first few failures to debug
+        if (failed < 3) console.warn('Row missing FullName. Record keys:', Object.keys(record), 'FullName mapping:', columnMapping['FullName'], 'row:', row.slice(0, 5));
+        failed++;
+        continue;
+      }
       const dbRow: Record<string, unknown> = { user_id: user.id };
       for (const [k, v] of Object.entries(record)) {
         if (fieldToCol[k]) dbRow[fieldToCol[k]] = v;
       }
       allRows.push(dbRow);
     }
+    console.log(`Built ${allRows.length} valid rows, ${failed} failed`);
 
     // Insert in batches of 50
     const BATCH = 50;
