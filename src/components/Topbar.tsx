@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Bell, UserPlus, ClipboardList, LogOut, Lock, X } from 'lucide-react';
+import { Search, Bell, UserPlus, ClipboardList, LogOut, Lock, X, Menu } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCrm } from '@/contexts/CrmContext';
 import { ChangePasswordModal } from './ChangePasswordModal';
@@ -19,7 +19,7 @@ function useSearch(contacts: any[]) {
   return { query, setQuery, open, setOpen, results };
 }
 
-export function Topbar() {
+export function Topbar({ onMenuToggle }: { onMenuToggle: () => void }) {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const { contacts } = useCrm();
@@ -49,9 +49,13 @@ export function Topbar() {
 
   return (
     <>
-      <header className="fixed top-0 left-56 right-0 h-14 bg-slate-800 border-b border-slate-700 flex items-center justify-between px-6 z-10">
-        {/* Search */}
-        <div className="relative w-80" ref={searchRef}>
+      <header className="fixed top-0 left-0 lg:left-56 right-0 h-14 bg-slate-800 border-b border-slate-700 flex items-center justify-between px-3 lg:px-6 z-20">
+        {/* Mobile menu button + Search */}
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <button type="button" onClick={onMenuToggle} className="lg:hidden p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700">
+            <Menu className="w-5 h-5" />
+          </button>
+          <div className="relative w-full max-w-sm" ref={searchRef}>
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
           <input
             type="text"
@@ -92,6 +96,7 @@ export function Topbar() {
               )}
             </div>
           )}
+          </div>
         </div>
 
         {/* Quick Actions + Right section */}
