@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { prospectColumns, filterOptions, type Prospect } from '../data/mockData';
 import { ContactDrawer } from '../components/ContactDrawer';
+import { AddContactModal } from '../components/AddContactModal';
 import { DataStatusBanner } from '../components/DataStatusBanner';
 import { useCrm } from '@/contexts/CrmContext';
 
@@ -55,7 +56,7 @@ export function Contacts() {
   const [openFilter, setOpenFilter] = useState<FilterKey | null>(null);
   const { contacts: prospects, contactsLoading, contactsDbActive } = useCrm();
   const [selectedProspect, setSelectedProspect] = useState<Prospect | null>(null);
-
+  const [showAddModal, setShowAddModal] = useState(false);
   const filteredProspects = useMemo(() => {
     return prospects.filter((prospect) => {
       if (searchQuery) {
@@ -149,6 +150,7 @@ export function Contacts() {
         </div>
         <button
           type="button"
+          onClick={() => setShowAddModal(true)}
           className="flex items-center gap-2 px-4 py-2.5 bg-teal-600 hover:bg-teal-500 text-white text-sm font-medium rounded-lg transition-colors"
         >
           <UserPlus className="w-4 h-4" />
@@ -340,6 +342,8 @@ export function Contacts() {
           }}
         />
       )}
+
+      {showAddModal && <AddContactModal onClose={() => setShowAddModal(false)} />}
     </div>
   );
 }
