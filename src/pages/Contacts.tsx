@@ -6,6 +6,7 @@ import {
   UserPlus,
   X,
   Loader2,
+  Trash2,
 } from 'lucide-react';
 import { prospectColumns, filterOptions, type Prospect } from '../data/mockData';
 import { ContactDrawer } from '../components/ContactDrawer';
@@ -54,9 +55,38 @@ export function Contacts() {
     LeadPath: '',
   });
   const [openFilter, setOpenFilter] = useState<FilterKey | null>(null);
-  const { contacts: prospects, contactsLoading, contactsDbActive } = useCrm();
+  const { contacts: prospects, contactsLoading, contactsDbActive, deleteContact } = useCrm();
   const [selectedProspect, setSelectedProspect] = useState<Prospect | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState(false);
+
+  const toggleSelect = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredProspects.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredProspects.map(p => String(p.id))));
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (!confirm(`Delete ${selectedIds.size} contact(s)? This cannot be undone.`)) return;
+    setDeleting(true);
+    for (const id of selectedIds) {
+      await deleteContact(id);
+    }
+    setSelectedIds(new Set());
+    setDeleting(false);
+  };
   const filteredProspects = useMemo(() => {
     return prospects.filter((prospect) => {
       if (searchQuery) {
@@ -279,12 +309,43 @@ export function Contacts() {
         </div>
       </div>
 
+      {/* Bulk Actions Bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg">
+          <span className="text-sm text-slate-300">{selectedIds.size} selected</span>
+          <button
+            type="button"
+            onClick={handleDeleteSelected}
+            disabled={deleting}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white rounded-lg transition-colors"
+          >
+            {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+            Delete Selected
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedIds(new Set())}
+            className="text-sm text-slate-400 hover:text-slate-200 transition-colors"
+          >
+            Clear Selection
+          </button>
+        </div>
+      )}
+
       {/* Table */}
       <div className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="bg-slate-800 border-b border-slate-700">
+                <th className="px-4 py-3 w-10">
+                  <input
+                    type="checkbox"
+                    checked={filteredProspects.length > 0 && selectedIds.size === filteredProspects.length}
+                    onChange={toggleSelectAll}
+                    className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-teal-500 focus:ring-teal-500/40"
+                  />
+                </th>
                 {prospectColumns
                   .filter((col) => visibleColumns.has(col.key))
                   .map((col) => (
@@ -302,8 +363,17 @@ export function Contacts() {
                 <tr
                   key={prospect.id}
                   onClick={() => setSelectedProspect(prospect)}
-                  className="hover:bg-slate-700/30 cursor-pointer transition-colors"
+                  className={`hover:bg-slate-700/30 cursor-pointer transition-colors ${selectedIds.has(String(prospect.id)) ? 'bg-teal-500/5' : ''}`}
                 >
+                  <td className="px-4 py-3 w-10">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(String(prospect.id))}
+                      onChange={() => {}}
+                      onClick={(e) => toggleSelect(String(prospect.id), e)}
+                      className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-teal-500 focus:ring-teal-500/40"
+                    />
+                  </td>
                   {prospectColumns
                     .filter((col) => visibleColumns.has(col.key))
                     .map((col) => (
