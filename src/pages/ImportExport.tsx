@@ -253,14 +253,15 @@ export function ImportExport() {
       for (const field of mappedFields) {
         const csvHeader = columnMapping[field.key];
         const colIdx = csvHeaders.indexOf(csvHeader);
-        if (colIdx !== -1 && row[colIdx]) record[field.key] = row[colIdx];
+        if (colIdx !== -1 && row[colIdx] != null) record[field.key] = row[colIdx];
       }
-      if (!record.FullName) {
-        // Log the first few failures to debug
-        if (failed < 3) console.warn('Row missing FullName. Record keys:', Object.keys(record), 'FullName mapping:', columnMapping['FullName'], 'row:', row.slice(0, 5));
+      const fullName = (record.FullName || '').trim();
+      if (!fullName) {
+        if (failed < 3) console.warn('Row missing FullName. record:', JSON.stringify(record), 'raw row:', JSON.stringify(row));
         failed++;
         continue;
       }
+      record.FullName = fullName;
       const dbRow: Record<string, unknown> = { user_id: user.id };
       for (const [k, v] of Object.entries(record)) {
         if (fieldToCol[k]) dbRow[fieldToCol[k]] = v;
