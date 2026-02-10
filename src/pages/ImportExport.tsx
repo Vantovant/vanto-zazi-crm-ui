@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Upload,
   Download,
@@ -127,6 +128,7 @@ const importTemplates = [
 export function ImportExport() {
   const { dbActive, refetchContacts } = useCrm();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'import' | 'export'>('import');
   const [dragActive, setDragActive] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -139,6 +141,7 @@ export function ImportExport() {
   const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
   const [headerError, setHeaderError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
   const [importResult, setImportResult] = useState<{ success: number; failed: number }>({ success: 0, failed: 0 });
 
   const processFile = useCallback(async (file: File) => {
@@ -215,11 +218,13 @@ export function ImportExport() {
     setHeaderError(null);
     setImporting(false);
     setImportResult({ success: 0, failed: 0 });
+    setImportProgress(0);
   };
 
   const runImport = async () => {
     if (!user) return;
     setImporting(true);
+    setImportProgress(0);
     let success = 0;
     let failed = 0;
     const mappedFields = CRM_FIELDS.filter(f => columnMapping[f.key]);
@@ -263,6 +268,9 @@ export function ImportExport() {
       } else {
         success += data.length;
       }
+      setImportProgress(Math.min(i + BATCH, allRows.length));
+      // Yield to UI thread
+      await new Promise(r => setTimeout(r, 50));
     }
 
     setImportResult({ success, failed });
@@ -567,7 +575,9 @@ export function ImportExport() {
                             : 'bg-slate-700 text-slate-500 cursor-not-allowed'
                         }`}
                       >
-                        {importing ? `Importing... (${csvRows.length} records)` : `Import ${csvRows.length} Record${csvRows.length !== 1 ? 's' : ''}`}
+                        {importing
+                          ? `Importing… ${importProgress} / ${csvRows.length}`
+                          : `Import ${csvRows.length} Record${csvRows.length !== 1 ? 's' : ''}`}
                       </button>
                     </div>
                   </div>
@@ -599,7 +609,7 @@ export function ImportExport() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => window.location.href = '/contacts'}
+                      onClick={() => navigate('/contacts')}
                       className="px-4 py-2.5 bg-teal-600 hover:bg-teal-500 text-white text-sm font-medium rounded-lg transition-colors"
                     >
                       View Contacts
