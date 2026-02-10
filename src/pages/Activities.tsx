@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { timelineActivities, activityFilterOptions, prospects, type TimelineActivity } from '../data/mockData';
 import { ContactDrawer } from '../components/ContactDrawer';
+import { LogActivityModal } from '../components/LogActivityModal';
 
 const activityIcons: Record<string, typeof Phone> = {
   whatsapp: MessageCircle,
@@ -55,6 +56,7 @@ export function Activities() {
   const [openFilter, setOpenFilter] = useState<FilterKey | null>(null);
   const [dateRange, setDateRange] = useState({ from: '', to: '' });
   const [selectedContactId, setSelectedContactId] = useState<number | null>(null);
+  const [showLogActivity, setShowLogActivity] = useState(false);
 
   // Get unique contacts from activities
   const uniqueContacts = useMemo(() => {
@@ -133,6 +135,7 @@ export function Activities() {
         </div>
         <button
           type="button"
+          onClick={() => setShowLogActivity(true)}
           className="flex items-center gap-2 px-4 py-2.5 bg-teal-600 hover:bg-teal-500 text-white text-sm font-medium rounded-lg transition-colors"
         >
           <Plus className="w-4 h-4" />
@@ -377,6 +380,10 @@ export function Activities() {
           className="fixed inset-0 z-10"
           onClick={() => setOpenFilter(null)}
         />
+      )}
+
+      {showLogActivity && (
+        <LogActivityModal onClose={() => setShowLogActivity(false)} />
       )}
     </div>
   );

@@ -13,7 +13,8 @@ import {
   Clock,
 } from 'lucide-react';
 import { whatsappConversations, type WhatsAppConversation } from '../data/mockData';
-
+import { LogActivityModal } from '../components/LogActivityModal';
+import { AddFollowUpModal } from '../components/AddFollowUpModal';
 const temperatureColors: Record<string, string> = {
   Hot: 'bg-rose-500',
   Warm: 'bg-amber-500',
@@ -39,7 +40,8 @@ export function WhatsApp() {
     conversationsWithFollowUp[0]
   );
   const [messageInput, setMessageInput] = useState('');
-
+  const [showLogActivity, setShowLogActivity] = useState(false);
+  const [showFollowUp, setShowFollowUp] = useState(false);
   const filteredConversations = useMemo(() => {
     if (!searchQuery) return conversationsWithFollowUp;
     const query = searchQuery.toLowerCase();
@@ -188,6 +190,7 @@ export function WhatsApp() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
+                  onClick={() => setShowLogActivity(true)}
                   className="flex items-center gap-2 px-3 py-2 text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition-colors"
                 >
                   <ClipboardList className="w-4 h-4" />
@@ -195,6 +198,7 @@ export function WhatsApp() {
                 </button>
                 <button
                   type="button"
+                  onClick={() => setShowFollowUp(true)}
                   className="flex items-center gap-2 px-3 py-2 text-sm font-medium bg-amber-600/20 hover:bg-amber-600/30 text-amber-400 border border-amber-500/30 rounded-lg transition-colors"
                 >
                   <Bell className="w-4 h-4" />
@@ -291,6 +295,19 @@ export function WhatsApp() {
             <p className="text-slate-400">Select a conversation to start chatting</p>
           </div>
         </div>
+      )}
+
+      {showLogActivity && (
+        <LogActivityModal
+          onClose={() => setShowLogActivity(false)}
+          prefillContactName={selectedConversation?.contactName}
+        />
+      )}
+      {showFollowUp && (
+        <AddFollowUpModal
+          onClose={() => setShowFollowUp(false)}
+          prefillContactName={selectedConversation?.contactName}
+        />
       )}
     </div>
   );
