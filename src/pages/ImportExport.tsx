@@ -11,7 +11,6 @@ import {
   X,
   FileText,
   Calendar,
-  Copy,
   ChevronDown,
 } from 'lucide-react';
 import { DataStatusBanner } from '../components/DataStatusBanner';
@@ -131,7 +130,7 @@ export function ImportExport() {
   const [importStep, setImportStep] = useState<ImportStep>('upload');
   const [selectedExports, setSelectedExports] = useState<Set<string>>(new Set());
   const [exportFormat, setExportFormat] = useState<'csv' | 'xlsx'>('csv');
-  const [showDuplicates, setShowDuplicates] = useState(false);
+  
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const [csvRows, setCsvRows] = useState<string[][]>([]);
   const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
@@ -411,158 +410,76 @@ export function ImportExport() {
               {/* Preview Step */}
               {importStep === 'preview' && (
                 <div className="p-6">
-                  {/* Warning Banners */}
+                  {/* Warning Banner */}
                   <div className="space-y-3 mb-6">
                     <div className="flex items-center gap-3 p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg">
                       <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0" />
                       <div>
                         <p className="text-sm font-medium text-amber-400">Preview Mode</p>
-                        <p className="text-xs text-amber-400/70">Review the data before importing. This action cannot be undone.</p>
+                        <p className="text-xs text-amber-400/70">Review your data before importing. This action cannot be undone.</p>
                       </div>
                     </div>
-
-                    {/* Duplicate Warning */}
-                    <div className="flex items-start gap-3 p-4 bg-orange-500/10 border border-orange-500/20 rounded-lg">
-                      <Copy className="w-5 h-5 text-orange-400 flex-shrink-0 mt-0.5" />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-orange-400">2 Potential Duplicates Detected</p>
-                        <p className="text-xs text-orange-400/70 mt-1">
-                          Matches found based on <span className="font-medium">Email Address</span> or <span className="font-medium">Phone Number</span>.
-                          You can proceed with import, but duplicate records may be created.
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => setShowDuplicates(!showDuplicates)}
-                          className="mt-2 text-xs font-medium text-orange-400 hover:text-orange-300 flex items-center gap-1"
-                        >
-                          {showDuplicates ? 'Hide' : 'Review'} Duplicates
-                          <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showDuplicates ? 'rotate-180' : ''}`} />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Duplicate Details Panel */}
-                    {showDuplicates && (
-                      <div className="bg-slate-800 rounded-lg border border-orange-500/20 overflow-hidden">
-                        <div className="px-4 py-3 bg-orange-500/5 border-b border-orange-500/20">
-                          <p className="text-xs font-semibold text-orange-400 uppercase tracking-wider">Duplicate Review</p>
-                        </div>
-                        <div className="divide-y divide-slate-700">
-                          {/* Duplicate 1 */}
-                          <div className="p-4">
-                            <div className="flex items-start justify-between">
-                              <div>
-                                <p className="text-sm font-medium text-white">Sarah Johnson</p>
-                                <p className="text-xs text-slate-400 mt-1">From import file (Row 4)</p>
-                              </div>
-                              <span className="text-xs px-2 py-0.5 bg-orange-500/20 text-orange-400 rounded-full">Duplicate</span>
-                            </div>
-                            <div className="mt-3 p-3 bg-slate-900 rounded-lg">
-                              <p className="text-xs text-slate-500 mb-2">Matches existing contact:</p>
-                              <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-white text-xs font-medium">SN</div>
-                                <div>
-                                  <p className="text-sm text-slate-300">Sarah Nkosi</p>
-                                  <p className="text-xs text-slate-500">Matched on: <span className="text-orange-400">+27 82 345 6789</span> (Phone)</p>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                          {/* Duplicate 2 */}
-                          <div className="p-4">
-                            <div className="flex items-start justify-between">
-                              <div>
-                                <p className="text-sm font-medium text-white">Mike Williams</p>
-                                <p className="text-xs text-slate-400 mt-1">From import file (Row 7)</p>
-                              </div>
-                              <span className="text-xs px-2 py-0.5 bg-orange-500/20 text-orange-400 rounded-full">Duplicate</span>
-                            </div>
-                            <div className="mt-3 p-3 bg-slate-900 rounded-lg">
-                              <p className="text-xs text-slate-500 mb-2">Matches existing contact:</p>
-                              <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-white text-xs font-medium">MZ</div>
-                                <div>
-                                  <p className="text-sm text-slate-300">Mandla Zulu</p>
-                                  <p className="text-xs text-slate-500">Matched on: <span className="text-orange-400">mandla.zulu@icloud.com</span> (Email)</p>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="px-4 py-3 bg-slate-900 border-t border-slate-700">
-                          <p className="text-xs text-slate-500">
-                            <span className="text-orange-400 font-medium">Note:</span> Proceeding will create new records. Duplicate merging will be available in a future update.
-                          </p>
-                        </div>
-                      </div>
-                    )}
                   </div>
 
-                  {/* Data Preview Table */}
-                  <div className="bg-slate-900 rounded-lg border border-slate-700 overflow-hidden mb-6">
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="bg-slate-800">
-                            <th className="text-left px-4 py-3 text-xs font-semibold text-slate-400">Name</th>
-                            <th className="text-left px-4 py-3 text-xs font-semibold text-slate-400">Phone</th>
-                            <th className="text-left px-4 py-3 text-xs font-semibold text-slate-400">Email</th>
-                            <th className="text-left px-4 py-3 text-xs font-semibold text-slate-400">Status</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-700">
-                          <tr>
-                            <td className="px-4 py-3 text-sm text-slate-300">John Smith</td>
-                            <td className="px-4 py-3 text-sm text-slate-400">+27 81 234 5678</td>
-                            <td className="px-4 py-3 text-sm text-slate-400">john@example.com</td>
-                            <td className="px-4 py-3"><span className="text-xs px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full">Valid</span></td>
-                          </tr>
-                          <tr>
-                            <td className="px-4 py-3 text-sm text-slate-300">Jane Doe</td>
-                            <td className="px-4 py-3 text-sm text-slate-400">+27 82 345 6789</td>
-                            <td className="px-4 py-3 text-sm text-slate-400">jane@example.com</td>
-                            <td className="px-4 py-3"><span className="text-xs px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full">Valid</span></td>
-                          </tr>
-                          <tr className="bg-orange-500/5">
-                            <td className="px-4 py-3 text-sm text-slate-300">
-                              <div className="flex items-center gap-2">
-                                Sarah Johnson
-                                <Copy className="w-3.5 h-3.5 text-orange-400" />
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 text-sm text-orange-400">+27 82 345 6789</td>
-                            <td className="px-4 py-3 text-sm text-slate-400">sarah.j@example.com</td>
-                            <td className="px-4 py-3"><span className="text-xs px-2 py-0.5 bg-orange-500/20 text-orange-400 rounded-full">Duplicate</span></td>
-                          </tr>
-                          <tr>
-                            <td className="px-4 py-3 text-sm text-slate-300">Bob Wilson</td>
-                            <td className="px-4 py-3 text-sm text-rose-400">Invalid phone</td>
-                            <td className="px-4 py-3 text-sm text-slate-400">bob@example.com</td>
-                            <td className="px-4 py-3"><span className="text-xs px-2 py-0.5 bg-rose-500/20 text-rose-400 rounded-full">Error</span></td>
-                          </tr>
-                          <tr className="bg-orange-500/5">
-                            <td className="px-4 py-3 text-sm text-slate-300">
-                              <div className="flex items-center gap-2">
-                                Mike Williams
-                                <Copy className="w-3.5 h-3.5 text-orange-400" />
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 text-sm text-slate-400">+27 86 111 2222</td>
-                            <td className="px-4 py-3 text-sm text-orange-400">mandla.zulu@icloud.com</td>
-                            <td className="px-4 py-3"><span className="text-xs px-2 py-0.5 bg-orange-500/20 text-orange-400 rounded-full">Duplicate</span></td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
+                  {/* Data Preview Table — built from real CSV rows */}
+                  {(() => {
+                    // Determine which CRM fields are mapped so we can build columns
+                    const mappedFields = CRM_FIELDS.filter(f => columnMapping[f.key]);
+                    // For each CSV row, resolve mapped values
+                    const previewRows = csvRows.map((row) => {
+                      const record: Record<string, string> = {};
+                      for (const field of mappedFields) {
+                        const csvHeader = columnMapping[field.key];
+                        const colIdx = csvHeaders.indexOf(csvHeader);
+                        record[field.key] = colIdx !== -1 ? (row[colIdx] ?? '') : '';
+                      }
+                      return record;
+                    });
+
+                    if (previewRows.length === 0) {
+                      return (
+                        <div className="flex items-center gap-3 p-4 mb-6 bg-rose-500/10 border border-rose-500/20 rounded-lg">
+                          <AlertCircle className="w-5 h-5 text-rose-400 flex-shrink-0" />
+                          <p className="text-sm text-rose-400">No data rows found in the uploaded file. Please check your CSV and try again.</p>
+                        </div>
+                      );
+                    }
+
+                    // Show at most the first 4 mapped columns in the table to keep it readable
+                    const displayFields = mappedFields.slice(0, 4);
+
+                    return (
+                      <div className="bg-slate-900 rounded-lg border border-slate-700 overflow-hidden mb-6">
+                        <div className="overflow-x-auto">
+                          <table className="w-full">
+                            <thead>
+                              <tr className="bg-slate-800">
+                                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-400">#</th>
+                                {displayFields.map(f => (
+                                  <th key={f.key} className="text-left px-4 py-3 text-xs font-semibold text-slate-400">{f.label}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-700">
+                              {previewRows.map((record, idx) => (
+                                <tr key={idx}>
+                                  <td className="px-4 py-3 text-xs text-slate-500">{idx + 1}</td>
+                                  {displayFields.map(f => (
+                                    <td key={f.key} className="px-4 py-3 text-sm text-slate-300">{record[f.key] || '—'}</td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Summary and Actions */}
                   <div className="flex items-center justify-between">
                     <p className="text-sm text-slate-400">
-                      <span className="text-emerald-400 font-medium">2 valid</span> ·
-                      <span className="text-orange-400 font-medium ml-1">2 duplicates</span> ·
-                      <span className="text-rose-400 font-medium ml-1">1 error</span> ·
-                      <span className="ml-1">5 total rows</span>
+                      <span className="text-emerald-400 font-medium">{csvRows.length} row{csvRows.length !== 1 ? 's' : ''}</span> ready to import
                     </p>
                     <div className="flex gap-3">
                       <button
@@ -582,9 +499,14 @@ export function ImportExport() {
                       <button
                         type="button"
                         onClick={() => setImportStep('complete')}
-                        className="px-4 py-2.5 bg-teal-600 hover:bg-teal-500 text-white text-sm font-medium rounded-lg transition-colors"
+                        disabled={csvRows.length === 0}
+                        className={`px-4 py-2.5 text-sm font-medium rounded-lg transition-colors ${
+                          csvRows.length > 0
+                            ? 'bg-teal-600 hover:bg-teal-500 text-white'
+                            : 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                        }`}
                       >
-                        Import 4 Records (incl. duplicates)
+                        Import {csvRows.length} Record{csvRows.length !== 1 ? 's' : ''}
                       </button>
                     </div>
                   </div>
