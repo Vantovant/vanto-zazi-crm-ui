@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import {
   Upload,
   Download,
@@ -16,8 +16,93 @@ import {
 } from 'lucide-react';
 import { DataStatusBanner } from '../components/DataStatusBanner';
 import { useCrm } from '@/contexts/CrmContext';
+import { prospectColumns } from '@/data/mockData';
 
 type ImportStep = 'upload' | 'mapping' | 'preview' | 'complete';
+
+// All CRM fields available for mapping
+const CRM_FIELDS = prospectColumns.map(col => ({ key: col.key, label: col.label }));
+
+// Normalize a string for fuzzy matching (lowercase, strip spaces/underscores/hyphens)
+function normalize(s: string): string {
+  return s.toLowerCase().replace(/[\s_\-\.]/g, '');
+}
+
+// Try to auto-map a CSV header to a CRM field key
+function autoMapHeader(header: string): string {
+  const norm = normalize(header);
+  for (const field of CRM_FIELDS) {
+    if (normalize(field.key) === norm || normalize(field.label) === norm) {
+      return field.key;
+    }
+  }
+  // Common aliases
+  const aliases: Record<string, string> = {
+    name: 'FullName', fullname: 'FullName',
+    phone: 'PhoneNumber', phonenumber: 'PhoneNumber', mobile: 'PhoneNumber',
+    email: 'EmailAddress', emailaddress: 'EmailAddress',
+    date: 'DateCaptured', datecaptured: 'DateCaptured',
+    temperature: 'LeadTemperature', leadtemperature: 'LeadTemperature', leadtemp: 'LeadTemperature',
+    commstatus: 'CommunicationStatus', communicationstatus: 'CommunicationStatus',
+    regstatus: 'RegistrationStatus', registrationstatus: 'RegistrationStatus',
+    leadtype: 'LeadType', type: 'LeadType',
+    interest: 'InterestLevel', interestlevel: 'InterestLevel',
+    focusarea: 'FocusArea', focus: 'FocusArea',
+    leadpath: 'LeadPath', path: 'LeadPath',
+    sponsor: 'SponsorName', sponsorname: 'SponsorName',
+    assignedto: 'AssignedTo', assigned: 'AssignedTo',
+    actiontaken: 'ActionTaken', action: 'ActionTaken',
+    nextaction: 'NextAction',
+    meetingtime: 'MeetingTime', meeting: 'MeetingTime',
+    aplgoid: 'APLGoID', aplid: 'APLGoID',
+    associatestatus: 'AssociateStatus', assocstatus: 'AssociateStatus',
+    additionalnotes: 'AdditionalNotes', notes: 'AdditionalNotes',
+    city: 'City',
+    province: 'Province',
+    state: 'State',
+    country: 'Country',
+  };
+  return aliases[norm] || '';
+}
+
+// Simple CSV line parser (handles quoted fields)
+function parseCSVLine(line: string): string[] {
+  const result: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuotes) {
+      if (ch === '"' && line[i + 1] === '"') { current += '"'; i++; }
+      else if (ch === '"') { inQuotes = false; }
+      else { current += ch; }
+    } else {
+      if (ch === '"') { inQuotes = true; }
+      else if (ch === ',') { result.push(current.trim()); current = ''; }
+      else { current += ch; }
+    }
+  }
+  result.push(current.trim());
+  return result;
+}
+
+function parseCSV(text: string): { headers: string[]; rows: string[][] } {
+  const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
+  if (lines.length === 0) return { headers: [], rows: [] };
+  const headers = parseCSVLine(lines[0]);
+  const rows = lines.slice(1).map(parseCSVLine);
+  return { headers, rows };
+}
+
+// Detect if first row looks like headers (non-numeric, non-empty labels)
+function looksLikeHeaders(row: string[]): boolean {
+  if (row.length === 0) return false;
+  const nonEmpty = row.filter(c => c.trim() !== '');
+  if (nonEmpty.length === 0) return false;
+  // If most cells are non-numeric short strings, likely headers
+  const textLike = nonEmpty.filter(c => c.length < 50 && Number.isNaN(Number(c)));
+  return textLike.length / nonEmpty.length > 0.5;
+}
 
 interface ExportOption {
   id: string;
@@ -47,6 +132,40 @@ export function ImportExport() {
   const [selectedExports, setSelectedExports] = useState<Set<string>>(new Set());
   const [exportFormat, setExportFormat] = useState<'csv' | 'xlsx'>('csv');
   const [showDuplicates, setShowDuplicates] = useState(false);
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
+  const [csvRows, setCsvRows] = useState<string[][]>([]);
+  const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
+  const [headerError, setHeaderError] = useState<string | null>(null);
+
+  const processFile = useCallback(async (file: File) => {
+    setUploadedFile(file);
+    setHeaderError(null);
+    try {
+      const text = await file.text();
+      const { headers, rows } = parseCSV(text);
+      if (headers.length === 0 || !looksLikeHeaders(headers)) {
+        setHeaderError('CSV must include a header row. Please use the provided template.');
+        setCsvHeaders([]);
+        setCsvRows([]);
+        setColumnMapping({});
+        return;
+      }
+      setCsvHeaders(headers);
+      setCsvRows(rows);
+      // Auto-map headers to CRM fields
+      const mapping: Record<string, string> = {};
+      for (const crmField of CRM_FIELDS) {
+        const matchIdx = headers.findIndex(h => autoMapHeader(h) === crmField.key);
+        if (matchIdx !== -1) {
+          mapping[crmField.key] = headers[matchIdx];
+        }
+      }
+      setColumnMapping(mapping);
+      setImportStep('mapping');
+    } catch {
+      setHeaderError('Could not read the file. Please upload a valid CSV.');
+    }
+  }, []);
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -63,15 +182,13 @@ export function ImportExport() {
     e.stopPropagation();
     setDragActive(false);
     if (e.dataTransfer.files?.[0]) {
-      setUploadedFile(e.dataTransfer.files[0]);
-      setImportStep('mapping');
+      processFile(e.dataTransfer.files[0]);
     }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.[0]) {
-      setUploadedFile(e.target.files[0]);
-      setImportStep('mapping');
+      processFile(e.target.files[0]);
     }
   };
 
@@ -88,7 +205,17 @@ export function ImportExport() {
   const resetImport = () => {
     setUploadedFile(null);
     setImportStep('upload');
+    setCsvHeaders([]);
+    setCsvRows([]);
+    setColumnMapping({});
+    setHeaderError(null);
   };
+
+  const updateMapping = (crmFieldKey: string, csvHeader: string) => {
+    setColumnMapping(prev => ({ ...prev, [crmFieldKey]: csvHeader }));
+  };
+
+  const mappedCount = Object.values(columnMapping).filter(v => v !== '').length;
 
   return (
     <div className="space-y-6">
@@ -163,6 +290,12 @@ export function ImportExport() {
               {/* Upload Step */}
               {importStep === 'upload' && (
                 <div className="p-6">
+                  {headerError && (
+                    <div className="flex items-center gap-3 p-4 mb-4 bg-rose-500/10 border border-rose-500/20 rounded-lg">
+                      <AlertCircle className="w-5 h-5 text-rose-400 flex-shrink-0" />
+                      <p className="text-sm text-rose-400">{headerError}</p>
+                    </div>
+                  )}
                   <div
                     onDragEnter={handleDrag}
                     onDragLeave={handleDrag}
@@ -181,14 +314,14 @@ export function ImportExport() {
                       Drop your file here
                     </h3>
                     <p className="text-sm text-slate-400 mb-4">
-                      Supports CSV and Excel files (.csv, .xlsx)
+                      Supports CSV files (.csv) — first row must be headers
                     </p>
                     <label className="inline-flex items-center gap-2 px-4 py-2.5 bg-teal-600 hover:bg-teal-500 text-white text-sm font-medium rounded-lg cursor-pointer transition-colors">
                       <Upload className="w-4 h-4" />
                       Browse Files
                       <input
                         type="file"
-                        accept=".csv,.xlsx,.xls"
+                        accept=".csv"
                         onChange={handleFileSelect}
                         className="hidden"
                       />
@@ -207,7 +340,9 @@ export function ImportExport() {
                       </div>
                       <div>
                         <p className="text-sm font-medium text-white">{uploadedFile.name}</p>
-                        <p className="text-xs text-slate-400">{(uploadedFile.size / 1024).toFixed(1)} KB</p>
+                        <p className="text-xs text-slate-400">
+                          {(uploadedFile.size / 1024).toFixed(1)} KB · {csvHeaders.length} columns · {csvRows.length} rows
+                        </p>
                       </div>
                     </div>
                     <button
@@ -219,23 +354,32 @@ export function ImportExport() {
                     </button>
                   </div>
 
-                  <h4 className="text-sm font-semibold text-white mb-4">Map Your Columns</h4>
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-sm font-semibold text-white">Map Your Columns</h4>
+                    <span className="text-xs text-slate-500">{mappedCount} of {CRM_FIELDS.length} fields mapped</span>
+                  </div>
 
-                  <div className="space-y-3">
-                    {['Full Name', 'Phone Number', 'Email', 'City', 'Lead Temperature', 'Focus Area'].map((field) => (
-                      <div key={field} className="flex items-center gap-4">
-                        <div className="w-40">
-                          <p className="text-sm text-slate-300">{field}</p>
+                  <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
+                    {CRM_FIELDS.map((field) => (
+                      <div key={field.key} className="flex items-center gap-4">
+                        <div className="w-44 flex-shrink-0">
+                          <p className="text-sm text-slate-300">{field.label}</p>
                         </div>
                         <div className="flex-1">
-                          <select className="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-700 rounded-lg text-slate-300 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500">
-                            <option value="">Select column...</option>
-                            <option value="col_a">Column A</option>
-                            <option value="col_b">Column B</option>
-                            <option value="col_c">Column C</option>
-                            <option value="col_d">Column D</option>
+                          <select
+                            value={columnMapping[field.key] || ''}
+                            onChange={(e) => updateMapping(field.key, e.target.value)}
+                            className="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-700 rounded-lg text-slate-300 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500"
+                          >
+                            <option value="">— Skip —</option>
+                            {csvHeaders.map((header) => (
+                              <option key={header} value={header}>{header}</option>
+                            ))}
                           </select>
                         </div>
+                        {columnMapping[field.key] && (
+                          <CheckCircle className="w-4 h-4 text-teal-400 flex-shrink-0" />
+                        )}
                       </div>
                     ))}
                   </div>
@@ -251,7 +395,12 @@ export function ImportExport() {
                     <button
                       type="button"
                       onClick={() => setImportStep('preview')}
-                      className="px-4 py-2.5 bg-teal-600 hover:bg-teal-500 text-white text-sm font-medium rounded-lg transition-colors"
+                      disabled={!columnMapping['FullName']}
+                      className={`px-4 py-2.5 text-sm font-medium rounded-lg transition-colors ${
+                        columnMapping['FullName']
+                          ? 'bg-teal-600 hover:bg-teal-500 text-white'
+                          : 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                      }`}
                     >
                       Continue to Preview
                     </button>
