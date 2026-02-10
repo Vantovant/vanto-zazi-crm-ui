@@ -9,6 +9,7 @@ import {
 import { orderFilterOptions, type Order } from '../data/mockData';
 import { DataStatusBanner } from '../components/DataStatusBanner';
 import { useCrm } from '@/contexts/CrmContext';
+import { AddOrderModal } from '@/components/AddOrderModal';
 
 const statusColors: Record<string, string> = {
   Pending: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
@@ -36,6 +37,7 @@ export function Orders() {
   const [openFilter, setOpenFilter] = useState<FilterKey | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [dateRange, setDateRange] = useState({ from: '', to: '' });
+  const [showAddOrder, setShowAddOrder] = useState(false);
 
   const uniqueContacts = useMemo(() => {
     return [...new Set(orders.map(o => o.contactName))];
@@ -90,6 +92,7 @@ export function Orders() {
         </div>
         <button
           type="button"
+          onClick={() => setShowAddOrder(true)}
           className="flex items-center gap-2 px-4 py-2.5 bg-teal-600 hover:bg-teal-500 text-white text-sm font-medium rounded-lg transition-colors"
         >
           <ShoppingCart className="w-4 h-4" />
@@ -383,6 +386,10 @@ export function Orders() {
           className="fixed inset-0 z-10"
           onClick={() => setOpenFilter(null)}
         />
+      )}
+
+      {showAddOrder && (
+        <AddOrderModal onClose={() => setShowAddOrder(false)} />
       )}
     </div>
   );
