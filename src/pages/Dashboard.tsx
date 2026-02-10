@@ -12,14 +12,31 @@ import {
   AlertCircle,
   ChevronRight,
 } from 'lucide-react';
-import { dashboardStats, todaysFocus, recentActivities, prospects } from '../data/mockData';
+import { todaysFocus, recentActivities } from '../data/mockData';
+import { DataStatusBanner } from '../components/DataStatusBanner';
+import { useCrm } from '@/contexts/CrmContext';
 
-const kpiCards = [
-  { label: 'Total Prospects', value: dashboardStats.totalProspects, icon: Users, color: 'bg-slate-600' },
-  { label: 'Hot Leads', value: dashboardStats.hotLeads, icon: Flame, color: 'bg-rose-500' },
-  { label: 'Warm Leads', value: dashboardStats.warmLeads, icon: Thermometer, color: 'bg-amber-500' },
-  { label: 'Cold Leads', value: dashboardStats.coldLeads, icon: Snowflake, color: 'bg-sky-500' },
-  { label: 'Registered', value: dashboardStats.registered, icon: UserCheck, color: 'bg-emerald-500' },
+function useDashboardStats() {
+  const { contacts: prospects, dbActive } = useCrm();
+  return {
+    dbActive,
+    stats: {
+      totalProspects: prospects.length,
+      hotLeads: prospects.filter(p => p.LeadTemperature === 'Hot').length,
+      warmLeads: prospects.filter(p => p.LeadTemperature === 'Warm').length,
+      coldLeads: prospects.filter(p => p.LeadTemperature === 'Cold').length,
+      registered: prospects.filter(p => p.RegistrationStatus === 'Registered' || p.RegistrationStatus === 'Activated').length,
+    },
+    recentProspects: prospects.slice(0, 5),
+  };
+}
+
+const kpiCardsMeta = [
+  { label: 'Total Prospects', key: 'totalProspects' as const, icon: Users, color: 'bg-slate-600' },
+  { label: 'Hot Leads', key: 'hotLeads' as const, icon: Flame, color: 'bg-rose-500' },
+  { label: 'Warm Leads', key: 'warmLeads' as const, icon: Thermometer, color: 'bg-amber-500' },
+  { label: 'Cold Leads', key: 'coldLeads' as const, icon: Snowflake, color: 'bg-sky-500' },
+  { label: 'Registered', key: 'registered' as const, icon: UserCheck, color: 'bg-emerald-500' },
 ];
 
 const activityIcons: Record<string, typeof Phone> = {
@@ -43,15 +60,18 @@ const temperatureColors: Record<string, string> = {
 };
 
 export function Dashboard() {
-  const recentProspects = prospects.slice(0, 5);
+  const { dbActive, stats, recentProspects } = useDashboardStats();
 
   return (
     <div className="space-y-6">
+      {/* Data Status Banner */}
+      <DataStatusBanner dbActive={dbActive} />
+
       {/* Page header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-white">Dashboard</h1>
-          <p className="text-sm text-slate-400 mt-0.5">Welcome back, Alex. Here's your daily overview.</p>
+          <p className="text-sm text-slate-400 mt-0.5">Welcome back. Here's your daily overview.</p>
         </div>
         <div className="text-sm text-slate-400">
           {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
@@ -60,7 +80,7 @@ export function Dashboard() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        {kpiCards.map((kpi) => (
+        {kpiCardsMeta.map((kpi) => (
           <div
             key={kpi.label}
             className="bg-slate-800/50 rounded-xl border border-slate-700 p-4 hover:bg-slate-800 transition-colors"
@@ -70,7 +90,7 @@ export function Dashboard() {
                 <kpi.icon className="w-4 h-4 text-white" />
               </div>
             </div>
-            <p className="text-2xl font-bold text-white">{kpi.value}</p>
+            <p className="text-2xl font-bold text-white">{stats[kpi.key]}</p>
             <p className="text-xs font-medium text-slate-400 mt-1">{kpi.label}</p>
           </div>
         ))}

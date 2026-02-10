@@ -6,7 +6,9 @@ import {
   X,
   Calendar,
 } from 'lucide-react';
-import { orders, orderFilterOptions, type Order } from '../data/mockData';
+import { orderFilterOptions, type Order } from '../data/mockData';
+import { DataStatusBanner } from '../components/DataStatusBanner';
+import { useCrm } from '@/contexts/CrmContext';
 
 const statusColors: Record<string, string> = {
   Pending: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
@@ -24,6 +26,7 @@ const badgeColors: Record<string, string> = {
 type FilterKey = 'status' | 'product' | 'contact';
 
 export function Orders() {
+  const { orders, ordersLoading, ordersDbActive } = useCrm();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilters, setActiveFilters] = useState<Record<FilterKey, string>>({
     status: '',
@@ -34,10 +37,9 @@ export function Orders() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [dateRange, setDateRange] = useState({ from: '', to: '' });
 
-  // Get unique contacts from orders
   const uniqueContacts = useMemo(() => {
     return [...new Set(orders.map(o => o.contactName))];
-  }, []);
+  }, [orders]);
 
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
@@ -75,12 +77,15 @@ export function Orders() {
 
   return (
     <div className="space-y-5">
+      {/* Data Status Banner */}
+      <DataStatusBanner dbActive={ordersDbActive} />
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-white">Orders</h1>
           <p className="text-sm text-slate-400 mt-0.5">
-            {filteredOrders.length} orders · R{totalRevenue.toLocaleString()} total
+            {ordersLoading ? 'Loading...' : `${filteredOrders.length} orders · R${totalRevenue.toLocaleString()} total`}
           </p>
         </div>
         <button

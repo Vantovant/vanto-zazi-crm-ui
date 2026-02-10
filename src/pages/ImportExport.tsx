@@ -14,6 +14,8 @@ import {
   Copy,
   ChevronDown,
 } from 'lucide-react';
+import { DataStatusBanner } from '../components/DataStatusBanner';
+import { useCrm } from '@/contexts/CrmContext';
 
 type ImportStep = 'upload' | 'mapping' | 'preview' | 'complete';
 
@@ -37,6 +39,7 @@ const importTemplates = [
 ];
 
 export function ImportExport() {
+  const { dbActive } = useCrm();
   const [activeTab, setActiveTab] = useState<'import' | 'export'>('import');
   const [dragActive, setDragActive] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -89,6 +92,9 @@ export function ImportExport() {
 
   return (
     <div className="space-y-6">
+      {/* Data Status Banner */}
+      <DataStatusBanner dbActive={dbActive} />
+
       {/* Header */}
       <div>
         <h1 className="text-2xl font-semibold text-white">Import / Export</h1>

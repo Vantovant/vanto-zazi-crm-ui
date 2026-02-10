@@ -14,6 +14,152 @@ export type Database = {
   }
   public: {
     Tables: {
+      contacts: {
+        Row: {
+          action_taken: string
+          additional_notes: string
+          aplgo_id: string
+          assigned_to: string
+          associate_status: string
+          city: string
+          communication_status: string
+          country: string
+          created_at: string
+          date_captured: string
+          email_address: string
+          focus_area: string
+          full_name: string
+          id: string
+          interest_level: string
+          lead_path: string
+          lead_temperature: string
+          lead_type: string
+          meeting_time: string
+          next_action: string
+          phone_number: string
+          province: string
+          registration_status: string
+          sponsor_name: string
+          state: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          action_taken?: string
+          additional_notes?: string
+          aplgo_id?: string
+          assigned_to?: string
+          associate_status?: string
+          city?: string
+          communication_status?: string
+          country?: string
+          created_at?: string
+          date_captured?: string
+          email_address?: string
+          focus_area?: string
+          full_name: string
+          id?: string
+          interest_level?: string
+          lead_path?: string
+          lead_temperature?: string
+          lead_type?: string
+          meeting_time?: string
+          next_action?: string
+          phone_number?: string
+          province?: string
+          registration_status?: string
+          sponsor_name?: string
+          state?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          action_taken?: string
+          additional_notes?: string
+          aplgo_id?: string
+          assigned_to?: string
+          associate_status?: string
+          city?: string
+          communication_status?: string
+          country?: string
+          created_at?: string
+          date_captured?: string
+          email_address?: string
+          focus_area?: string
+          full_name?: string
+          id?: string
+          interest_level?: string
+          lead_path?: string
+          lead_temperature?: string
+          lead_type?: string
+          meeting_time?: string
+          next_action?: string
+          phone_number?: string
+          province?: string
+          registration_status?: string
+          sponsor_name?: string
+          state?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      orders: {
+        Row: {
+          amount: number
+          badges: string[]
+          contact_id: string | null
+          contact_name: string
+          created_at: string
+          id: string
+          order_date: string
+          order_id: string
+          product: string
+          quantity: number
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          badges?: string[]
+          contact_id?: string | null
+          contact_name?: string
+          created_at?: string
+          id?: string
+          order_date?: string
+          order_id?: string
+          product?: string
+          quantity?: number
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          badges?: string[]
+          contact_id?: string | null
+          contact_name?: string
+          created_at?: string
+          id?: string
+          order_date?: string
+          order_id?: string
+          product?: string
+          quantity?: number
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
