@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import { DataStatusBanner } from '../components/DataStatusBanner';
 import { useCrm } from '@/contexts/CrmContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { prospectColumns } from '@/data/mockData';
 
 type ImportStep = 'upload' | 'mapping' | 'preview' | 'complete';
@@ -123,7 +125,8 @@ const importTemplates = [
 ];
 
 export function ImportExport() {
-  const { dbActive } = useCrm();
+  const { dbActive, refetchContacts } = useCrm();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'import' | 'export'>('import');
   const [dragActive, setDragActive] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -135,6 +138,8 @@ export function ImportExport() {
   const [csvRows, setCsvRows] = useState<string[][]>([]);
   const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
   const [headerError, setHeaderError] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{ success: number; failed: number }>({ success: 0, failed: 0 });
 
   const processFile = useCallback(async (file: File) => {
     setUploadedFile(file);
@@ -208,6 +213,62 @@ export function ImportExport() {
     setCsvRows([]);
     setColumnMapping({});
     setHeaderError(null);
+    setImporting(false);
+    setImportResult({ success: 0, failed: 0 });
+  };
+
+  const runImport = async () => {
+    if (!user) return;
+    setImporting(true);
+    let success = 0;
+    let failed = 0;
+    const mappedFields = CRM_FIELDS.filter(f => columnMapping[f.key]);
+
+    // Map CRM field keys to DB column names
+    const fieldToCol: Record<string, string> = {
+      FullName: 'full_name', PhoneNumber: 'phone_number', EmailAddress: 'email_address',
+      DateCaptured: 'date_captured', City: 'city', Province: 'province', State: 'state',
+      Country: 'country', LeadTemperature: 'lead_temperature', CommunicationStatus: 'communication_status',
+      RegistrationStatus: 'registration_status', LeadType: 'lead_type', InterestLevel: 'interest_level',
+      FocusArea: 'focus_area', LeadPath: 'lead_path', SponsorName: 'sponsor_name',
+      AssignedTo: 'assigned_to', ActionTaken: 'action_taken', NextAction: 'next_action',
+      MeetingTime: 'meeting_time', APLGoID: 'aplgo_id', AssociateStatus: 'associate_status',
+      AdditionalNotes: 'additional_notes',
+    };
+
+    // Build all insert rows
+    const allRows: Record<string, unknown>[] = [];
+    for (const row of csvRows) {
+      const record: Record<string, string> = {};
+      for (const field of mappedFields) {
+        const colIdx = csvHeaders.indexOf(columnMapping[field.key]);
+        if (colIdx !== -1 && row[colIdx]) record[field.key] = row[colIdx];
+      }
+      if (!record.FullName) { failed++; continue; }
+      const dbRow: Record<string, unknown> = { user_id: user.id };
+      for (const [k, v] of Object.entries(record)) {
+        if (fieldToCol[k]) dbRow[fieldToCol[k]] = v;
+      }
+      allRows.push(dbRow);
+    }
+
+    // Insert in batches of 50
+    const BATCH = 50;
+    for (let i = 0; i < allRows.length; i += BATCH) {
+      const batch = allRows.slice(i, i + BATCH);
+      const { data, error } = await supabase.from('contacts').insert(batch as any).select('id');
+      if (error) {
+        console.error('Batch insert error:', error);
+        failed += batch.length;
+      } else {
+        success += data.length;
+      }
+    }
+
+    setImportResult({ success, failed });
+    await refetchContacts();
+    setImporting(false);
+    setImportStep('complete');
   };
 
   const updateMapping = (crmFieldKey: string, csvHeader: string) => {
@@ -498,15 +559,15 @@ export function ImportExport() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => setImportStep('complete')}
-                        disabled={csvRows.length === 0}
+                        onClick={runImport}
+                        disabled={csvRows.length === 0 || importing}
                         className={`px-4 py-2.5 text-sm font-medium rounded-lg transition-colors ${
-                          csvRows.length > 0
+                          csvRows.length > 0 && !importing
                             ? 'bg-teal-600 hover:bg-teal-500 text-white'
                             : 'bg-slate-700 text-slate-500 cursor-not-allowed'
                         }`}
                       >
-                        Import {csvRows.length} Record{csvRows.length !== 1 ? 's' : ''}
+                        {importing ? `Importing... (${csvRows.length} records)` : `Import ${csvRows.length} Record${csvRows.length !== 1 ? 's' : ''}`}
                       </button>
                     </div>
                   </div>
@@ -520,8 +581,15 @@ export function ImportExport() {
                     <CheckCircle className="w-8 h-8 text-emerald-400" />
                   </div>
                   <h3 className="text-xl font-semibold text-white mb-2">Import Complete</h3>
-                  <p className="text-sm text-slate-400 mb-6">Successfully imported 2 contacts into your CRM.</p>
-                  <div className="flex justify-center gap-3">
+                  <p className="text-sm text-slate-400 mb-2">
+                    Successfully imported <span className="text-emerald-400 font-medium">{importResult.success}</span> contacts into your CRM.
+                  </p>
+                  {importResult.failed > 0 && (
+                    <p className="text-sm text-rose-400 mb-4">
+                      {importResult.failed} record{importResult.failed !== 1 ? 's' : ''} failed (missing Full Name or database error).
+                    </p>
+                  )}
+                  <div className="flex justify-center gap-3 mt-4">
                     <button
                       type="button"
                       onClick={resetImport}
@@ -531,6 +599,7 @@ export function ImportExport() {
                     </button>
                     <button
                       type="button"
+                      onClick={() => window.location.href = '/contacts'}
                       className="px-4 py-2.5 bg-teal-600 hover:bg-teal-500 text-white text-sm font-medium rounded-lg transition-colors"
                     >
                       View Contacts
