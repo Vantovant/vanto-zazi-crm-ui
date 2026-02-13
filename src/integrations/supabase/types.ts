@@ -14,6 +14,92 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_action_log: {
+        Row: {
+          auto_detected_success: boolean | null
+          contact_id: string | null
+          created_at: string
+          executed_action: string
+          final_success: boolean | null
+          id: string
+          manual_mark_success: boolean | null
+          pattern_source: string | null
+          recommended_action: string
+          success_score: number | null
+          success_source: string | null
+          user_id: string
+        }
+        Insert: {
+          auto_detected_success?: boolean | null
+          contact_id?: string | null
+          created_at?: string
+          executed_action?: string
+          final_success?: boolean | null
+          id?: string
+          manual_mark_success?: boolean | null
+          pattern_source?: string | null
+          recommended_action?: string
+          success_score?: number | null
+          success_source?: string | null
+          user_id: string
+        }
+        Update: {
+          auto_detected_success?: boolean | null
+          contact_id?: string | null
+          created_at?: string
+          executed_action?: string
+          final_success?: boolean | null
+          id?: string
+          manual_mark_success?: boolean | null
+          pattern_source?: string | null
+          recommended_action?: string
+          success_score?: number | null
+          success_source?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_action_log_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_team_patterns: {
+        Row: {
+          action_type: string
+          created_at: string
+          id: string
+          lifecycle_stage: string
+          sample_count: number | null
+          success_rate: number | null
+          timing_pattern: string | null
+          updated_at: string
+        }
+        Insert: {
+          action_type: string
+          created_at?: string
+          id?: string
+          lifecycle_stage: string
+          sample_count?: number | null
+          success_rate?: number | null
+          timing_pattern?: string | null
+          updated_at?: string
+        }
+        Update: {
+          action_type?: string
+          created_at?: string
+          id?: string
+          lifecycle_stage?: string
+          sample_count?: number | null
+          success_rate?: number | null
+          timing_pattern?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       contacts: {
         Row: {
           action_taken: string

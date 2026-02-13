@@ -1,1 +1,4 @@
 project_id = "urfyfuakgabieellbuce"
+
+[functions.zazi-copilot]
+verify_jwt = false

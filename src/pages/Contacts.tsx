@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import {
   Search,
   ChevronDown,
@@ -42,6 +43,7 @@ const leadTypeColors: Record<string, string> = {
 };
 
 export function Contacts() {
+  const outletContext = useOutletContext<{ setSelectedContactId?: (id: string | null) => void }>();
   const [searchQuery, setSearchQuery] = useState('');
   const [visibleColumns, setVisibleColumns] = useState<Set<string>>(
     new Set(prospectColumns.filter((c) => c.default).map((c) => c.key))
@@ -60,6 +62,11 @@ export function Contacts() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
+
+  // Notify layout of selected contact for ZAZI copilot
+  useEffect(() => {
+    outletContext?.setSelectedContactId?.(selectedProspect ? String(selectedProspect.id) : null);
+  }, [selectedProspect, outletContext]);
 
   const toggleSelect = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
