@@ -10,11 +10,10 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { action, message, route, contactData, contactId } = await req.json();
+    const { action, message, route, contactData, contactId, crmSummary } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    // Get user from auth header
     const authHeader = req.headers.get("Authorization");
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -31,16 +30,20 @@ serve(async (req) => {
       userId = user?.id || null;
     }
 
-    // Build system prompt based on action type
-    let systemPrompt = `You are ZAZI, an AI copilot for the Vanto Zazi CRM system. You specialize in APLGO network marketing / MLM business.
+    let systemPrompt = `You are ZAZI, an expert AI copilot for the Vanto Zazi CRM system. You are a dual expert in:
+
+1. **APLGO Business** — APLGO's health & wellness product line, compensation plan, registration/activation process, and product positioning strategies.
+2. **Network Marketing / MLM Industry** — General MLM best practices, team building, prospect conversion, downline management, leadership development, duplication strategies, and industry trends.
 
 IMPORTANT RULES:
-- Never fabricate data. Only reference data provided in context.
+- You have FULL ACCESS to the user's CRM data (contacts, orders, summaries). Use it to answer questions directly.
+- Never say you don't have access to data. The CRM data is provided in context — reference it.
 - Never silently modify the database.
 - Always explain your reasoning.
 - Show confidence score (Low/Medium/High) for recommendations.
-- Be transparent about pattern source: "Based on your history", "Based on team pattern", or "Based on lifecycle stage".
+- Be transparent about pattern source: "Based on your CRM data", "Based on MLM best practices", or "Based on APLGO lifecycle".
 - Keep responses concise and actionable.
+- Format responses with markdown for readability.
 
 CRM CONTEXT:
 - The CRM tracks contacts (prospects/customers/distributors) through a lifecycle
@@ -53,23 +56,39 @@ CRM CONTEXT:
 
 APLGO BUSINESS MODEL:
 - APLGO is a health & wellness network marketing company
-- Products focus on health transformation
+- Products focus on health transformation (candy-based supplements)
 - Business model involves building distributor teams
 - Key lifecycle: Prospect → Customer → Distributor
-- Activation means fully onboarded distributor
+- Activation means fully onboarded distributor with first product order
 - Success metrics: registrations, activations, team building, product orders
+
+MLM EXPERTISE:
+- Prospect warming techniques and follow-up cadences
+- Objection handling for both product and opportunity
+- Team duplication and training systems
+- Recognition and motivation strategies
+- Social media prospecting and personal branding
+- Home meeting and presentation strategies
+- Upline/downline relationship management
 `;
 
     let userMessage = message || "";
+
+    // Attach CRM data summary to all actions so ZAZI always has context
+    if (crmSummary) {
+      systemPrompt += `\n\nUSER'S CURRENT CRM DATA:\n${JSON.stringify(crmSummary, null, 2)}\n`;
+    }
 
     if (action === "page_guidance") {
       systemPrompt += `\nThe user is asking for guidance about the "${route}" page of their CRM. Explain what this page does, how to use it effectively, and give practical tips. Be specific to the APLGO/MLM context.`;
       userMessage = `Explain the ${route} page and give me tips on using it effectively.`;
     } else if (action === "contact_analysis") {
-      systemPrompt += `\nAnalyze this contact and suggest the next best action. Show confidence score. Explain reasoning.`;
+      systemPrompt += `\nAnalyze this contact and suggest the next best action. Show confidence score. Explain reasoning. Consider their position in the APLGO lifecycle and suggest specific MLM strategies.`;
       userMessage = `Analyze this contact and suggest next steps:\n${JSON.stringify(contactData, null, 2)}`;
+    } else if (action === "contact_chat") {
+      systemPrompt += `\nThe user is asking a follow-up question about a specific contact. Here is the contact data:\n${JSON.stringify(contactData, null, 2)}\n\nAnswer their question using both the contact data and your APLGO/MLM expertise.`;
     } else if (action === "business_insight") {
-      systemPrompt += `\nProvide APLGO business insights. Focus on: activation suggestions, product positioning, follow-up timing, customer-to-distributor transition advice. Do NOT hardcode compensation data.`;
+      systemPrompt += `\nProvide APLGO business insights and MLM strategy recommendations. Focus on: activation suggestions, product positioning, follow-up timing, customer-to-distributor transition advice, team building strategies. Do NOT hardcode compensation data.`;
       if (!userMessage) {
         userMessage = "Give me business insights and suggestions for growing my APLGO business based on my CRM data patterns.";
       }

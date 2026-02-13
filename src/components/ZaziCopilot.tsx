@@ -1,9 +1,10 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { MessageSquare, X, Sparkles, BookOpen, User, TrendingUp, Send, Loader2, ThumbsUp, ThumbsDown, Minus } from 'lucide-react';
 import { useCrm } from '@/contexts/CrmContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import ReactMarkdown from 'react-markdown';
 
 type Tab = 'ask' | 'page' | 'contact' | 'insight';
 interface Message { role: 'user' | 'assistant'; content: string }
@@ -57,14 +58,36 @@ async function streamChat(
   onDone();
 }
 
+function MarkdownContent({ content }: { content: string }) {
+  return (
+    <ReactMarkdown
+      components={{
+        h1: ({ children }) => <h1 className="text-lg font-bold text-teal-400 mb-2">{children}</h1>,
+        h2: ({ children }) => <h2 className="text-base font-bold text-teal-400 mb-2">{children}</h2>,
+        h3: ({ children }) => <h3 className="text-sm font-semibold text-teal-300 mb-1">{children}</h3>,
+        p: ({ children }) => <p className="mb-2 leading-relaxed">{children}</p>,
+        ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
+        ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
+        li: ({ children }) => <li className="text-slate-300">{children}</li>,
+        strong: ({ children }) => <strong className="text-teal-300 font-semibold">{children}</strong>,
+        em: ({ children }) => <em className="text-slate-400">{children}</em>,
+        code: ({ children }) => <code className="bg-slate-700 px-1 py-0.5 rounded text-xs text-teal-300">{children}</code>,
+      }}
+    >
+      {content}
+    </ReactMarkdown>
+  );
+}
+
 export function ZaziCopilot({ selectedContactId }: { selectedContactId?: string | null }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<Tab>('ask');
   const [messages, setMessages] = useState<Message[]>([]);
+  const [contactMessages, setContactMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
+  const [contactInput, setContactInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [pageContent, setPageContent] = useState('');
-  const [contactContent, setContactContent] = useState('');
   const [insightContent, setInsightContent] = useState('');
   const [feedbackShown, setFeedbackShown] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -74,14 +97,45 @@ export function ZaziCopilot({ selectedContactId }: { selectedContactId?: string 
 
   const currentRoute = location.pathname.replace('/', '') || 'dashboard';
 
-  // Auto-scroll
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [messages, pageContent, contactContent, insightContent]);
+  }, [messages, contactMessages, pageContent, insightContent]);
 
   const selectedContact = selectedContactId
     ? contacts.find(c => String(c.id) === selectedContactId)
     : null;
+
+  // Build a CRM summary that gets passed with every request
+  const crmSummary = useMemo(() => {
+    const contactsList = contacts.map(c => ({
+      id: c.id,
+      name: c.FullName,
+      temp: c.LeadTemperature,
+      type: c.LeadType,
+      status: c.RegistrationStatus,
+      commStatus: c.CommunicationStatus,
+      focus: c.FocusArea,
+      path: c.LeadPath,
+      phone: c.PhoneNumber,
+      city: c.City,
+      aplgoId: c.APLGoID,
+    }));
+    return {
+      totalContacts: contacts.length,
+      contacts: contactsList,
+      hot: contacts.filter(c => c.LeadTemperature === 'Hot').length,
+      warm: contacts.filter(c => c.LeadTemperature === 'Warm').length,
+      cold: contacts.filter(c => c.LeadTemperature === 'Cold').length,
+      activated: contacts.filter(c => c.RegistrationStatus === 'Activated').length,
+      registered: contacts.filter(c => c.RegistrationStatus === 'Registered').length,
+      notRegistered: contacts.filter(c => c.RegistrationStatus === 'Not Registered').length,
+      distributors: contacts.filter(c => c.LeadType === 'Distributor').length,
+      customers: contacts.filter(c => c.LeadType === 'Customer').length,
+      prospects: contacts.filter(c => c.LeadType === 'Prospect').length,
+      totalOrders: orders.length,
+      paidOrders: orders.filter(o => o.status === 'Paid').length,
+    };
+  }, [contacts, orders]);
 
   const sendAsk = useCallback(async () => {
     if (!input.trim() || loading) return;
@@ -102,7 +156,7 @@ export function ZaziCopilot({ selectedContactId }: { selectedContactId?: string 
 
     try {
       await streamChat(
-        { action: 'ask', message: input, route: currentRoute },
+        { action: 'ask', message: input, route: currentRoute, crmSummary },
         upsert,
         () => setLoading(false),
       );
@@ -110,7 +164,43 @@ export function ZaziCopilot({ selectedContactId }: { selectedContactId?: string 
       upsert(`\n\n⚠️ ${e instanceof Error ? e.message : 'Error connecting to AI'}`);
       setLoading(false);
     }
-  }, [input, loading, currentRoute]);
+  }, [input, loading, currentRoute, crmSummary]);
+
+  const sendContactChat = useCallback(async () => {
+    if (!contactInput.trim() || loading || !selectedContact) return;
+    const userMsg: Message = { role: 'user', content: contactInput };
+    setContactMessages(prev => [...prev, userMsg]);
+    setContactInput('');
+    setLoading(true);
+
+    const contactOrders = orders.filter(o => o.contactName === selectedContact.FullName);
+    let soFar = '';
+    const upsert = (chunk: string) => {
+      soFar += chunk;
+      setContactMessages(prev => {
+        const last = prev[prev.length - 1];
+        if (last?.role === 'assistant') return prev.map((m, i) => i === prev.length - 1 ? { ...m, content: soFar } : m);
+        return [...prev, { role: 'assistant', content: soFar }];
+      });
+    };
+
+    try {
+      await streamChat(
+        {
+          action: 'contact_chat',
+          message: contactInput,
+          contactData: { ...selectedContact, orders: contactOrders },
+          contactId: String(selectedContact.id),
+          crmSummary,
+        },
+        upsert,
+        () => setLoading(false),
+      );
+    } catch (e) {
+      upsert(`\n\n⚠️ ${e instanceof Error ? e.message : 'Error connecting to AI'}`);
+      setLoading(false);
+    }
+  }, [contactInput, loading, selectedContact, orders, crmSummary]);
 
   const loadPageGuidance = useCallback(async () => {
     if (loading) return;
@@ -119,7 +209,7 @@ export function ZaziCopilot({ selectedContactId }: { selectedContactId?: string 
     let soFar = '';
     try {
       await streamChat(
-        { action: 'page_guidance', route: currentRoute },
+        { action: 'page_guidance', route: currentRoute, crmSummary },
         (chunk) => { soFar += chunk; setPageContent(soFar); },
         () => setLoading(false),
       );
@@ -127,50 +217,45 @@ export function ZaziCopilot({ selectedContactId }: { selectedContactId?: string 
       setPageContent(`⚠️ ${e instanceof Error ? e.message : 'Error'}`);
       setLoading(false);
     }
-  }, [currentRoute, loading]);
+  }, [currentRoute, loading, crmSummary]);
 
   const loadContactAnalysis = useCallback(async () => {
     if (!selectedContact || loading) return;
-    setContactContent('');
+    setContactMessages([]);
     setLoading(true);
     const contactOrders = orders.filter(o => o.contactName === selectedContact.FullName);
     let soFar = '';
+
+    const addAnalysis = (chunk: string) => {
+      soFar += chunk;
+      setContactMessages([{ role: 'assistant', content: soFar }]);
+    };
+
     try {
       await streamChat(
         {
           action: 'contact_analysis',
           contactId: String(selectedContact.id),
           contactData: { ...selectedContact, orders: contactOrders },
+          crmSummary,
         },
-        (chunk) => { soFar += chunk; setContactContent(soFar); },
+        addAnalysis,
         () => { setLoading(false); setFeedbackShown(String(selectedContact.id)); },
       );
     } catch (e) {
-      setContactContent(`⚠️ ${e instanceof Error ? e.message : 'Error'}`);
+      setContactMessages([{ role: 'assistant', content: `⚠️ ${e instanceof Error ? e.message : 'Error'}` }]);
       setLoading(false);
     }
-  }, [selectedContact, orders, loading]);
+  }, [selectedContact, orders, loading, crmSummary]);
 
   const loadInsight = useCallback(async () => {
     if (loading) return;
     setInsightContent('');
     setLoading(true);
-    const summary = {
-      totalContacts: contacts.length,
-      hot: contacts.filter(c => c.LeadTemperature === 'Hot').length,
-      warm: contacts.filter(c => c.LeadTemperature === 'Warm').length,
-      cold: contacts.filter(c => c.LeadTemperature === 'Cold').length,
-      activated: contacts.filter(c => c.RegistrationStatus === 'Activated').length,
-      registered: contacts.filter(c => c.RegistrationStatus === 'Registered').length,
-      distributors: contacts.filter(c => c.LeadType === 'Distributor').length,
-      customers: contacts.filter(c => c.LeadType === 'Customer').length,
-      totalOrders: orders.length,
-      paidOrders: orders.filter(o => o.status === 'Paid').length,
-    };
     let soFar = '';
     try {
       await streamChat(
-        { action: 'business_insight', message: `My CRM summary: ${JSON.stringify(summary)}` },
+        { action: 'business_insight', message: `My CRM summary: ${JSON.stringify(crmSummary)}`, crmSummary },
         (chunk) => { soFar += chunk; setInsightContent(soFar); },
         () => setLoading(false),
       );
@@ -178,7 +263,7 @@ export function ZaziCopilot({ selectedContactId }: { selectedContactId?: string 
       setInsightContent(`⚠️ ${e instanceof Error ? e.message : 'Error'}`);
       setLoading(false);
     }
-  }, [contacts, orders, loading]);
+  }, [crmSummary, loading]);
 
   const handleFeedback = async (success: boolean | null) => {
     if (!user || !selectedContact) return;
@@ -207,7 +292,6 @@ export function ZaziCopilot({ selectedContactId }: { selectedContactId?: string 
 
   return (
     <>
-      {/* Floating bubble */}
       {!open && (
         <button
           type="button"
@@ -219,7 +303,6 @@ export function ZaziCopilot({ selectedContactId }: { selectedContactId?: string 
         </button>
       )}
 
-      {/* Side panel */}
       {open && (
         <div className="fixed inset-y-0 right-0 z-50 w-full sm:w-96 bg-slate-900 border-l border-slate-700 shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
           {/* Header */}
@@ -227,6 +310,7 @@ export function ZaziCopilot({ selectedContactId }: { selectedContactId?: string 
             <div className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-teal-400" />
               <span className="font-semibold text-white text-sm">ZAZI Copilot</span>
+              <span className="text-[10px] bg-teal-600/20 text-teal-400 px-1.5 py-0.5 rounded">APLGO + MLM Expert</span>
             </div>
             <button type="button" onClick={() => setOpen(false)} className="text-slate-400 hover:text-white">
               <X className="w-5 h-5" />
@@ -242,7 +326,7 @@ export function ZaziCopilot({ selectedContactId }: { selectedContactId?: string 
                 onClick={() => {
                   setTab(t.key);
                   if (t.key === 'page' && !pageContent) loadPageGuidance();
-                  if (t.key === 'contact' && selectedContact && !contactContent) loadContactAnalysis();
+                  if (t.key === 'contact' && selectedContact && contactMessages.length === 0) loadContactAnalysis();
                   if (t.key === 'insight' && !insightContent) loadInsight();
                 }}
                 className={`flex-1 flex flex-col items-center gap-1 py-2.5 text-xs transition-colors ${
@@ -262,7 +346,8 @@ export function ZaziCopilot({ selectedContactId }: { selectedContactId?: string 
                 {messages.length === 0 && (
                   <div className="text-center py-8">
                     <Sparkles className="w-10 h-10 text-teal-400/50 mx-auto mb-3" />
-                    <p className="text-sm text-slate-400">Ask me anything about your CRM, contacts, or APLGO business.</p>
+                    <p className="text-sm text-slate-400">Ask me anything about your CRM, contacts, APLGO business, or MLM strategies.</p>
+                    <p className="text-xs text-slate-600 mt-1">I have access to all {contacts.length} contacts & {orders.length} orders</p>
                   </div>
                 )}
                 {messages.map((m, i) => (
@@ -272,7 +357,7 @@ export function ZaziCopilot({ selectedContactId }: { selectedContactId?: string 
                         ? 'bg-teal-600 text-white'
                         : 'bg-slate-800 text-slate-200 border border-slate-700'
                     }`}>
-                      <p className="whitespace-pre-wrap">{m.content}</p>
+                      {m.role === 'assistant' ? <MarkdownContent content={m.content} /> : <p className="whitespace-pre-wrap">{m.content}</p>}
                     </div>
                   </div>
                 ))}
@@ -285,11 +370,11 @@ export function ZaziCopilot({ selectedContactId }: { selectedContactId?: string 
             )}
 
             {tab === 'page' && (
-              <div className="text-sm text-slate-300 whitespace-pre-wrap">
+              <div className="text-sm text-slate-300">
                 {!pageContent && loading && (
                   <div className="flex items-center gap-2 text-slate-500"><Loader2 className="w-4 h-4 animate-spin" /> Loading guidance...</div>
                 )}
-                {pageContent || (!loading && <p className="text-slate-500">Click to load page guidance.</p>)}
+                {pageContent ? <MarkdownContent content={pageContent} /> : (!loading && <p className="text-slate-500">Click to load page guidance.</p>)}
                 {!loading && pageContent && (
                   <button type="button" onClick={loadPageGuidance} className="mt-3 text-xs text-teal-400 hover:underline">Refresh</button>
                 )}
@@ -297,7 +382,7 @@ export function ZaziCopilot({ selectedContactId }: { selectedContactId?: string 
             )}
 
             {tab === 'contact' && (
-              <div className="text-sm text-slate-300 whitespace-pre-wrap">
+              <div className="text-sm text-slate-300">
                 {!selectedContact ? (
                   <div className="text-center py-8">
                     <User className="w-10 h-10 text-slate-600 mx-auto mb-3" />
@@ -309,16 +394,26 @@ export function ZaziCopilot({ selectedContactId }: { selectedContactId?: string 
                       <p className="font-medium text-teal-400">{selectedContact.FullName}</p>
                       <p className="text-xs text-slate-500">{selectedContact.LeadTemperature} · {selectedContact.LeadType} · {selectedContact.RegistrationStatus}</p>
                     </div>
-                    {!contactContent && loading && (
+                    {contactMessages.length === 0 && loading && (
                       <div className="flex items-center gap-2 text-slate-500"><Loader2 className="w-4 h-4 animate-spin" /> Analyzing contact...</div>
                     )}
-                    {contactContent}
-                    {!loading && contactContent && feedbackShown === String(selectedContact.id) && (
+                    {contactMessages.map((m, i) => (
+                      <div key={i} className={`text-sm mb-3 ${m.role === 'user' ? 'text-right' : ''}`}>
+                        <div className={`inline-block max-w-[85%] px-3 py-2 rounded-lg ${
+                          m.role === 'user'
+                            ? 'bg-teal-600 text-white'
+                            : 'bg-slate-800 text-slate-200 border border-slate-700'
+                        }`}>
+                          {m.role === 'assistant' ? <MarkdownContent content={m.content} /> : <p className="whitespace-pre-wrap">{m.content}</p>}
+                        </div>
+                      </div>
+                    ))}
+                    {!loading && contactMessages.length > 0 && feedbackShown === String(selectedContact.id) && (
                       <div className="mt-4 p-3 bg-slate-800 rounded-lg border border-slate-700">
                         <p className="text-xs text-slate-400 mb-2">Did this recommendation help move the prospect forward?</p>
                         <div className="flex gap-2">
                           <button type="button" onClick={() => handleFeedback(true)} className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600/20 text-emerald-400 rounded text-xs hover:bg-emerald-600/30">
-                            <ThumbsUp className="w-3 h-3" /> Yes — It Worked
+                            <ThumbsUp className="w-3 h-3" /> Yes
                           </button>
                           <button type="button" onClick={() => handleFeedback(null)} className="flex items-center gap-1 px-3 py-1.5 bg-slate-700 text-slate-400 rounded text-xs hover:bg-slate-600">
                             <Minus className="w-3 h-3" /> Not Yet
@@ -338,11 +433,11 @@ export function ZaziCopilot({ selectedContactId }: { selectedContactId?: string 
             )}
 
             {tab === 'insight' && (
-              <div className="text-sm text-slate-300 whitespace-pre-wrap">
+              <div className="text-sm text-slate-300">
                 {!insightContent && loading && (
                   <div className="flex items-center gap-2 text-slate-500"><Loader2 className="w-4 h-4 animate-spin" /> Generating insights...</div>
                 )}
-                {insightContent || (!loading && <p className="text-slate-500">Click to generate business insights.</p>)}
+                {insightContent ? <MarkdownContent content={insightContent} /> : (!loading && <p className="text-slate-500">Click to generate business insights.</p>)}
                 {!loading && insightContent && (
                   <button type="button" onClick={loadInsight} className="mt-3 text-xs text-teal-400 hover:underline">Refresh</button>
                 )}
@@ -350,7 +445,7 @@ export function ZaziCopilot({ selectedContactId }: { selectedContactId?: string 
             )}
           </div>
 
-          {/* Input (Ask tab only) */}
+          {/* Input - Ask tab */}
           {tab === 'ask' && (
             <div className="border-t border-slate-700 p-3">
               <div className="flex gap-2">
@@ -359,13 +454,37 @@ export function ZaziCopilot({ selectedContactId }: { selectedContactId?: string 
                   value={input}
                   onChange={e => setInput(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && sendAsk()}
-                  placeholder="Ask ZAZI anything..."
+                  placeholder="Ask about your contacts, APLGO, or MLM..."
                   className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-teal-500"
                 />
                 <button
                   type="button"
                   onClick={sendAsk}
                   disabled={loading || !input.trim()}
+                  className="px-3 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white rounded-lg transition-colors"
+                >
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Input - Contact tab */}
+          {tab === 'contact' && selectedContact && (
+            <div className="border-t border-slate-700 p-3">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={contactInput}
+                  onChange={e => setContactInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && sendContactChat()}
+                  placeholder={`Ask about ${selectedContact.FullName}...`}
+                  className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-teal-500"
+                />
+                <button
+                  type="button"
+                  onClick={sendContactChat}
+                  disabled={loading || !contactInput.trim()}
                   className="px-3 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white rounded-lg transition-colors"
                 >
                   {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
