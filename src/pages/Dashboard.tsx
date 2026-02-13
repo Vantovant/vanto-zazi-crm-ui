@@ -11,25 +11,12 @@ import {
   Clock,
   AlertCircle,
   ChevronRight,
+  ShoppingCart,
 } from 'lucide-react';
-import { todaysFocus, recentActivities } from '../data/mockData';
 import { DataStatusBanner } from '../components/DataStatusBanner';
 import { useCrm } from '@/contexts/CrmContext';
-
-function useDashboardStats() {
-  const { contacts: prospects, dbActive } = useCrm();
-  return {
-    dbActive,
-    stats: {
-      totalProspects: prospects.length,
-      hotLeads: prospects.filter(p => p.LeadTemperature === 'Hot').length,
-      warmLeads: prospects.filter(p => p.LeadTemperature === 'Warm').length,
-      coldLeads: prospects.filter(p => p.LeadTemperature === 'Cold').length,
-      registered: prospects.filter(p => p.RegistrationStatus === 'Registered' || p.RegistrationStatus === 'Activated').length,
-    },
-    recentProspects: prospects.slice(0, 5),
-  };
-}
+import { useNavigate } from 'react-router-dom';
+import { useMemo } from 'react';
 
 const kpiCardsMeta = [
   { label: 'Total Prospects', key: 'totalProspects' as const, icon: Users, color: 'bg-slate-600' },
@@ -39,20 +26,6 @@ const kpiCardsMeta = [
   { label: 'Registered', key: 'registered' as const, icon: UserCheck, color: 'bg-emerald-500' },
 ];
 
-const activityIcons: Record<string, typeof Phone> = {
-  whatsapp: MessageCircle,
-  call: Phone,
-  meeting: Calendar,
-  registration: CheckCircle,
-};
-
-const activityColors: Record<string, string> = {
-  whatsapp: 'bg-green-500/20 text-green-400',
-  call: 'bg-cyan-500/20 text-cyan-400',
-  meeting: 'bg-violet-500/20 text-violet-400',
-  registration: 'bg-emerald-500/20 text-emerald-400',
-};
-
 const temperatureColors: Record<string, string> = {
   Hot: 'bg-rose-500/20 text-rose-400 border-rose-500/30',
   Warm: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
@@ -60,18 +33,117 @@ const temperatureColors: Record<string, string> = {
 };
 
 export function Dashboard() {
-  const { dbActive, stats, recentProspects } = useDashboardStats();
+  const navigate = useNavigate();
+  const { contacts: prospects, orders, dbActive, contactsLoading, ordersLoading } = useCrm();
+
+  const stats = useMemo(() => ({
+    totalProspects: prospects.length,
+    hotLeads: prospects.filter(p => p.LeadTemperature === 'Hot').length,
+    warmLeads: prospects.filter(p => p.LeadTemperature === 'Warm').length,
+    coldLeads: prospects.filter(p => p.LeadTemperature === 'Cold').length,
+    registered: prospects.filter(p => p.RegistrationStatus === 'Registered' || p.RegistrationStatus === 'Activated').length,
+  }), [prospects]);
+
+  const recentProspects = prospects.slice(0, 5);
+
+  // Derive follow-ups from contacts with NextAction set
+  const followUps = useMemo(() => {
+    return prospects
+      .filter(p => p.NextAction && p.NextAction.trim() !== '')
+      .slice(0, 3)
+      .map(p => ({
+        id: p.id,
+        name: p.FullName,
+        action: p.NextAction,
+        temperature: p.LeadTemperature,
+      }));
+  }, [prospects]);
+
+  // Derive meetings from contacts with MeetingTime set
+  const meetings = useMemo(() => {
+    return prospects
+      .filter(p => p.MeetingTime && p.MeetingTime.trim() !== '')
+      .slice(0, 3)
+      .map(p => ({
+        id: p.id,
+        name: p.FullName,
+        time: p.MeetingTime,
+        type: p.FocusArea || 'Meeting',
+      }));
+  }, [prospects]);
+
+  // Hot leads needing action
+  const hotLeadsNeedingAction = useMemo(() => {
+    return prospects
+      .filter(p => p.LeadTemperature === 'Hot' && p.CommunicationStatus !== 'Completed')
+      .slice(0, 3)
+      .map(p => ({
+        id: p.id,
+        name: p.FullName,
+        status: p.CommunicationStatus || 'Needs Contact',
+        nextAction: p.NextAction || 'No action set',
+      }));
+  }, [prospects]);
+
+  // Recent orders for activity feed
+  const recentOrderActivity = useMemo(() => {
+    return orders.slice(0, 4).map(o => ({
+      id: o.id,
+      type: 'order' as const,
+      contact: o.contactName,
+      description: `${o.product} — R${o.amount.toLocaleString()} (${o.status})`,
+      time: o.orderDate,
+    }));
+  }, [orders]);
+
+  // Recent contacts added for activity feed
+  const recentContactActivity = useMemo(() => {
+    return prospects.slice(0, 3).map(p => ({
+      id: p.id,
+      type: (p.ActionTaken?.toLowerCase().includes('whatsapp') ? 'whatsapp'
+        : p.ActionTaken?.toLowerCase().includes('call') ? 'call'
+        : p.ActionTaken?.toLowerCase().includes('meeting') ? 'meeting'
+        : 'note') as 'whatsapp' | 'call' | 'meeting' | 'note',
+      contact: p.FullName,
+      description: p.ActionTaken || `Added as ${p.LeadType}`,
+      time: p.DateCaptured,
+    }));
+  }, [prospects]);
+
+  // Merge and sort recent activity
+  const recentActivity = useMemo(() => {
+    const all = [...recentOrderActivity, ...recentContactActivity];
+    return all.slice(0, 6);
+  }, [recentOrderActivity, recentContactActivity]);
+
+  const activityIcons: Record<string, typeof Phone> = {
+    whatsapp: MessageCircle,
+    call: Phone,
+    meeting: Calendar,
+    order: ShoppingCart,
+    note: CheckCircle,
+  };
+
+  const activityColors: Record<string, string> = {
+    whatsapp: 'bg-green-500/20 text-green-400',
+    call: 'bg-cyan-500/20 text-cyan-400',
+    meeting: 'bg-violet-500/20 text-violet-400',
+    order: 'bg-teal-500/20 text-teal-400',
+    note: 'bg-slate-500/20 text-slate-400',
+  };
+
+  const loading = contactsLoading || ordersLoading;
 
   return (
     <div className="space-y-6">
-      {/* Data Status Banner */}
       <DataStatusBanner dbActive={dbActive} />
 
-      {/* Page header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-white">Dashboard</h1>
-          <p className="text-sm text-slate-400 mt-0.5">Welcome back. Here's your daily overview.</p>
+          <p className="text-sm text-slate-400 mt-0.5">
+            {loading ? 'Loading...' : 'Welcome back. Here\'s your daily overview.'}
+          </p>
         </div>
         <div className="text-sm text-slate-400">
           {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
@@ -111,15 +183,19 @@ export function Dashboard() {
               <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-slate-300">Follow-ups Due</h3>
                 <span className="text-xs font-medium text-teal-400 bg-teal-500/10 px-2 py-0.5 rounded-full">
-                  {todaysFocus.followUps.length}
+                  {followUps.length}
                 </span>
               </div>
               <div className="divide-y divide-slate-700/50">
-                {todaysFocus.followUps.map((item) => (
-                  <div key={item.id} className="px-4 py-3 hover:bg-slate-700/30 transition-colors cursor-pointer">
+                {followUps.length === 0 ? (
+                  <div className="px-4 py-6 text-center">
+                    <p className="text-xs text-slate-500">No follow-ups pending</p>
+                  </div>
+                ) : followUps.map((item) => (
+                  <div key={item.id} className="px-4 py-3 hover:bg-slate-700/30 transition-colors">
                     <p className="text-sm font-medium text-slate-200">{item.name}</p>
                     <p className="text-xs text-slate-500 mt-0.5">{item.action}</p>
-                    <span className={`inline-block mt-1.5 text-xs font-medium px-1.5 py-0.5 rounded border ${temperatureColors[item.temperature]}`}>
+                    <span className={`inline-block mt-1.5 text-xs font-medium px-1.5 py-0.5 rounded border ${temperatureColors[item.temperature] || ''}`}>
                       {item.temperature}
                     </span>
                   </div>
@@ -130,19 +206,25 @@ export function Dashboard() {
             {/* Scheduled Meetings */}
             <div className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden">
               <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-slate-300">Meetings Today</h3>
+                <h3 className="text-sm font-semibold text-slate-300">Meetings</h3>
                 <span className="text-xs font-medium text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded-full">
-                  {todaysFocus.meetings.length}
+                  {meetings.length}
                 </span>
               </div>
               <div className="divide-y divide-slate-700/50">
-                {todaysFocus.meetings.map((item) => (
-                  <div key={item.id} className="px-4 py-3 hover:bg-slate-700/30 transition-colors cursor-pointer">
+                {meetings.length === 0 ? (
+                  <div className="px-4 py-6 text-center">
+                    <p className="text-xs text-slate-500">No meetings scheduled</p>
+                  </div>
+                ) : meetings.map((item) => (
+                  <div key={item.id} className="px-4 py-3 hover:bg-slate-700/30 transition-colors">
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-medium text-slate-200">{item.name}</p>
-                      <span className="text-xs font-semibold text-teal-400">{item.time}</span>
                     </div>
                     <p className="text-xs text-slate-500 mt-0.5">{item.type}</p>
+                    <p className="text-xs text-teal-400 mt-1 flex items-center gap-1">
+                      <Clock className="w-3 h-3" />{item.time}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -153,18 +235,19 @@ export function Dashboard() {
               <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-slate-300">Hot Leads</h3>
                 <span className="text-xs font-medium text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded-full">
-                  {todaysFocus.hotLeadsNeedingAction.length}
+                  {hotLeadsNeedingAction.length}
                 </span>
               </div>
               <div className="divide-y divide-slate-700/50">
-                {todaysFocus.hotLeadsNeedingAction.map((item) => (
-                  <div key={item.id} className="px-4 py-3 hover:bg-slate-700/30 transition-colors cursor-pointer">
+                {hotLeadsNeedingAction.length === 0 ? (
+                  <div className="px-4 py-6 text-center">
+                    <p className="text-xs text-slate-500">No hot leads needing action</p>
+                  </div>
+                ) : hotLeadsNeedingAction.map((item) => (
+                  <div key={item.id} className="px-4 py-3 hover:bg-slate-700/30 transition-colors">
                     <p className="text-sm font-medium text-slate-200">{item.name}</p>
                     <p className="text-xs text-slate-500 mt-0.5">{item.status}</p>
-                    <div className="flex items-center gap-1 mt-1.5 text-xs text-slate-500">
-                      <Clock className="w-3 h-3" />
-                      {item.daysSinceContact === 0 ? 'Today' : `${item.daysSinceContact}d ago`}
-                    </div>
+                    <p className="text-xs text-amber-400 mt-1">{item.nextAction}</p>
                   </div>
                 ))}
               </div>
@@ -175,7 +258,11 @@ export function Dashboard() {
           <div className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden mt-6">
             <div className="px-5 py-4 border-b border-slate-700 flex items-center justify-between">
               <h3 className="font-semibold text-white">Recent Prospects</h3>
-              <button type="button" className="text-xs font-medium text-teal-400 hover:text-teal-300 flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => navigate('/contacts')}
+                className="text-xs font-medium text-teal-400 hover:text-teal-300 flex items-center gap-1"
+              >
                 View All <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -192,14 +279,20 @@ export function Dashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-700/50">
-                  {recentProspects.map((prospect) => (
-                    <tr key={prospect.id} className="hover:bg-slate-700/30 transition-colors cursor-pointer">
+                  {recentProspects.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-500">
+                        No contacts yet. Add your first contact to get started.
+                      </td>
+                    </tr>
+                  ) : recentProspects.map((prospect) => (
+                    <tr key={prospect.id} className="hover:bg-slate-700/30 transition-colors cursor-pointer" onClick={() => navigate('/contacts')}>
                       <td className="px-4 py-3">
                         <p className="text-sm font-medium text-slate-200">{prospect.FullName}</p>
                       </td>
                       <td className="px-4 py-3 text-sm text-slate-400">{prospect.PhoneNumber}</td>
                       <td className="px-4 py-3">
-                        <span className={`text-xs font-medium px-1.5 py-0.5 rounded border ${temperatureColors[prospect.LeadTemperature]}`}>
+                        <span className={`text-xs font-medium px-1.5 py-0.5 rounded border ${temperatureColors[prospect.LeadTemperature] || ''}`}>
                           {prospect.LeadTemperature}
                         </span>
                       </td>
@@ -219,11 +312,15 @@ export function Dashboard() {
           <h2 className="text-lg font-semibold text-white mb-4">Recent Activity</h2>
           <div className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden">
             <div className="divide-y divide-slate-700/50">
-              {recentActivities.map((activity) => {
-                const Icon = activityIcons[activity.type];
-                const colorClass = activityColors[activity.type];
+              {recentActivity.length === 0 ? (
+                <div className="px-4 py-8 text-center">
+                  <p className="text-sm text-slate-500">No recent activity. Start by adding contacts or orders.</p>
+                </div>
+              ) : recentActivity.map((activity) => {
+                const Icon = activityIcons[activity.type] || CheckCircle;
+                const colorClass = activityColors[activity.type] || 'bg-slate-500/20 text-slate-400';
                 return (
-                  <div key={activity.id} className="px-4 py-3.5 hover:bg-slate-700/30 transition-colors cursor-pointer">
+                  <div key={`${activity.type}-${activity.id}`} className="px-4 py-3.5 hover:bg-slate-700/30 transition-colors">
                     <div className="flex items-start gap-3">
                       <div className={`p-2 rounded-lg ${colorClass}`}>
                         <Icon className="w-4 h-4" />
@@ -239,7 +336,11 @@ export function Dashboard() {
               })}
             </div>
             <div className="px-4 py-3 bg-slate-800 border-t border-slate-700">
-              <button type="button" className="w-full text-center text-xs font-medium text-teal-400 hover:text-teal-300">
+              <button
+                type="button"
+                onClick={() => navigate('/activities')}
+                className="w-full text-center text-xs font-medium text-teal-400 hover:text-teal-300"
+              >
                 View All Activity
               </button>
             </div>

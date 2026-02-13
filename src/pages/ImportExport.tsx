@@ -6,7 +6,7 @@ import {
   FileSpreadsheet,
   Users,
   ShoppingCart,
-  Activity,
+  
   CheckCircle,
   AlertCircle,
   X,
@@ -114,11 +114,7 @@ interface ExportOption {
   recordCount: number;
 }
 
-const exportOptions: ExportOption[] = [
-  { id: 'contacts', label: 'Contacts', description: 'Export all prospects and contacts', icon: Users, recordCount: 12 },
-  { id: 'orders', label: 'Orders', description: 'Export order history and transactions', icon: ShoppingCart, recordCount: 10 },
-  { id: 'activities', label: 'Activities', description: 'Export activity log and timeline', icon: Activity, recordCount: 12 },
-];
+// Export options are dynamically built in the component
 
 const importTemplates = [
   { id: 'contacts', label: 'Contacts Template', description: 'CSV template for importing contacts' },
@@ -126,7 +122,7 @@ const importTemplates = [
 ];
 
 export function ImportExport() {
-  const { dbActive, refetchContacts } = useCrm();
+  const { dbActive, refetchContacts, contacts, orders } = useCrm();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'import' | 'export'>('import');
@@ -143,6 +139,11 @@ export function ImportExport() {
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
   const [importResult, setImportResult] = useState<{ success: number; failed: number }>({ success: 0, failed: 0 });
+
+  const exportOptions: ExportOption[] = [
+    { id: 'contacts', label: 'Contacts', description: 'Export all prospects and contacts', icon: Users, recordCount: contacts.length },
+    { id: 'orders', label: 'Orders', description: 'Export order history and transactions', icon: ShoppingCart, recordCount: orders.length },
+  ];
 
   const processFile = useCallback(async (file: File) => {
     setUploadedFile(file);
@@ -780,6 +781,39 @@ export function ImportExport() {
               <button
                 type="button"
                 disabled={selectedExports.size === 0}
+                onClick={() => {
+                  // Generate CSV export
+                  const datasets: string[] = [];
+                  if (selectedExports.has('contacts') && contacts.length > 0) {
+                    const headers = prospectColumns.map(c => c.label).join(',');
+                    const rows = contacts.map(c => 
+                      prospectColumns.map(col => {
+                        const val = String(c[col.key as keyof typeof c] ?? '');
+                        return val.includes(',') ? `"${val}"` : val;
+                      }).join(',')
+                    ).join('\n');
+                    const blob = new Blob([headers + '\n' + rows], { type: 'text/csv' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url; a.download = `contacts_export_${new Date().toISOString().split('T')[0]}.csv`;
+                    a.click(); URL.revokeObjectURL(url);
+                    datasets.push('contacts');
+                  }
+                  if (selectedExports.has('orders') && orders.length > 0) {
+                    const headers = 'Order ID,Contact,Product,Quantity,Amount,Status,Date';
+                    const rows = orders.map(o =>
+                      [o.orderId, o.contactName, o.product, o.quantity, o.amount, o.status, o.orderDate]
+                        .map(v => { const s = String(v); return s.includes(',') ? `"${s}"` : s; })
+                        .join(',')
+                    ).join('\n');
+                    const blob = new Blob([headers + '\n' + rows], { type: 'text/csv' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url; a.download = `orders_export_${new Date().toISOString().split('T')[0]}.csv`;
+                    a.click(); URL.revokeObjectURL(url);
+                    datasets.push('orders');
+                  }
+                }}
                 className={`w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
                   selectedExports.size > 0
                     ? 'bg-teal-600 hover:bg-teal-500 text-white'
@@ -791,51 +825,23 @@ export function ImportExport() {
               </button>
             </div>
           </div>
-
-          {/* Export History */}
           <div className="lg:col-span-1">
             <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-5">
-              <h3 className="text-sm font-semibold text-white mb-4">Recent Exports</h3>
-
-              <div className="space-y-3">
-                <div className="flex items-center gap-3 p-3 bg-slate-700/30 rounded-lg">
-                  <div className="w-10 h-10 rounded-lg bg-slate-600 flex items-center justify-center">
-                    <FileText className="w-5 h-5 text-slate-300" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-white">contacts_export.csv</p>
-                    <p className="text-xs text-slate-500">Feb 8, 2026 · 12 records</p>
-                  </div>
-                  <Download className="w-4 h-4 text-slate-400 cursor-pointer hover:text-teal-400" />
-                </div>
-                <div className="flex items-center gap-3 p-3 bg-slate-700/30 rounded-lg">
-                  <div className="w-10 h-10 rounded-lg bg-slate-600 flex items-center justify-center">
-                    <FileSpreadsheet className="w-5 h-5 text-slate-300" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-white">orders_jan2026.xlsx</p>
-                    <p className="text-xs text-slate-500">Jan 31, 2026 · 45 records</p>
-                  </div>
-                  <Download className="w-4 h-4 text-slate-400 cursor-pointer hover:text-teal-400" />
-                </div>
-                <div className="flex items-center gap-3 p-3 bg-slate-700/30 rounded-lg">
-                  <div className="w-10 h-10 rounded-lg bg-slate-600 flex items-center justify-center">
-                    <FileText className="w-5 h-5 text-slate-300" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-white">activities_q4.csv</p>
-                    <p className="text-xs text-slate-500">Dec 31, 2025 · 128 records</p>
-                  </div>
-                  <Download className="w-4 h-4 text-slate-400 cursor-pointer hover:text-teal-400" />
-                </div>
-              </div>
-
-              <button
-                type="button"
-                className="w-full mt-4 text-center text-xs font-medium text-teal-400 hover:text-teal-300"
-              >
-                View All Export History
-              </button>
+              <h3 className="text-sm font-semibold text-white mb-4">Export Info</h3>
+              <ul className="space-y-2 text-xs text-slate-400">
+                <li className="flex items-start gap-2">
+                  <CheckCircle className="w-3.5 h-3.5 text-teal-400 mt-0.5 flex-shrink-0" />
+                  Select datasets to export as CSV files
+                </li>
+                <li className="flex items-start gap-2">
+                  <CheckCircle className="w-3.5 h-3.5 text-teal-400 mt-0.5 flex-shrink-0" />
+                  Each dataset exports as a separate file
+                </li>
+                <li className="flex items-start gap-2">
+                  <CheckCircle className="w-3.5 h-3.5 text-teal-400 mt-0.5 flex-shrink-0" />
+                  All your data is included in exports
+                </li>
+              </ul>
             </div>
           </div>
         </div>
