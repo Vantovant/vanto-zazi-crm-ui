@@ -371,9 +371,26 @@ export function Orders() {
                 <span className={`inline-block mt-3 text-xs font-medium px-2.5 py-1 rounded-full border ${statusColors[selectedOrder.status]}`}>
                   {selectedOrder.status}
                 </span>
-                <p className="text-xs text-slate-500 mt-6 max-w-[240px]">
-                  Order detail drawer will be implemented in the next iteration.
-                </p>
+                <div className="mt-6 space-y-3 text-left w-full max-w-[280px]">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-500">Product</span>
+                    <span className="text-slate-300">{selectedOrder.product}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-500">Quantity</span>
+                    <span className="text-slate-300">{selectedOrder.quantity}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-500">Date</span>
+                    <span className="text-slate-300">{selectedOrder.orderDate}</span>
+                  </div>
+                  {selectedOrder.badges.length > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-500">Badges</span>
+                      <span className="text-slate-300">{selectedOrder.badges.join(', ')}</span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
