@@ -79,7 +79,7 @@ export interface Prospect {
   LeadTemperature: 'Hot' | 'Warm' | 'Cold';
   CommunicationStatus: 'New' | 'In Progress' | 'Pending' | 'Completed';
   RegistrationStatus: 'Registered' | 'Not Registered' | 'Activated';
-  LeadType: 'Prospect' | 'Customer' | 'Distributor';
+  LeadType: 'Prospect' | 'Registered_Nopurchase' | 'Purchase_Nostatus' | 'Purchase_Status';
   InterestLevel: 'High' | 'Medium' | 'Low';
   FocusArea: 'Health Transformation' | 'Business Opportunity' | 'Both';
   LeadPath: 'Customer' | 'Distributor' | 'Not sure yet';
@@ -162,7 +162,7 @@ export const prospects: Prospect[] = [
     LeadTemperature: 'Hot',
     CommunicationStatus: 'Completed',
     RegistrationStatus: 'Activated',
-    LeadType: 'Distributor',
+    LeadType: 'Purchase_Status',
     InterestLevel: 'High',
     FocusArea: 'Business Opportunity',
     LeadPath: 'Distributor',
@@ -216,7 +216,7 @@ export const prospects: Prospect[] = [
     LeadTemperature: 'Warm',
     CommunicationStatus: 'In Progress',
     RegistrationStatus: 'Registered',
-    LeadType: 'Customer',
+    LeadType: 'Registered_Nopurchase',
     InterestLevel: 'Medium',
     FocusArea: 'Health Transformation',
     LeadPath: 'Customer',
@@ -297,7 +297,7 @@ export const prospects: Prospect[] = [
     LeadTemperature: 'Warm',
     CommunicationStatus: 'Completed',
     RegistrationStatus: 'Activated',
-    LeadType: 'Customer',
+    LeadType: 'Purchase_Nostatus',
     InterestLevel: 'Medium',
     FocusArea: 'Health Transformation',
     LeadPath: 'Customer',
@@ -324,7 +324,7 @@ export const prospects: Prospect[] = [
     LeadTemperature: 'Hot',
     CommunicationStatus: 'In Progress',
     RegistrationStatus: 'Registered',
-    LeadType: 'Distributor',
+    LeadType: 'Purchase_Status',
     InterestLevel: 'High',
     FocusArea: 'Business Opportunity',
     LeadPath: 'Distributor',
@@ -378,7 +378,7 @@ export const prospects: Prospect[] = [
     LeadTemperature: 'Hot',
     CommunicationStatus: 'Completed',
     RegistrationStatus: 'Activated',
-    LeadType: 'Distributor',
+    LeadType: 'Purchase_Status',
     InterestLevel: 'High',
     FocusArea: 'Business Opportunity',
     LeadPath: 'Distributor',
@@ -452,7 +452,7 @@ export const prospectColumns = [
 export const filterOptions = {
   LeadTemperature: ['Hot', 'Warm', 'Cold'],
   RegistrationStatus: ['Registered', 'Not Registered', 'Activated'],
-  LeadType: ['Prospect', 'Customer', 'Distributor'],
+  LeadType: ['Prospect', 'Registered_Nopurchase', 'Purchase_Nostatus', 'Purchase_Status'],
   FocusArea: ['Health Transformation', 'Business Opportunity', 'Both'],
   LeadPath: ['Customer', 'Distributor', 'Not sure yet'],
 };
