@@ -59,6 +59,7 @@ function autoMapHeader(header: string): string {
     aplgoid: 'APLGoID', aplid: 'APLGoID',
     associatestatus: 'AssociateStatus', assocstatus: 'AssociateStatus',
     additionalnotes: 'AdditionalNotes', notes: 'AdditionalNotes',
+    gostatus: 'GOStatus', go_status: 'GOStatus',
     city: 'City',
     province: 'Province',
     state: 'State',
@@ -239,7 +240,7 @@ export function ImportExport() {
       FocusArea: 'focus_area', LeadPath: 'lead_path', SponsorName: 'sponsor_name',
       AssignedTo: 'assigned_to', ActionTaken: 'action_taken', NextAction: 'next_action',
       MeetingTime: 'meeting_time', APLGoID: 'aplgo_id', AssociateStatus: 'associate_status',
-      AdditionalNotes: 'additional_notes',
+      AdditionalNotes: 'additional_notes', GOStatus: 'go_status',
     };
 
     // Build all insert rows

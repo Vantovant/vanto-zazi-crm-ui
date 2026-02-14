@@ -30,6 +30,7 @@ interface ContactRow {
   aplgo_id: string;
   associate_status: string;
   additional_notes: string;
+  go_status: string;
 }
 
 function rowToProspect(row: ContactRow): Prospect {
@@ -58,6 +59,7 @@ function rowToProspect(row: ContactRow): Prospect {
     APLGoID: row.aplgo_id,
     AssociateStatus: row.associate_status,
     AdditionalNotes: row.additional_notes,
+    GOStatus: row.go_status,
   };
 }
 
@@ -87,6 +89,7 @@ function prospectToInsert(p: Omit<Prospect, 'id'>, userId: string) {
     aplgo_id: p.APLGoID || '',
     associate_status: p.AssociateStatus || '',
     additional_notes: p.AdditionalNotes || '',
+    go_status: p.GOStatus || '',
   };
 }
 
@@ -158,6 +161,7 @@ export function useContacts() {
     if (updates.AssociateStatus !== undefined) dbUpdates.associate_status = updates.AssociateStatus;
     if (updates.AdditionalNotes !== undefined) dbUpdates.additional_notes = updates.AdditionalNotes;
     if (updates.DateCaptured !== undefined) dbUpdates.date_captured = updates.DateCaptured;
+    if (updates.GOStatus !== undefined) dbUpdates.go_status = updates.GOStatus;
 
     const { error } = await supabase.from('contacts').update(dbUpdates).eq('id', id);
     if (error) {
