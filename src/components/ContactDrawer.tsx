@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   X,
   Phone,
@@ -11,8 +12,12 @@ import {
   Target,
   Clock,
   AlertCircle,
+  Pencil,
+  Award,
 } from 'lucide-react';
 import type { Prospect } from '../data/mockData';
+import { EditContactModal } from './EditContactModal';
+import { useCrm } from '@/contexts/CrmContext';
 
 interface ContactDrawerProps {
   prospect: Prospect;
@@ -37,7 +42,13 @@ const regStatusColors: Record<string, string> = {
   Activated: 'bg-emerald-500/20 text-emerald-400',
 };
 
-export function ContactDrawer({ prospect, onClose }: ContactDrawerProps) {
+export function ContactDrawer({ prospect: initialProspect, onClose }: ContactDrawerProps) {
+  const { contacts } = useCrm();
+  const [showEdit, setShowEdit] = useState(false);
+
+  // Always use latest contact data from context
+  const prospect = contacts.find(c => String(c.id) === String(initialProspect.id)) || initialProspect;
+
   const initials = prospect.FullName.split(' ').map(n => n[0]).join('');
 
   const handleWhatsApp = () => {
@@ -53,13 +64,23 @@ export function ContactDrawer({ prospect, onClose }: ContactDrawerProps) {
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700 bg-slate-800/50">
           <h2 className="font-semibold text-white text-lg">Contact Details</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowEdit(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-teal-400 hover:bg-teal-500/10 transition-colors text-sm font-medium"
+            >
+              <Pencil className="w-4 h-4" />
+              Edit
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Content - Two Column Layout */}
@@ -83,10 +104,15 @@ export function ContactDrawer({ prospect, onClose }: ContactDrawerProps) {
                     {prospect.LeadType}
                   </span>
                 </div>
-                <div className="mt-2">
+                <div className="mt-2 flex flex-wrap justify-center gap-2">
                   <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${regStatusColors[prospect.RegistrationStatus] || ''}`}>
                     {prospect.RegistrationStatus}
                   </span>
+                  {prospect.GOStatus && (
+                    <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/40">
+                      GO: {prospect.GOStatus}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -179,6 +205,18 @@ export function ContactDrawer({ prospect, onClose }: ContactDrawerProps) {
                   </div>
                 </div>
 
+                {prospect.GOStatus && (
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center">
+                      <Award className="w-4 h-4 text-amber-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-slate-500">GO Status</p>
+                      <p className="text-sm font-medium text-amber-400">{prospect.GOStatus}</p>
+                    </div>
+                  </div>
+                )}
+
                 {prospect.APLGoID && (
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center">
@@ -218,15 +256,42 @@ export function ContactDrawer({ prospect, onClose }: ContactDrawerProps) {
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
-              {/* Last Action */}
-              {prospect.ActionTaken ? (
-                <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-4">
-                  <h5 className="text-xs font-semibold text-slate-500 uppercase mb-2">Last Action Taken</h5>
-                  <p className="text-sm text-slate-300">{prospect.ActionTaken}</p>
+              {/* Activity Details */}
+              {prospect.ActionTaken || prospect.NextAction || prospect.MeetingTime ? (
+                <div className="space-y-3">
+                  {prospect.ActionTaken && (
+                    <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-4">
+                      <h5 className="text-xs font-semibold text-slate-500 uppercase mb-2">Last Action Taken</h5>
+                      <p className="text-sm text-slate-300">{prospect.ActionTaken}</p>
+                    </div>
+                  )}
+
+                  {prospect.NextAction && (
+                    <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-4">
+                      <h5 className="text-xs font-semibold text-slate-500 uppercase mb-2">Next Action</h5>
+                      <p className="text-sm text-slate-300">{prospect.NextAction}</p>
+                    </div>
+                  )}
+
+                  {prospect.MeetingTime && (
+                    <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-4">
+                      <h5 className="text-xs font-semibold text-slate-500 uppercase mb-2 flex items-center gap-1">
+                        <Calendar className="w-3 h-3" /> Meeting Time
+                      </h5>
+                      <p className="text-sm text-slate-300">{prospect.MeetingTime}</p>
+                    </div>
+                  )}
+
+                  {prospect.DateCaptured && (
+                    <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-4">
+                      <h5 className="text-xs font-semibold text-slate-500 uppercase mb-2">Date Captured</h5>
+                      <p className="text-sm text-slate-300">{prospect.DateCaptured}</p>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="bg-slate-800/30 rounded-lg border border-dashed border-slate-700 p-4">
-                  <p className="text-sm text-slate-500 italic">No activity logged yet for this contact.</p>
+                  <p className="text-sm text-slate-500 italic">No activity logged yet.</p>
                 </div>
               )}
 
@@ -255,6 +320,14 @@ export function ContactDrawer({ prospect, onClose }: ContactDrawerProps) {
           </div>
         </div>
       </div>
+
+      {showEdit && (
+        <EditContactModal
+          prospect={prospect}
+          onClose={() => setShowEdit(false)}
+          onSaved={() => {}}
+        />
+      )}
     </>
   );
 }

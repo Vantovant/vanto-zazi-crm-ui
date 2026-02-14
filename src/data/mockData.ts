@@ -91,6 +91,7 @@ export interface Prospect {
   APLGoID: string;
   AssociateStatus: string;
   AdditionalNotes: string;
+  GOStatus: string;
 }
 
 export const prospects: Prospect[] = [
@@ -119,6 +120,7 @@ export const prospects: Prospect[] = [
     APLGoID: '',
     AssociateStatus: 'Pending',
     AdditionalNotes: 'Very interested in business opportunity',
+    GOStatus: '',
   },
   {
     id: 2,
@@ -145,6 +147,7 @@ export const prospects: Prospect[] = [
     APLGoID: '',
     AssociateStatus: '',
     AdditionalNotes: 'Referred by existing customer',
+    GOStatus: '',
   },
   {
     id: 3,
@@ -171,6 +174,7 @@ export const prospects: Prospect[] = [
     APLGoID: 'APL-78234',
     AssociateStatus: 'Active',
     AdditionalNotes: 'Fast starter, very motivated',
+    GOStatus: '',
   },
   {
     id: 4,
@@ -197,6 +201,7 @@ export const prospects: Prospect[] = [
     APLGoID: '',
     AssociateStatus: '',
     AdditionalNotes: 'Busy schedule, try again later',
+    GOStatus: '',
   },
   {
     id: 5,
@@ -223,6 +228,7 @@ export const prospects: Prospect[] = [
     APLGoID: 'APL-78301',
     AssociateStatus: 'Customer',
     AdditionalNotes: 'Interested in weight management products',
+    GOStatus: '',
   },
   {
     id: 6,
@@ -249,6 +255,7 @@ export const prospects: Prospect[] = [
     APLGoID: '',
     AssociateStatus: 'Pending',
     AdditionalNotes: 'Ready to sign, needs sponsor approval',
+    GOStatus: '',
   },
   {
     id: 7,
@@ -275,6 +282,7 @@ export const prospects: Prospect[] = [
     APLGoID: '',
     AssociateStatus: '',
     AdditionalNotes: 'Facebook lead, needs qualification',
+    GOStatus: '',
   },
   {
     id: 8,
@@ -301,6 +309,7 @@ export const prospects: Prospect[] = [
     APLGoID: 'APL-78156',
     AssociateStatus: 'Customer',
     AdditionalNotes: 'Happy with initial products',
+    GOStatus: '',
   },
   {
     id: 9,
@@ -327,6 +336,7 @@ export const prospects: Prospect[] = [
     APLGoID: 'APL-78289',
     AssociateStatus: 'Pending Activation',
     AdditionalNotes: 'Experienced in network marketing',
+    GOStatus: '',
   },
   {
     id: 10,
@@ -353,6 +363,7 @@ export const prospects: Prospect[] = [
     APLGoID: '',
     AssociateStatus: '',
     AdditionalNotes: 'Reviewing materials',
+    GOStatus: '',
   },
   {
     id: 11,
@@ -379,6 +390,7 @@ export const prospects: Prospect[] = [
     APLGoID: 'APL-78102',
     AssociateStatus: 'Active',
     AdditionalNotes: 'Building team actively',
+    GOStatus: '',
   },
   {
     id: 12,
@@ -405,6 +417,7 @@ export const prospects: Prospect[] = [
     APLGoID: '',
     AssociateStatus: '',
     AdditionalNotes: 'Unresponsive to calls',
+    GOStatus: '',
   },
 ];
 
@@ -432,6 +445,7 @@ export const prospectColumns = [
   { key: 'APLGoID', label: 'APL ID', default: false },
   { key: 'AssociateStatus', label: 'Assoc. Status', default: false },
   { key: 'AdditionalNotes', label: 'Notes', default: false },
+  { key: 'GOStatus', label: 'GO Status', default: false },
 ];
 
 // Filter options

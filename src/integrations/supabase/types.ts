@@ -115,6 +115,7 @@ export type Database = {
           email_address: string
           focus_area: string
           full_name: string
+          go_status: string
           id: string
           interest_level: string
           lead_path: string
@@ -144,6 +145,7 @@ export type Database = {
           email_address?: string
           focus_area?: string
           full_name: string
+          go_status?: string
           id?: string
           interest_level?: string
           lead_path?: string
@@ -173,6 +175,7 @@ export type Database = {
           email_address?: string
           focus_area?: string
           full_name?: string
+          go_status?: string
           id?: string
           interest_level?: string
           lead_path?: string

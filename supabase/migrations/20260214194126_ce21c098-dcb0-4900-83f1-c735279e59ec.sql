@@ -1,0 +1,1 @@
+ALTER TABLE public.contacts ADD COLUMN go_status text NOT NULL DEFAULT '';
