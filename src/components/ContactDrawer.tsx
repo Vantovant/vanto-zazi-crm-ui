@@ -32,8 +32,9 @@ const temperatureColors: Record<string, string> = {
 
 const leadTypeColors: Record<string, string> = {
   Prospect: 'bg-slate-500/20 text-slate-300 border-slate-500/40',
-  Customer: 'bg-teal-500/20 text-teal-400 border-teal-500/40',
-  Distributor: 'bg-violet-500/20 text-violet-400 border-violet-500/40',
+  Registered_Nopurchase: 'bg-amber-500/20 text-amber-400 border-amber-500/40',
+  Purchase_Nostatus: 'bg-teal-500/20 text-teal-400 border-teal-500/40',
+  Purchase_Status: 'bg-violet-500/20 text-violet-400 border-violet-500/40',
 };
 
 const regStatusColors: Record<string, string> = {

@@ -38,8 +38,9 @@ const regStatusColors: Record<string, string> = {
 
 const leadTypeColors: Record<string, string> = {
   Prospect: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
-  Customer: 'bg-teal-500/20 text-teal-400 border-teal-500/30',
-  Distributor: 'bg-violet-500/20 text-violet-400 border-violet-500/30',
+  Registered_Nopurchase: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+  Purchase_Nostatus: 'bg-teal-500/20 text-teal-400 border-teal-500/30',
+  Purchase_Status: 'bg-violet-500/20 text-violet-400 border-violet-500/30',
 };
 
 export function Contacts() {
