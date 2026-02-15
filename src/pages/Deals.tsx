@@ -30,7 +30,7 @@ function estimatedMinValue(goStatus: string): number {
   if (goStatus.includes('Diamond')) return 45000;   // $3,000 × 15
   if (goStatus.includes('Mentor')) return 9000;      // $600 × 15
   if (goStatus.includes('Builder')) return 6000;     // $400 × 15
-  if (goStatus.includes('Associate')) return 7500;   // $500 × 15
+  if (goStatus.includes('Associate')) return 3000;   // $200 × 15
   if (goStatus.includes('Promoter')) return 1500;    // $100 × 15
   // Activation only (no rank) = R375 activation fee
   return 375;
