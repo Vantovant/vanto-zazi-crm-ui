@@ -7,6 +7,7 @@ import {
   Award,
   X,
   Filter,
+  Download,
 } from 'lucide-react';
 import { type Prospect, type Order } from '../data/mockData';
 import { ContactDrawer } from '../components/ContactDrawer';
@@ -121,6 +122,42 @@ export function Deals() {
     'activated-with-status': 'With GO-Status',
   };
 
+  const exportActivationOnlyCSV = () => {
+    const activationOnly = deals.filter((d) => d.status === 'activated-no-status');
+    const headers = ['email_address', 'first_name', 'last_name', 'tags', 'source', 'opt_in_date'];
+    const rows = activationOnly.map((deal) => {
+      const nameParts = deal.contact.FullName.trim().split(/\s+/);
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+      const tags = [
+        'Activated_Distributor',
+        'Activation_Only_R375',
+        deal.contact.FocusArea ? deal.contact.FocusArea.replace(/\s+/g, '_') : '',
+        deal.contact.LeadTemperature ? `Temp_${deal.contact.LeadTemperature}` : '',
+        deal.contact.InterestLevel ? `Interest_${deal.contact.InterestLevel}` : '',
+      ].filter(Boolean).join(', ');
+      const source = deal.contact.LeadPath || 'Manual';
+      const optInDate = deal.contact.DateCaptured || '';
+      return [
+        deal.contact.EmailAddress,
+        firstName,
+        lastName,
+        tags,
+        source,
+        optInDate,
+      ].map((v) => `"${(v || '').replace(/"/g, '""')}"`).join(',');
+    });
+
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `zazi-mail-activation-only-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -131,6 +168,14 @@ export function Deals() {
             {deals.length} activated distributors — prospects for upgrades
           </p>
         </div>
+        <button
+          type="button"
+          onClick={exportActivationOnlyCSV}
+          className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-teal-600 hover:bg-teal-500 text-white transition-colors"
+        >
+          <Download className="w-4 h-4" />
+          Export ZAZI Mail ({statusCounts['activated-no-status']})
+        </button>
       </div>
 
       {/* Status Summary Cards */}
