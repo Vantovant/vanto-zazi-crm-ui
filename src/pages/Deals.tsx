@@ -12,48 +12,34 @@ import { type Prospect, type Order } from '../data/mockData';
 import { ContactDrawer } from '../components/ContactDrawer';
 import { useCrm } from '@/contexts/CrmContext';
 
-// Derive Deal Status from contact and order data
-type DealStatus = 'registered-no-purchase' | 'activated-no-status' | 'activated-with-status';
+// Deal status derived from GO Status and registration
+type DealStatus = 'activated-no-status' | 'activated-with-status';
 
 interface Deal {
   contact: Prospect;
   status: DealStatus;
   statusLabel: string;
+  goStatus: string;
   orderCount: number;
   totalOrderValue: number;
   lastOrderDate: string | null;
 }
 
 function deriveDealStatus(contact: Prospect, contactOrders: Order[]): Deal {
-  const hasOrders = contactOrders.length > 0;
   const totalOrderValue = contactOrders.reduce((sum, o) => sum + o.amount, 0);
   const lastOrder = contactOrders.sort((a, b) => b.orderDate.localeCompare(a.orderDate))[0];
 
-  let status: DealStatus;
-  let statusLabel: string;
+  const goStatus = contact.GOStatus || 'No status';
+  const hasRank = goStatus !== 'No status' && goStatus !== '';
 
-  if (contact.RegistrationStatus === 'Registered' && !hasOrders) {
-    // Registered but no purchase
-    status = 'registered-no-purchase';
-    statusLabel = 'Registered — No Purchase';
-  } else if (hasOrders && (!contact.AssociateStatus || contact.AssociateStatus === '' || contact.AssociateStatus === 'Pending')) {
-    // Has orders but no status yet
-    status = 'activated-no-status';
-    statusLabel = 'Activated — No Status Yet';
-  } else if (hasOrders && contact.AssociateStatus && contact.AssociateStatus !== '' && contact.AssociateStatus !== 'Pending') {
-    // Has orders and has associate status
-    status = 'activated-with-status';
-    statusLabel = `Activated — ${contact.AssociateStatus}`;
-  } else {
-    // Default case (not registered, no orders)
-    status = 'registered-no-purchase';
-    statusLabel = 'Prospect';
-  }
+  const status: DealStatus = hasRank ? 'activated-with-status' : 'activated-no-status';
+  const statusLabel = hasRank ? goStatus : 'Activation Only';
 
   return {
     contact,
     status,
     statusLabel,
+    goStatus,
     orderCount: contactOrders.length,
     totalOrderValue,
     lastOrderDate: lastOrder?.orderDate || null,
@@ -61,13 +47,11 @@ function deriveDealStatus(contact: Prospect, contactOrders: Order[]): Deal {
 }
 
 const statusColors: Record<DealStatus, string> = {
-  'registered-no-purchase': 'bg-amber-500/20 text-amber-400 border-amber-500/40',
-  'activated-no-status': 'bg-cyan-500/20 text-cyan-400 border-cyan-500/40',
+  'activated-no-status': 'bg-amber-500/20 text-amber-400 border-amber-500/40',
   'activated-with-status': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40',
 };
 
 const statusIcons: Record<DealStatus, typeof Users> = {
-  'registered-no-purchase': Users,
   'activated-no-status': ShoppingCart,
   'activated-with-status': Award,
 };
@@ -81,27 +65,25 @@ export function Deals() {
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [selectedContactId, setSelectedContactId] = useState<number | null>(null);
 
-  // Derive deals from contacts and orders
+  // Derive deals from Purchase_Status contacts only (actual distributors)
   const deals = useMemo(() => {
-    return prospects.map((contact) => {
-      const contactOrders = orders.filter((o) => o.contactName === contact.FullName);
-      return deriveDealStatus(contact, contactOrders);
-    });
+    return prospects
+      .filter((c) => c.LeadType === 'Purchase_Status')
+      .map((contact) => {
+        const contactOrders = orders.filter((o) => o.contactName === contact.FullName);
+        return deriveDealStatus(contact, contactOrders);
+      });
   }, [prospects, orders]);
 
   // Filter deals
   const filteredDeals = useMemo(() => {
     return deals.filter((deal) => {
-      // Search filter
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
-        const searchable = `${deal.contact.FullName} ${deal.statusLabel} ${deal.contact.City}`.toLowerCase();
+        const searchable = `${deal.contact.FullName} ${deal.statusLabel} ${deal.contact.City} ${deal.goStatus}`.toLowerCase();
         if (!searchable.includes(query)) return false;
       }
-
-      // Status filter
       if (statusFilter !== 'all' && deal.status !== statusFilter) return false;
-
       return true;
     });
   }, [deals, searchQuery, statusFilter]);
@@ -110,7 +92,6 @@ export function Deals() {
   const statusCounts = useMemo(() => {
     return {
       all: deals.length,
-      'registered-no-purchase': deals.filter((d) => d.status === 'registered-no-purchase').length,
       'activated-no-status': deals.filter((d) => d.status === 'activated-no-status').length,
       'activated-with-status': deals.filter((d) => d.status === 'activated-with-status').length,
     };
@@ -120,9 +101,8 @@ export function Deals() {
 
   const filterLabels: Record<StatusFilter, string> = {
     all: 'All Deals',
-    'registered-no-purchase': 'Registered — No Purchase',
-    'activated-no-status': 'Activated — No Status',
-    'activated-with-status': 'Activated — With Status',
+    'activated-no-status': 'Activation Only',
+    'activated-with-status': 'With GO-Status',
   };
 
   return (
@@ -132,49 +112,29 @@ export function Deals() {
         <div>
           <h1 className="text-2xl font-semibold text-white">Deals</h1>
           <p className="text-sm text-slate-400 mt-0.5">
-            MLM lifecycle tracking for {deals.length} contacts
+            {deals.length} activated distributors — prospects for upgrades
           </p>
         </div>
       </div>
 
       {/* Status Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <button
           type="button"
-          onClick={() => setStatusFilter('registered-no-purchase')}
+          onClick={() => setStatusFilter('activated-no-status')}
           className={`p-4 rounded-xl border transition-all ${
-            statusFilter === 'registered-no-purchase'
+            statusFilter === 'activated-no-status'
               ? 'bg-amber-500/10 border-amber-500/40'
               : 'bg-slate-800/50 border-slate-700 hover:border-slate-600'
           }`}
         >
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center">
-              <Users className="w-6 h-6 text-amber-400" />
-            </div>
-            <div className="text-left">
-              <p className="text-2xl font-bold text-white">{statusCounts['registered-no-purchase']}</p>
-              <p className="text-xs text-slate-400">Registered — No Purchase</p>
-            </div>
-          </div>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setStatusFilter('activated-no-status')}
-          className={`p-4 rounded-xl border transition-all ${
-            statusFilter === 'activated-no-status'
-              ? 'bg-cyan-500/10 border-cyan-500/40'
-              : 'bg-slate-800/50 border-slate-700 hover:border-slate-600'
-          }`}
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-cyan-500/20 flex items-center justify-center">
-              <ShoppingCart className="w-6 h-6 text-cyan-400" />
+              <ShoppingCart className="w-6 h-6 text-amber-400" />
             </div>
             <div className="text-left">
               <p className="text-2xl font-bold text-white">{statusCounts['activated-no-status']}</p>
-              <p className="text-xs text-slate-400">Activated — No Status Yet</p>
+              <p className="text-xs text-slate-400">Activation Only (R375+VAT)</p>
             </div>
           </div>
         </button>
@@ -194,7 +154,7 @@ export function Deals() {
             </div>
             <div className="text-left">
               <p className="text-2xl font-bold text-white">{statusCounts['activated-with-status']}</p>
-              <p className="text-xs text-slate-400">Activated — With Status</p>
+              <p className="text-xs text-slate-400">With GO-Status</p>
             </div>
           </div>
         </button>
@@ -328,10 +288,10 @@ export function Deals() {
                   <span className="text-xs text-slate-500">Path:</span>
                   <span className="text-xs font-medium text-slate-300">{deal.contact.LeadPath}</span>
                 </div>
-                {deal.contact.AssociateStatus && deal.contact.AssociateStatus !== '' && (
+                {deal.goStatus && deal.goStatus !== 'No status' && (
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-500">Status:</span>
-                    <span className="text-xs font-medium text-emerald-400">{deal.contact.AssociateStatus}</span>
+                    <span className="text-xs text-slate-500">GO-Status:</span>
+                    <span className="text-xs font-medium text-emerald-400">{deal.goStatus}</span>
                   </div>
                 )}
               </div>
