@@ -25,6 +25,16 @@ interface Deal {
   lastOrderDate: string | null;
 }
 
+// Minimum investment by GO-Status rank (ZAR excl VAT)
+function estimatedMinValue(goStatus: string): number {
+  if (goStatus.includes('Diamond')) return 12000;
+  if (goStatus.includes('Builder')) return 6000;
+  if (goStatus.includes('Associate')) return 3000;
+  if (goStatus.includes('Promoter')) return 1500;
+  // Activation only (no rank) = R375 activation fee
+  return 375;
+}
+
 function deriveDealStatus(contact: Prospect, contactOrders: Order[]): Deal {
   const totalOrderValue = contactOrders.reduce((sum, o) => sum + o.amount, 0);
   const lastOrder = contactOrders.sort((a, b) => b.orderDate.localeCompare(a.orderDate))[0];
@@ -35,13 +45,17 @@ function deriveDealStatus(contact: Prospect, contactOrders: Order[]): Deal {
   const status: DealStatus = hasRank ? 'activated-with-status' : 'activated-no-status';
   const statusLabel = hasRank ? goStatus : 'Activation Only';
 
+  // Use actual orders if available, otherwise estimate from GO-Status
+  const minValue = estimatedMinValue(goStatus);
+  const displayValue = totalOrderValue > 0 ? totalOrderValue : minValue;
+
   return {
     contact,
     status,
     statusLabel,
     goStatus,
     orderCount: contactOrders.length,
-    totalOrderValue,
+    totalOrderValue: displayValue,
     lastOrderDate: lastOrder?.orderDate || null,
   };
 }
@@ -267,8 +281,8 @@ export function Deals() {
                     </>
                   ) : (
                     <>
-                      <p className="text-lg font-bold text-slate-500">R0</p>
-                      <p className="text-xs text-slate-500">No orders yet</p>
+                      <p className="text-lg font-bold text-white">R{deal.totalOrderValue.toLocaleString()}</p>
+                      <p className="text-xs text-slate-500">Est. min investment</p>
                     </>
                   )}
                 </div>
