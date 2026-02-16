@@ -646,6 +646,23 @@ export function ImportExport() {
                   <button
                     key={template.id}
                     type="button"
+                    onClick={() => {
+                      if (template.id === 'contacts') {
+                        const headers = prospectColumns.map(c => c.label).join(',');
+                        const blob = new Blob([headers + '\n'], { type: 'text/csv' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url; a.download = 'contacts_import_template.csv';
+                        a.click(); URL.revokeObjectURL(url);
+                      } else if (template.id === 'orders') {
+                        const headers = 'Order ID,Contact Name,Product,Quantity,Amount,Status,Order Date';
+                        const blob = new Blob([headers + '\n'], { type: 'text/csv' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url; a.download = 'orders_import_template.csv';
+                        a.click(); URL.revokeObjectURL(url);
+                      }
+                    }}
                     className="w-full flex items-center gap-3 p-3 bg-slate-700/50 hover:bg-slate-700 rounded-lg transition-colors text-left"
                   >
                     <div className="w-10 h-10 rounded-lg bg-slate-600 flex items-center justify-center flex-shrink-0">
