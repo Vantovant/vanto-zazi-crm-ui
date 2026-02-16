@@ -136,6 +136,21 @@ export function TeamDashboard() {
   const totalContacts = stats.reduce((sum, s) => sum + s.contactsCreated, 0);
   const totalOrders = stats.reduce((sum, s) => sum + s.ordersCreated, 0);
 
+  const OWNER_ID = 'b8028d7d-6a08-45ef-a369-b438c440bea3';
+  const isOwner = user?.id === OWNER_ID;
+
+  if (!isOwner) {
+    return (
+      <div className="flex items-center justify-center h-[60vh]">
+        <div className="text-center">
+          <ShoppingCart className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+          <h2 className="text-lg font-semibold text-white">Access Restricted</h2>
+          <p className="text-slate-400 text-sm mt-1">This page is only available to the platform owner.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
