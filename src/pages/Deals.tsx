@@ -316,7 +316,7 @@ export function Deals() {
                   </p>
                 </div>
 
-                {/* Order Stats */}
+                {/* Order Stats — always show estimated min investment based on GO-Status */}
                 <div className="text-right flex-shrink-0">
                   {deal.orderCount > 0 ? (
                     <>
@@ -328,8 +328,10 @@ export function Deals() {
                     </>
                   ) : (
                     <>
-                      <p className="text-lg font-bold text-white">R{deal.totalOrderValue.toLocaleString()}</p>
-                      <p className="text-xs text-slate-500">Est. min investment</p>
+                      <p className="text-lg font-bold text-emerald-400">R{deal.totalOrderValue.toLocaleString()}</p>
+                      <p className="text-xs text-slate-500">
+                        Est. min investment ({deal.goStatus !== 'No status' ? deal.goStatus : 'Activation R375'})
+                      </p>
                     </>
                   )}
                 </div>
