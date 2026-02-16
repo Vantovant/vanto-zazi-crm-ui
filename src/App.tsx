@@ -10,6 +10,7 @@ import { WhatsApp } from './pages/WhatsApp';
 import { Activities } from './pages/Activities';
 import { ImportExport } from './pages/ImportExport';
 import { Deals } from './pages/Deals';
+import { TeamDashboard } from './pages/TeamDashboard';
 
 function App() {
   return (
@@ -33,6 +34,7 @@ function App() {
             <Route path="deals" element={<Deals />} />
             <Route path="whatsapp" element={<WhatsApp />} />
             <Route path="import-export" element={<ImportExport />} />
+            <Route path="team" element={<TeamDashboard />} />
             <Route path="help" element={<PlaceholderPage title="Help" />} />
           </Route>
         </Routes>
