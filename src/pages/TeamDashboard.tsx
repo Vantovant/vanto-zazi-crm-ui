@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   Users,
   Activity,
@@ -10,6 +11,11 @@ import {
   UserCheck,
   ShoppingCart,
   Eye,
+  Link,
+  Plus,
+  Copy,
+  Check,
+  Trash2,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
@@ -30,6 +36,13 @@ export function TeamDashboard() {
   const [aiSummary, setAiSummary] = useState('');
   const [loading, setLoading] = useState(true);
   const [aiLoading, setAiLoading] = useState(false);
+
+  const { user } = useAuth();
+
+  // Invite management state
+  const [invites, setInvites] = useState<any[]>([]);
+  const [newLabel, setNewLabel] = useState('');
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const fetchStats = async () => {
     setLoading(true);
@@ -62,8 +75,38 @@ export function TeamDashboard() {
     }
   };
 
+  const fetchInvites = async () => {
+    const { data } = await (supabase.from('invites') as any)
+      .select('*')
+      .order('created_at', { ascending: false });
+    setInvites(data || []);
+  };
+
+  const createInvite = async () => {
+    if (!user) return;
+    await (supabase.from('invites') as any).insert({
+      created_by: user.id,
+      label: newLabel || 'Tester',
+    });
+    setNewLabel('');
+    fetchInvites();
+  };
+
+  const deleteInvite = async (id: string) => {
+    await (supabase.from('invites') as any).delete().eq('id', id);
+    fetchInvites();
+  };
+
+  const copyLink = (token: string, id: string) => {
+    const url = `${window.location.origin}/auth?invite=${token}`;
+    navigator.clipboard.writeText(url);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
   useEffect(() => {
     fetchStats();
+    fetchInvites();
   }, []);
 
   const formatDate = (d: string | null) => {
@@ -155,6 +198,79 @@ export function TeamDashboard() {
             Orders Created
           </div>
           <p className="text-2xl font-bold text-white">{totalOrders}</p>
+        </div>
+      </div>
+
+      {/* Invite Management */}
+      <div className="bg-slate-800/30 border border-slate-700 rounded-xl overflow-hidden">
+        <div className="p-4 border-b border-slate-700 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+            <Link className="w-4 h-4 text-teal-400" />
+            Invite Links ({invites.filter(i => !i.is_used).length} available · {invites.filter(i => i.is_used).length} used)
+          </h3>
+        </div>
+        <div className="p-4 space-y-3">
+          {/* Create new invite */}
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newLabel}
+              onChange={(e) => setNewLabel(e.target.value)}
+              placeholder="Tester name (optional)"
+              className="flex-1 px-3 py-2 text-sm bg-slate-900 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500/30 placeholder:text-slate-500"
+            />
+            <button
+              type="button"
+              onClick={createInvite}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-teal-600 hover:bg-teal-500 text-white rounded-lg transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Create Invite
+            </button>
+          </div>
+
+          {/* Invite list */}
+          {invites.length === 0 ? (
+            <p className="text-slate-500 text-sm text-center py-4">No invites created yet. Create one above to share with testers.</p>
+          ) : (
+            <div className="space-y-2">
+              {invites.map((inv) => (
+                <div key={inv.id} className={`flex items-center justify-between p-3 rounded-lg border ${inv.is_used ? 'bg-slate-800/30 border-slate-700/50' : 'bg-slate-800/50 border-slate-700'}`}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-white">{inv.label || 'Tester'}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${inv.is_used ? 'bg-slate-700 text-slate-400' : 'bg-teal-500/20 text-teal-400'}`}>
+                        {inv.is_used ? 'Used' : 'Available'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5 truncate font-mono">
+                      {window.location.origin}/auth?invite={inv.token}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 ml-3">
+                    {!inv.is_used && (
+                      <button
+                        type="button"
+                        onClick={() => copyLink(inv.token, inv.id)}
+                        className="p-2 text-slate-400 hover:text-white transition-colors"
+                        title="Copy link"
+                      >
+                        {copiedId === inv.id ? <Check className="w-4 h-4 text-teal-400" /> : <Copy className="w-4 h-4" />}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => deleteInvite(inv.id)}
+                      className="p-2 text-slate-500 hover:text-rose-400 transition-colors"
+                      title="Delete invite"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
