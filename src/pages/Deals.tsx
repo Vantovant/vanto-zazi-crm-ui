@@ -30,7 +30,7 @@ interface Deal {
 function estimatedMinValue(goStatus: string): number {
   const s = goStatus.toLowerCase();
   if (s.includes('diamond')) return 45000;   // $3,000 × 15
-  if (s.includes('vip')) return 22500;        // $1,500 × 15
+  if (s.includes('vip')) return 27000;        // $1,800 × 15
   if (s.includes('mentor')) return 9000;      // $600 × 15
   if (s.includes('builder')) return 6000;     // $400 × 15
   if (s.includes('associate')) return 3000;   // $200 × 15
