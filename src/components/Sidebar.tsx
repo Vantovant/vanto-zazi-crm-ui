@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import logo from '@/assets/logo.jpg';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   LayoutDashboard,
   Users,
@@ -13,7 +14,9 @@ import {
   BarChart3,
 } from 'lucide-react';
 
-const navItems = [
+const OWNER_ID = 'b8028d7d-6a08-45ef-a369-b438c440bea3';
+
+const baseNavItems = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/contacts', label: 'Contacts', icon: Users },
   { path: '/activities', label: 'Activities', icon: Activity },
@@ -21,7 +24,6 @@ const navItems = [
   { path: '/deals', label: 'Deals', icon: Briefcase },
   { path: '/whatsapp', label: 'WhatsApp', icon: MessageCircle },
   { path: '/import-export', label: 'Import / Export', icon: ArrowUpDown },
-  { path: '/team', label: 'Tester Dashboard', icon: BarChart3 },
 ];
 
 interface SidebarProps {
@@ -30,6 +32,10 @@ interface SidebarProps {
 }
 
 export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
+  const { user } = useAuth();
+  const navItems = user?.id === OWNER_ID
+    ? [...baseNavItems, { path: '/team', label: 'Tester Dashboard', icon: BarChart3 }]
+    : baseNavItems;
   return (
     <>
       {/* Mobile overlay */}
