@@ -122,16 +122,19 @@ export function Deals() {
     'activated-with-status': 'With GO-Status',
   };
 
-  const exportActivationOnlyCSV = () => {
-    const activationOnly = deals.filter((d) => d.status === 'activated-no-status');
+  const exportCSV = (filterStatus: DealStatus, fileLabel: string) => {
+    const filtered = deals.filter((d) => d.status === filterStatus);
     const headers = ['email_address', 'first_name', 'last_name', 'tags', 'source', 'opt_in_date'];
-    const rows = activationOnly.map((deal) => {
+    const rows = filtered.map((deal) => {
       const nameParts = deal.contact.FullName.trim().split(/\s+/);
       const firstName = nameParts[0] || '';
       const lastName = nameParts.slice(1).join(' ') || '';
+      const isRanked = filterStatus === 'activated-with-status';
+      const rankTag = isRanked && deal.goStatus ? `Rank_${deal.goStatus.replace(/\s+/g, '_')}` : '';
       const tags = [
         'Activated_Distributor',
-        'Activation_Only_R375',
+        isRanked ? 'Has_GO_Status' : 'Activation_Only_R375',
+        rankTag,
         deal.contact.FocusArea ? deal.contact.FocusArea.replace(/\s+/g, '_') : '',
         deal.contact.LeadTemperature ? `Temp_${deal.contact.LeadTemperature}` : '',
         deal.contact.InterestLevel ? `Interest_${deal.contact.InterestLevel}` : '',
@@ -153,7 +156,7 @@ export function Deals() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `zazi-mail-activation-only-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `zazi-mail-${fileLabel}-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -168,14 +171,24 @@ export function Deals() {
             {deals.length} activated distributors — {statusCounts['activated-with-status']} with GO-Status, {statusCounts['activated-no-status']} activation only
           </p>
         </div>
-        <button
-          type="button"
-          onClick={exportActivationOnlyCSV}
-          className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-teal-600 hover:bg-teal-500 text-white transition-colors"
-        >
-          <Download className="w-4 h-4" />
-          Export ZAZI Mail ({statusCounts['activated-no-status']})
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => exportCSV('activated-no-status', 'activation-only')}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-teal-600 hover:bg-teal-500 text-white transition-colors"
+          >
+            <Download className="w-4 h-4" />
+            Export Activation Only ({statusCounts['activated-no-status']})
+          </button>
+          <button
+            type="button"
+            onClick={() => exportCSV('activated-with-status', 'go-status-ranked')}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
+          >
+            <Download className="w-4 h-4" />
+            Export GO-Status ({statusCounts['activated-with-status']})
+          </button>
+        </div>
       </div>
 
       {/* Status Summary Cards */}
