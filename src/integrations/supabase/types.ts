@@ -193,6 +193,39 @@ export type Database = {
         }
         Relationships: []
       }
+      invites: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          is_used: boolean
+          label: string
+          token: string
+          used_at: string | null
+          used_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          is_used?: boolean
+          label?: string
+          token?: string
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          is_used?: boolean
+          label?: string
+          token?: string
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Relationships: []
+      }
       orders: {
         Row: {
           amount: number
