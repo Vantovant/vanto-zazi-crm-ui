@@ -4,10 +4,12 @@ import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { ZaziCopilot } from './ZaziCopilot';
 import { CrmProvider } from '@/contexts/CrmContext';
+import { useActivityTracker } from '@/hooks/useActivityTracker';
 
 export function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
+  useActivityTracker();
 
   return (
     <CrmProvider>

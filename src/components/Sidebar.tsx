@@ -10,6 +10,7 @@ import {
   ArrowUpDown,
   HelpCircle,
   X,
+  BarChart3,
 } from 'lucide-react';
 
 const navItems = [
@@ -20,6 +21,7 @@ const navItems = [
   { path: '/deals', label: 'Deals', icon: Briefcase },
   { path: '/whatsapp', label: 'WhatsApp', icon: MessageCircle },
   { path: '/import-export', label: 'Import / Export', icon: ArrowUpDown },
+  { path: '/team', label: 'Tester Dashboard', icon: BarChart3 },
 ];
 
 interface SidebarProps {
