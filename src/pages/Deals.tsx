@@ -30,6 +30,7 @@ interface Deal {
 function estimatedMinValue(goStatus: string): number {
   const s = goStatus.toLowerCase();
   if (s.includes('diamond')) return 45000;   // $3,000 × 15
+  if (s.includes('vip')) return 22500;        // $1,500 × 15
   if (s.includes('mentor')) return 9000;      // $600 × 15
   if (s.includes('builder')) return 6000;     // $400 × 15
   if (s.includes('associate')) return 3000;   // $200 × 15
@@ -137,6 +138,7 @@ export function Deals() {
       if (isRanked && rank) {
         const r = rank.toLowerCase();
         if (r.includes('diamond')) sequence = 'Diamond_Leader_Sequence';
+        else if (r.includes('vip')) sequence = 'VIP_Elite_Sequence';
         else if (r.includes('mentor')) sequence = 'Mentor_Growth_Sequence';
         else if (r.includes('builder')) sequence = 'Builder_Momentum_Sequence';
         else if (r.includes('associate')) sequence = 'Associate_Upgrade_Sequence';
