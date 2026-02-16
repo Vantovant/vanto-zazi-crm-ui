@@ -6,13 +6,14 @@ import {
   FileSpreadsheet,
   Users,
   ShoppingCart,
-  
+  Award,
   CheckCircle,
   AlertCircle,
   X,
   FileText,
   Calendar,
   ChevronDown,
+  Mail,
 } from 'lucide-react';
 import { DataStatusBanner } from '../components/DataStatusBanner';
 import { useCrm } from '@/contexts/CrmContext';
@@ -299,6 +300,52 @@ export function ImportExport() {
   };
 
   const mappedCount = Object.values(columnMapping).filter(v => v !== '').length;
+
+  // ZAZI Mail export with tags & sequences (ConvertKit format)
+  const exportZaziMail = (filteredContacts: typeof contacts, isRanked: boolean, fileLabel: string) => {
+    const headers = ['email_address', 'first_name', 'last_name', 'tags', 'go_status_rank', 'sequence', 'source', 'opt_in_date'];
+    const rows = filteredContacts.map((contact) => {
+      const nameParts = contact.FullName.trim().split(/\s+/);
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+      const rank = contact.GOStatus && contact.GOStatus !== 'No status' ? contact.GOStatus.trim() : '';
+      const rankTag = isRanked && rank ? `GO_Status_${rank.replace(/\s+/g, '_')}` : '';
+      let sequence = '';
+      if (isRanked && rank) {
+        const r = rank.toLowerCase();
+        if (r.includes('diamond')) sequence = 'Diamond_Leader_Sequence';
+        else if (r.includes('vip')) sequence = 'VIP_Elite_Sequence';
+        else if (r.includes('mentor')) sequence = 'Mentor_Growth_Sequence';
+        else if (r.includes('builder')) sequence = 'Builder_Momentum_Sequence';
+        else if (r.includes('associate')) sequence = 'Associate_Upgrade_Sequence';
+        else if (r.includes('promoter')) sequence = 'Promoter_Activation_Sequence';
+        else sequence = 'General_Status_Sequence';
+      } else {
+        sequence = 'Activation_Nurture_Sequence';
+      }
+      const tags = [
+        'Activated_Distributor',
+        isRanked ? 'Has_GO_Status' : 'Activation_Only_R375',
+        rankTag,
+        contact.FocusArea ? contact.FocusArea.replace(/\s+/g, '_') : '',
+        contact.LeadTemperature ? `Temp_${contact.LeadTemperature}` : '',
+        contact.InterestLevel ? `Interest_${contact.InterestLevel}` : '',
+      ].filter(Boolean).join(', ');
+      const source = contact.LeadPath || 'Manual';
+      const optInDate = contact.DateCaptured || '';
+      return [
+        contact.EmailAddress, firstName, lastName, tags, rank, sequence, source, optInDate,
+      ].map((v) => `"${(v || '').replace(/"/g, '""')}"`).join(',');
+    });
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `zazi-mail-${fileLabel}-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="space-y-6">
@@ -843,7 +890,54 @@ export function ImportExport() {
               </button>
             </div>
           </div>
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-1 space-y-6">
+            {/* ZAZI Mail Exports */}
+            <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <Mail className="w-4 h-4 text-teal-400" />
+                <h3 className="text-sm font-semibold text-white">ZAZI Mail Exports</h3>
+              </div>
+              <p className="text-xs text-slate-400 mb-4">Export distributors with tags &amp; sequences for your email system.</p>
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const purchaseContacts = contacts.filter(c => c.LeadType === 'Purchase_Status');
+                    const activationOnly = purchaseContacts.filter(c => !c.GOStatus || c.GOStatus === 'No status' || c.GOStatus === '');
+                    exportZaziMail(activationOnly, false, 'activation-only');
+                  }}
+                  className="w-full flex items-center gap-3 p-3 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-lg transition-colors text-left"
+                >
+                  <div className="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                    <ShoppingCart className="w-5 h-5 text-amber-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-white">Activation Only</p>
+                    <p className="text-xs text-slate-400">{contacts.filter(c => c.LeadType === 'Purchase_Status' && (!c.GOStatus || c.GOStatus === 'No status' || c.GOStatus === '')).length} contacts · Tags + Sequences</p>
+                  </div>
+                  <Download className="w-4 h-4 text-amber-400" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const purchaseContacts = contacts.filter(c => c.LeadType === 'Purchase_Status');
+                    const withStatus = purchaseContacts.filter(c => c.GOStatus && c.GOStatus !== 'No status' && c.GOStatus !== '');
+                    exportZaziMail(withStatus, true, 'go-status-ranked');
+                  }}
+                  className="w-full flex items-center gap-3 p-3 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-lg transition-colors text-left"
+                >
+                  <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                    <Award className="w-5 h-5 text-emerald-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-white">GO-Status Ranked</p>
+                    <p className="text-xs text-slate-400">{contacts.filter(c => c.LeadType === 'Purchase_Status' && c.GOStatus && c.GOStatus !== 'No status' && c.GOStatus !== '').length} contacts · Tags + Sequences</p>
+                  </div>
+                  <Download className="w-4 h-4 text-emerald-400" />
+                </button>
+              </div>
+            </div>
+
             <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-5">
               <h3 className="text-sm font-semibold text-white mb-4">Export Info</h3>
               <ul className="space-y-2 text-xs text-slate-400">
@@ -857,7 +951,7 @@ export function ImportExport() {
                 </li>
                 <li className="flex items-start gap-2">
                   <CheckCircle className="w-3.5 h-3.5 text-teal-400 mt-0.5 flex-shrink-0" />
-                  All your data is included in exports
+                  ZAZI Mail exports include tags &amp; sequences
                 </li>
               </ul>
             </div>
