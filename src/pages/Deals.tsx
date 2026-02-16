@@ -124,13 +124,27 @@ export function Deals() {
 
   const exportCSV = (filterStatus: DealStatus, fileLabel: string) => {
     const filtered = deals.filter((d) => d.status === filterStatus);
-    const headers = ['email_address', 'first_name', 'last_name', 'tags', 'source', 'opt_in_date'];
+    const headers = ['email_address', 'first_name', 'last_name', 'tags', 'go_status_rank', 'sequence', 'source', 'opt_in_date'];
     const rows = filtered.map((deal) => {
       const nameParts = deal.contact.FullName.trim().split(/\s+/);
       const firstName = nameParts[0] || '';
       const lastName = nameParts.slice(1).join(' ') || '';
       const isRanked = filterStatus === 'activated-with-status';
-      const rankTag = isRanked && deal.goStatus ? `Rank_${deal.goStatus.replace(/\s+/g, '_')}` : '';
+      const rank = deal.goStatus && deal.goStatus !== 'No status' ? deal.goStatus.trim() : '';
+      const rankTag = isRanked && rank ? `GO_Status_${rank.replace(/\s+/g, '_')}` : '';
+      // Assign sequence based on rank tier
+      let sequence = '';
+      if (isRanked && rank) {
+        const r = rank.toLowerCase();
+        if (r.includes('diamond')) sequence = 'Diamond_Leader_Sequence';
+        else if (r.includes('mentor')) sequence = 'Mentor_Growth_Sequence';
+        else if (r.includes('builder')) sequence = 'Builder_Momentum_Sequence';
+        else if (r.includes('associate')) sequence = 'Associate_Upgrade_Sequence';
+        else if (r.includes('promoter')) sequence = 'Promoter_Activation_Sequence';
+        else sequence = 'General_Status_Sequence';
+      } else {
+        sequence = 'Activation_Nurture_Sequence';
+      }
       const tags = [
         'Activated_Distributor',
         isRanked ? 'Has_GO_Status' : 'Activation_Only_R375',
@@ -146,6 +160,8 @@ export function Deals() {
         firstName,
         lastName,
         tags,
+        rank,
+        sequence,
         source,
         optInDate,
       ].map((v) => `"${(v || '').replace(/"/g, '""')}"`).join(',');
