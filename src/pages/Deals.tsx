@@ -165,7 +165,7 @@ export function Deals() {
         <div>
           <h1 className="text-2xl font-semibold text-white">Deals</h1>
           <p className="text-sm text-slate-400 mt-0.5">
-            {deals.length} activated distributors — prospects for upgrades
+            {deals.length} activated distributors — {statusCounts['activated-with-status']} with GO-Status, {statusCounts['activated-no-status']} activation only
           </p>
         </div>
         <button
