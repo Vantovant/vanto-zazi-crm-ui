@@ -98,7 +98,8 @@ export function TeamDashboard() {
   };
 
   const copyLink = (token: string, id: string) => {
-    const url = `${window.location.origin}/auth?invite=${token}`;
+    const publishedUrl = 'https://vanto-zazi-bloom.lovable.app';
+    const url = `${publishedUrl}/auth?invite=${token}`;
     navigator.clipboard.writeText(url);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
@@ -259,7 +260,7 @@ export function TeamDashboard() {
                       </span>
                     </div>
                     <p className="text-xs text-slate-500 mt-0.5 truncate font-mono">
-                      {window.location.origin}/auth?invite={inv.token}
+                      https://vanto-zazi-bloom.lovable.app/auth?invite={inv.token}
                     </p>
                   </div>
                   <div className="flex items-center gap-1 ml-3">
