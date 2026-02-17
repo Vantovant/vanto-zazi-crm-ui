@@ -338,11 +338,10 @@ export function ImportExport() {
       }
 
       // Normalize date fields to YYYY-MM-DD for PostgreSQL
-      if (dbRow.date_captured) {
-        const normalized = normalizeDate(dbRow.date_captured as string);
-        if (normalized) dbRow.date_captured = normalized;
-        else delete dbRow.date_captured; // let DB use default
-      }
+      // Always ensure date_captured is set (batch inserts need consistent columns)
+      const rawDate = (dbRow.date_captured as string) || '';
+      const normalized = normalizeDate(rawDate);
+      dbRow.date_captured = normalized || new Date().toISOString().split('T')[0];
 
       // Detect expired member spreadsheets: if "Date of making inactive" header is present
       const hasInactiveDate = fileHeaders.some(h => normalize(h).includes('makinginactive'));
