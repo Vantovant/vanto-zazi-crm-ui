@@ -210,11 +210,29 @@ export function ContactDrawer({ prospect: initialProspect, onClose }: ContactDra
                   <MessageCircle className="w-5 h-5" />
                   <span className="text-xs font-medium">WhatsApp</span>
                 </button>
-                <button type="button" onClick={() => { if (prospect.PhoneNumber) window.open(`tel:${prospect.PhoneNumber}`); }} className="flex flex-col items-center gap-1.5 p-3 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 transition-colors">
+                <button type="button" onClick={async () => {
+                  if (prospect.PhoneNumber) {
+                    await logActivity({
+                      contact_id: String(prospect.id),
+                      activity_type: 'call',
+                      summary: `Called ${prospect.FullName}`,
+                    });
+                    window.open(`tel:${prospect.PhoneNumber}`);
+                  }
+                }} className="flex flex-col items-center gap-1.5 p-3 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 transition-colors">
                   <Phone className="w-5 h-5" />
                   <span className="text-xs font-medium">Call</span>
                 </button>
-                <button type="button" onClick={() => { if (prospect.EmailAddress) window.open(`mailto:${prospect.EmailAddress}`); }} className="flex flex-col items-center gap-1.5 p-3 rounded-lg bg-violet-500/10 hover:bg-violet-500/20 text-violet-400 transition-colors">
+                <button type="button" onClick={async () => {
+                  if (prospect.EmailAddress) {
+                    await logActivity({
+                      contact_id: String(prospect.id),
+                      activity_type: 'email',
+                      summary: `Sent email to ${prospect.FullName}`,
+                    });
+                    window.open(`mailto:${prospect.EmailAddress}`);
+                  }
+                }} className="flex flex-col items-center gap-1.5 p-3 rounded-lg bg-violet-500/10 hover:bg-violet-500/20 text-violet-400 transition-colors">
                   <Mail className="w-5 h-5" />
                   <span className="text-xs font-medium">Email</span>
                 </button>
