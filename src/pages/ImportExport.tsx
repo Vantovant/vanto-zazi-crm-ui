@@ -288,6 +288,23 @@ export function ImportExport() {
       AdditionalNotes: 'additional_notes', GOStatus: 'go_status',
     };
 
+    // Helper: convert various date formats to YYYY-MM-DD
+    const normalizeDate = (val: string): string => {
+      if (!val) return '';
+      // Already ISO format YYYY-MM-DD
+      if (/^\d{4}-\d{2}-\d{2}/.test(val)) return val.slice(0, 10);
+      // DD.MM.YYYY or DD/MM/YYYY
+      const euMatch = val.match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})$/);
+      if (euMatch) return `${euMatch[3]}-${euMatch[2].padStart(2, '0')}-${euMatch[1].padStart(2, '0')}`;
+      // MM/DD/YYYY
+      const usMatch = val.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      if (usMatch) return `${usMatch[3]}-${usMatch[1].padStart(2, '0')}-${usMatch[2].padStart(2, '0')}`;
+      // Try native parse as last resort
+      const d = new Date(val);
+      if (!Number.isNaN(d.getTime())) return d.toISOString().split('T')[0];
+      return ''; // unparseable — will use DB default
+    };
+
     const allRows: Record<string, unknown>[] = [];
     for (const row of fileRows) {
       const record: Record<string, string> = {};
@@ -304,6 +321,14 @@ export function ImportExport() {
       for (const [k, v] of Object.entries(record)) {
         if (fieldToCol[k]) dbRow[fieldToCol[k]] = v;
       }
+
+      // Normalize date fields to YYYY-MM-DD for PostgreSQL
+      if (dbRow.date_captured) {
+        const normalized = normalizeDate(dbRow.date_captured as string);
+        if (normalized) dbRow.date_captured = normalized;
+        else delete dbRow.date_captured; // let DB use default
+      }
+
       // Smart lead_type classification based on GO Status
       const goStatus = ((dbRow.go_status as string) || '').trim().toLowerCase();
       if (goStatus) {
@@ -322,7 +347,10 @@ export function ImportExport() {
     for (let i = 0; i < allRows.length; i += BATCH) {
       const batch = allRows.slice(i, i + BATCH);
       const { data, error } = await supabase.from('contacts').insert(batch as any).select('id');
-      if (error) { failed += batch.length; }
+      if (error) {
+        console.error('Import batch error:', error.message, 'Sample row:', JSON.stringify(batch[0]));
+        failed += batch.length;
+      }
       else { success += data.length; }
       setImportProgress(Math.min(i + BATCH, allRows.length));
       await new Promise(r => setTimeout(r, 50));
