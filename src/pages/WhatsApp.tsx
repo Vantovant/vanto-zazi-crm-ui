@@ -8,11 +8,15 @@ import {
   Bell,
   Copy,
   Check,
+  Sparkles,
+  Loader2,
+  Send,
 } from 'lucide-react';
 import { LogActivityModal } from '../components/LogActivityModal';
 import { AddFollowUpModal } from '../components/AddFollowUpModal';
 import { useCrm } from '@/contexts/CrmContext';
 import { useContactActivities } from '@/hooks/useContactActivities';
+import { supabase } from '@/integrations/supabase/client';
 
 const temperatureColors: Record<string, string> = {
   Hot: 'bg-rose-500',
@@ -28,6 +32,9 @@ export function WhatsApp() {
   const [showLogActivity, setShowLogActivity] = useState(false);
   const [showFollowUp, setShowFollowUp] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [suggestedMsg, setSuggestedMsg] = useState('');
+  const [msgLoading, setMsgLoading] = useState(false);
+  const [msgCopied, setMsgCopied] = useState(false);
 
   const contactsWithPhone = useMemo(() => {
     return contacts.filter(c => c.PhoneNumber && c.PhoneNumber.trim() !== '');
@@ -47,19 +54,77 @@ export function WhatsApp() {
     ? contacts.find(c => String(c.id) === selectedContactId)
     : filteredContacts[0] || null;
 
-  const handleOpenWhatsApp = useCallback(async () => {
+  const handleOpenWhatsApp = useCallback(async (prefilledMsg?: string) => {
     if (!selectedContact) return;
     const phone = selectedContact.PhoneNumber.replace(/\s/g, '').replace('+', '');
     
     // Log the WhatsApp activity with timestamp
+    const msgSummary = prefilledMsg
+      ? `Sent AI-suggested WhatsApp message to ${selectedContact.FullName}`
+      : `Opened WhatsApp chat with ${selectedContact.FullName}`;
     await logActivity({
       contact_id: String(selectedContact.id),
       activity_type: 'whatsapp',
-      summary: `Opened WhatsApp chat with ${selectedContact.FullName}`,
+      summary: msgSummary,
+      notes: prefilledMsg || '',
     });
     
-    window.open(`https://wa.me/${phone}`, '_blank');
+    const url = prefilledMsg
+      ? `https://wa.me/${phone}?text=${encodeURIComponent(prefilledMsg)}`
+      : `https://wa.me/${phone}`;
+    window.open(url, '_blank');
   }, [selectedContact, logActivity]);
+
+  const handleSuggestMessage = useCallback(async () => {
+    if (!selectedContact) return;
+    setMsgLoading(true);
+    setSuggestedMsg('');
+
+    try {
+      const contactData = {
+        name: selectedContact.FullName,
+        temperature: selectedContact.LeadTemperature,
+        type: selectedContact.LeadType,
+        status: selectedContact.CommunicationStatus,
+        registrationStatus: selectedContact.RegistrationStatus,
+        focusArea: selectedContact.FocusArea,
+        leadPath: selectedContact.LeadPath,
+        lastAction: selectedContact.ActionTaken,
+        nextAction: selectedContact.NextAction,
+        notes: selectedContact.AdditionalNotes,
+        goStatus: selectedContact.GOStatus,
+      };
+
+      const resp = await supabase.functions.invoke('zazi-copilot', {
+        body: {
+          action: 'contact_analysis',
+          message: `Generate a ready-to-send WhatsApp message for this contact. The message should be natural, friendly, and contextual based on their status and where they are in the journey. Keep it short (2-4 sentences max). Do NOT include any analysis — only output the message text itself, nothing else. No markdown, no quotes, just the plain message.`,
+          contactData,
+          contactId: String(selectedContact.id),
+        },
+      });
+
+      if (resp.error) throw resp.error;
+
+      const text = typeof resp.data === 'string' ? resp.data : await new Response(resp.data).text();
+      let result = '';
+      for (const line of text.split('\n')) {
+        if (!line.startsWith('data: ')) continue;
+        const json = line.slice(6).trim();
+        if (json === '[DONE]') break;
+        try {
+          const parsed = JSON.parse(json);
+          const content = parsed.choices?.[0]?.delta?.content;
+          if (content) result += content;
+        } catch {}
+      }
+      setSuggestedMsg(result.trim());
+    } catch (e) {
+      console.error('Suggest message error:', e);
+      setSuggestedMsg('Could not generate a message. Please try again.');
+    }
+    setMsgLoading(false);
+  }, [selectedContact]);
 
   const handleCopyNumber = useCallback(() => {
     if (!selectedContact) return;
@@ -97,7 +162,7 @@ export function WhatsApp() {
           {filteredContacts.map((contact) => (
             <div
               key={contact.id}
-              onClick={() => setSelectedContactId(String(contact.id))}
+              onClick={() => { setSelectedContactId(String(contact.id)); setSuggestedMsg(''); }}
               className={`flex items-start gap-3 p-4 cursor-pointer transition-colors border-b border-slate-700/50 ${
                 String(selectedContact?.id) === String(contact.id)
                   ? 'bg-slate-700/50'
@@ -183,7 +248,7 @@ export function WhatsApp() {
                 </button>
                 <button
                   type="button"
-                  onClick={handleOpenWhatsApp}
+                  onClick={() => handleOpenWhatsApp()}
                   className="flex items-center gap-2 px-3 py-2 text-sm font-medium bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors"
                 >
                   <ExternalLink className="w-4 h-4" />
@@ -196,6 +261,59 @@ export function WhatsApp() {
           {/* Contact Details */}
           <div className="flex-1 overflow-y-auto p-6">
             <div className="max-w-md mx-auto space-y-6">
+              {/* AI Message Suggestion */}
+              <div className="bg-violet-500/10 border border-violet-500/20 rounded-xl p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-violet-400" />
+                    <h3 className="text-sm font-semibold text-violet-300">AI Message</h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleSuggestMessage}
+                    disabled={msgLoading}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white rounded-lg transition-colors"
+                  >
+                    {msgLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                    {suggestedMsg ? 'Regenerate' : 'Suggest Message'}
+                  </button>
+                </div>
+                {msgLoading ? (
+                  <div className="flex items-center gap-2 text-violet-400 py-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span className="text-sm">Crafting the perfect message...</span>
+                  </div>
+                ) : suggestedMsg ? (
+                  <div>
+                    <p className="text-sm text-slate-300 whitespace-pre-wrap mb-3">{suggestedMsg}</p>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(suggestedMsg);
+                          setMsgCopied(true);
+                          setTimeout(() => setMsgCopied(false), 2000);
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition-colors"
+                      >
+                        {msgCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                        {msgCopied ? 'Copied!' : 'Copy'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenWhatsApp(suggestedMsg)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors"
+                      >
+                        <Send className="w-3 h-3" />
+                        Send via WhatsApp
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-violet-400/70">Click "Suggest Message" to generate a smart, contextual WhatsApp message for {selectedContact.FullName}.</p>
+                )}
+              </div>
+
               {/* Contact Info Card */}
               <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5 space-y-4">
                 <h3 className="text-sm font-semibold text-white">Contact Details</h3>
