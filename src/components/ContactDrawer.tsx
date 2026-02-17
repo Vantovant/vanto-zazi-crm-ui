@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   X,
   Phone,
@@ -14,6 +14,8 @@ import {
   AlertCircle,
   Pencil,
   Award,
+  Loader2,
+  Save,
 } from 'lucide-react';
 import type { Prospect } from '../data/mockData';
 import { EditContactModal } from './EditContactModal';
@@ -45,14 +47,27 @@ const regStatusColors: Record<string, string> = {
 };
 
 export function ContactDrawer({ prospect: initialProspect, onClose }: ContactDrawerProps) {
-  const { contacts } = useCrm();
-  const { logActivity } = useContactActivities();
+  const { contacts, updateContact } = useCrm();
+  const { logActivity, getContactActivities } = useContactActivities();
   const [showEdit, setShowEdit] = useState(false);
+  const [notesValue, setNotesValue] = useState('');
+  const [notesSaving, setNotesSaving] = useState(false);
 
   // Always use latest contact data from context
   const prospect = contacts.find(c => String(c.id) === String(initialProspect.id)) || initialProspect;
 
   const initials = prospect.FullName.split(' ').map(n => n[0]).join('');
+  const contactActivities = getContactActivities(String(prospect.id));
+
+  useEffect(() => {
+    setNotesValue(prospect.AdditionalNotes || '');
+  }, [prospect.AdditionalNotes]);
+
+  const handleSaveNotes = useCallback(async () => {
+    setNotesSaving(true);
+    await updateContact(String(prospect.id), { AdditionalNotes: notesValue } as any);
+    setNotesSaving(false);
+  }, [prospect.id, notesValue, updateContact]);
 
   const handleWhatsApp = useCallback(async () => {
     const phone = prospect.PhoneNumber.replace(/\s/g, '').replace('+', '');
@@ -265,67 +280,65 @@ export function ContactDrawer({ prospect: initialProspect, onClose }: ContactDra
               <h4 className="font-semibold text-white">Activity & Notes</h4>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-4">
-              {/* Activity Details */}
-              {prospect.ActionTaken || prospect.NextAction || prospect.MeetingTime ? (
-                <div className="space-y-3">
-                  {prospect.ActionTaken && (
-                    <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-4">
-                      <h5 className="text-xs font-semibold text-slate-500 uppercase mb-2">Last Action Taken</h5>
-                      <p className="text-sm text-slate-300">{prospect.ActionTaken}</p>
-                    </div>
-                  )}
-
-                  {prospect.NextAction && (
-                    <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-4">
-                      <h5 className="text-xs font-semibold text-slate-500 uppercase mb-2">Next Action</h5>
-                      <p className="text-sm text-slate-300">{prospect.NextAction}</p>
-                    </div>
-                  )}
-
+            <div className="flex-1 sm:overflow-y-auto p-6 space-y-4">
+              {/* Next Action */}
+              {prospect.NextAction && (
+                <div className="bg-teal-500/10 rounded-lg border border-teal-500/20 p-4">
+                  <h5 className="text-xs font-semibold text-teal-400 uppercase mb-2">Next Action</h5>
+                  <p className="text-sm text-teal-300">{prospect.NextAction}</p>
                   {prospect.MeetingTime && (
-                    <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-4">
-                      <h5 className="text-xs font-semibold text-slate-500 uppercase mb-2 flex items-center gap-1">
-                        <Calendar className="w-3 h-3" /> Meeting Time
-                      </h5>
-                      <p className="text-sm text-slate-300">{prospect.MeetingTime}</p>
-                    </div>
+                    <p className="text-xs text-teal-400/70 mt-1">📅 {prospect.MeetingTime}</p>
                   )}
-
-                  {prospect.DateCaptured && (
-                    <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-4">
-                      <h5 className="text-xs font-semibold text-slate-500 uppercase mb-2">Date Captured</h5>
-                      <p className="text-sm text-slate-300">{prospect.DateCaptured}</p>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="bg-slate-800/30 rounded-lg border border-dashed border-slate-700 p-4">
-                  <p className="text-sm text-slate-500 italic">No activity logged yet.</p>
                 </div>
               )}
 
-              {/* Phase 2B timeline notice */}
-              <div className="flex items-start gap-3 p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-                <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
-                <p className="text-xs text-amber-400/70">
-                  Full activity timeline coming in Phase 2B. Activity is currently saved to the contact's ActionTaken field.
-                </p>
+              {/* Activity Timeline */}
+              <div>
+                <h5 className="text-xs font-semibold text-slate-500 uppercase mb-2">Activity History</h5>
+                {contactActivities.length === 0 ? (
+                  <div className="bg-slate-800/30 rounded-lg border border-dashed border-slate-700 p-4">
+                    <p className="text-sm text-slate-500 italic">No activities logged yet.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {contactActivities.slice(0, 20).map((a) => (
+                      <div key={a.id} className="bg-slate-800/50 rounded-lg border border-slate-700 p-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-medium text-teal-400 capitalize">{a.activity_type}</span>
+                          <span className="text-xs text-slate-500">{new Date(a.created_at).toLocaleDateString()}</span>
+                        </div>
+                        <p className="text-sm text-slate-300 mt-1">{a.summary}</p>
+                        {a.notes && <p className="text-xs text-slate-500 mt-1">{a.notes}</p>}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Notes Section */}
+            {/* Notes Section - Editable */}
             <div className="border-t border-slate-700 p-4">
-              <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Notes</h4>
-              {prospect.AdditionalNotes ? (
-                <div className="p-3 rounded-lg bg-slate-800 border border-slate-700">
-                  <p className="text-sm text-slate-300">{prospect.AdditionalNotes}</p>
-                </div>
-              ) : (
-                <div className="p-3 rounded-lg bg-slate-800/50 border border-dashed border-slate-700">
-                  <p className="text-sm text-slate-500 italic">No notes added yet.</p>
-                </div>
-              )}
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Notes</h4>
+                {notesValue !== (prospect.AdditionalNotes || '') && (
+                  <button
+                    type="button"
+                    onClick={handleSaveNotes}
+                    disabled={notesSaving}
+                    className="flex items-center gap-1 px-2 py-1 text-xs font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white rounded-md transition-colors"
+                  >
+                    {notesSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                    Save
+                  </button>
+                )}
+              </div>
+              <textarea
+                value={notesValue}
+                onChange={(e) => setNotesValue(e.target.value)}
+                placeholder="Add notes about this contact..."
+                rows={3}
+                className="w-full px-3 py-2 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500 placeholder:text-slate-500 resize-none"
+              />
             </div>
           </div>
         </div>
