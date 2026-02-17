@@ -1,13 +1,21 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
-import { MessageSquare, X, Sparkles, BookOpen, User, TrendingUp, Send, Loader2, ThumbsUp, ThumbsDown, Minus } from 'lucide-react';
+import { MessageSquare, X, Sparkles, BookOpen, User, TrendingUp, Send, Loader2, ThumbsUp, ThumbsDown, Minus, FileText, Upload, Trash2 } from 'lucide-react';
 import { useCrm } from '@/contexts/CrmContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import ReactMarkdown from 'react-markdown';
 
-type Tab = 'ask' | 'page' | 'contact' | 'insight';
+type Tab = 'ask' | 'page' | 'contact' | 'insight' | 'knowledge';
 interface Message { role: 'user' | 'assistant'; content: string }
+interface KnowledgeDoc {
+  id: string;
+  file_name: string;
+  file_type: string;
+  file_size: number;
+  status: string;
+  created_at: string;
+}
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zazi-copilot`;
 
@@ -79,6 +87,15 @@ function MarkdownContent({ content }: { content: string }) {
   );
 }
 
+const ACCEPTED_TYPES = [
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/msword',
+  'text/plain',
+];
+const ACCEPTED_EXT = ['.pdf', '.docx', '.doc', '.txt', '.md'];
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
 export function ZaziCopilot({ selectedContactId }: { selectedContactId?: string | null }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<Tab>('ask');
@@ -90,7 +107,11 @@ export function ZaziCopilot({ selectedContactId }: { selectedContactId?: string 
   const [pageContent, setPageContent] = useState('');
   const [insightContent, setInsightContent] = useState('');
   const [feedbackShown, setFeedbackShown] = useState<string | null>(null);
+  const [knowledgeDocs, setKnowledgeDocs] = useState<KnowledgeDoc[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [docsLoaded, setDocsLoaded] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const location = useLocation();
   const { contacts, orders } = useCrm();
   const { user } = useAuth();
@@ -104,6 +125,96 @@ export function ZaziCopilot({ selectedContactId }: { selectedContactId?: string 
   const selectedContact = selectedContactId
     ? contacts.find(c => String(c.id) === selectedContactId)
     : null;
+
+  // Load knowledge docs
+  const loadKnowledgeDocs = useCallback(async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from('user_knowledge_docs')
+      .select('id, file_name, file_type, file_size, status, created_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+    if (data) setKnowledgeDocs(data as KnowledgeDoc[]);
+    setDocsLoaded(true);
+  }, [user]);
+
+  useEffect(() => {
+    if (tab === 'knowledge' && !docsLoaded) loadKnowledgeDocs();
+  }, [tab, docsLoaded, loadKnowledgeDocs]);
+
+  // Upload a knowledge doc
+  const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    const ext = '.' + file.name.split('.').pop()?.toLowerCase();
+    if (!ACCEPTED_TYPES.includes(file.type) && !ACCEPTED_EXT.includes(ext)) {
+      alert('Unsupported file type. Please upload PDF, Word (.docx/.doc), or text (.txt/.md) files.');
+      return;
+    }
+    if (file.size > MAX_FILE_SIZE) {
+      alert('File too large. Maximum size is 10MB.');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const filePath = `${user.id}/${Date.now()}_${file.name}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('knowledge-docs')
+        .upload(filePath, file);
+      if (uploadError) throw uploadError;
+
+      const { data: docRecord, error: insertError } = await supabase
+        .from('user_knowledge_docs')
+        .insert({
+          user_id: user.id,
+          file_name: file.name,
+          file_type: file.type || ext,
+          file_path: filePath,
+          file_size: file.size,
+          status: 'processing',
+        })
+        .select('id')
+        .single();
+      if (insertError) throw insertError;
+
+      // Trigger parsing
+      await supabase.functions.invoke('parse-knowledge-doc', {
+        body: { docId: docRecord.id },
+      });
+
+      await loadKnowledgeDocs();
+    } catch (err) {
+      console.error('Upload error:', err);
+      alert('Failed to upload document. Please try again.');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }, [user, loadKnowledgeDocs]);
+
+  // Delete a knowledge doc
+  const deleteDoc = useCallback(async (doc: KnowledgeDoc) => {
+    if (!user || !confirm(`Delete "${doc.file_name}"?`)) return;
+    try {
+      // Get full doc to find file_path
+      const { data: fullDoc } = await supabase
+        .from('user_knowledge_docs')
+        .select('file_path')
+        .eq('id', doc.id)
+        .single();
+
+      if (fullDoc?.file_path) {
+        await supabase.storage.from('knowledge-docs').remove([fullDoc.file_path]);
+      }
+      await supabase.from('user_knowledge_docs').delete().eq('id', doc.id);
+      setKnowledgeDocs(prev => prev.filter(d => d.id !== doc.id));
+    } catch (err) {
+      console.error('Delete error:', err);
+    }
+  }, [user]);
 
   // Build a CRM summary that gets passed with every request
   const crmSummary = useMemo(() => {
@@ -138,6 +249,23 @@ export function ZaziCopilot({ selectedContactId }: { selectedContactId?: string 
     };
   }, [contacts, orders]);
 
+  // Fetch user's knowledge docs content for AI context
+  const getKnowledgeContext = useCallback(async (): Promise<string> => {
+    if (!user) return '';
+    const { data } = await supabase
+      .from('user_knowledge_docs')
+      .select('file_name, extracted_text')
+      .eq('user_id', user.id)
+      .eq('status', 'ready');
+    if (!data || data.length === 0) return '';
+    // Combine all docs, truncate total to ~50k chars
+    let combined = data.map((d: { file_name: string; extracted_text: string | null }) =>
+      `--- Document: ${d.file_name} ---\n${d.extracted_text || ''}`
+    ).join('\n\n');
+    if (combined.length > 50000) combined = combined.substring(0, 50000) + '\n[Knowledge base truncated]';
+    return combined;
+  }, [user]);
+
   const sendAsk = useCallback(async () => {
     if (!input.trim() || loading) return;
     const userMsg: Message = { role: 'user', content: input };
@@ -156,8 +284,9 @@ export function ZaziCopilot({ selectedContactId }: { selectedContactId?: string 
     };
 
     try {
+      const knowledgeContext = await getKnowledgeContext();
       await streamChat(
-        { action: 'ask', message: input, route: currentRoute, crmSummary },
+        { action: 'ask', message: input, route: currentRoute, crmSummary, knowledgeContext },
         upsert,
         () => setLoading(false),
       );
@@ -165,7 +294,7 @@ export function ZaziCopilot({ selectedContactId }: { selectedContactId?: string 
       upsert(`\n\n⚠️ ${e instanceof Error ? e.message : 'Error connecting to AI'}`);
       setLoading(false);
     }
-  }, [input, loading, currentRoute, crmSummary]);
+  }, [input, loading, currentRoute, crmSummary, getKnowledgeContext]);
 
   const sendContactChat = useCallback(async () => {
     if (!contactInput.trim() || loading || !selectedContact) return;
@@ -186,6 +315,7 @@ export function ZaziCopilot({ selectedContactId }: { selectedContactId?: string 
     };
 
     try {
+      const knowledgeContext = await getKnowledgeContext();
       await streamChat(
         {
           action: 'contact_chat',
@@ -193,6 +323,7 @@ export function ZaziCopilot({ selectedContactId }: { selectedContactId?: string 
           contactData: { ...selectedContact, orders: contactOrders },
           contactId: String(selectedContact.id),
           crmSummary,
+          knowledgeContext,
         },
         upsert,
         () => setLoading(false),
@@ -201,7 +332,7 @@ export function ZaziCopilot({ selectedContactId }: { selectedContactId?: string 
       upsert(`\n\n⚠️ ${e instanceof Error ? e.message : 'Error connecting to AI'}`);
       setLoading(false);
     }
-  }, [contactInput, loading, selectedContact, orders, crmSummary]);
+  }, [contactInput, loading, selectedContact, orders, crmSummary, getKnowledgeContext]);
 
   const loadPageGuidance = useCallback(async () => {
     if (loading) return;
@@ -233,12 +364,14 @@ export function ZaziCopilot({ selectedContactId }: { selectedContactId?: string 
     };
 
     try {
+      const knowledgeContext = await getKnowledgeContext();
       await streamChat(
         {
           action: 'contact_analysis',
           contactId: String(selectedContact.id),
           contactData: { ...selectedContact, orders: contactOrders },
           crmSummary,
+          knowledgeContext,
         },
         addAnalysis,
         () => { setLoading(false); setFeedbackShown(String(selectedContact.id)); },
@@ -247,7 +380,7 @@ export function ZaziCopilot({ selectedContactId }: { selectedContactId?: string 
       setContactMessages([{ role: 'assistant', content: `⚠️ ${e instanceof Error ? e.message : 'Error'}` }]);
       setLoading(false);
     }
-  }, [selectedContact, orders, loading, crmSummary]);
+  }, [selectedContact, orders, loading, crmSummary, getKnowledgeContext]);
 
   const loadInsight = useCallback(async () => {
     if (loading) return;
@@ -255,8 +388,9 @@ export function ZaziCopilot({ selectedContactId }: { selectedContactId?: string 
     setLoading(true);
     let soFar = '';
     try {
+      const knowledgeContext = await getKnowledgeContext();
       await streamChat(
-        { action: 'business_insight', message: `My CRM summary: ${JSON.stringify(crmSummary)}`, crmSummary },
+        { action: 'business_insight', message: `My CRM summary: ${JSON.stringify(crmSummary)}`, crmSummary, knowledgeContext },
         (chunk) => { soFar += chunk; setInsightContent(soFar); },
         () => setLoading(false),
       );
@@ -264,7 +398,7 @@ export function ZaziCopilot({ selectedContactId }: { selectedContactId?: string 
       setInsightContent(`⚠️ ${e instanceof Error ? e.message : 'Error'}`);
       setLoading(false);
     }
-  }, [crmSummary, loading]);
+  }, [crmSummary, loading, getKnowledgeContext]);
 
   const handleFeedback = async (success: boolean | null) => {
     if (!user || !selectedContact) return;
@@ -284,11 +418,18 @@ export function ZaziCopilot({ selectedContactId }: { selectedContactId?: string 
     setFeedbackShown(null);
   };
 
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
   const tabs: { key: Tab; icon: typeof MessageSquare; label: string }[] = [
     { key: 'ask', icon: MessageSquare, label: 'Ask ZAZI' },
     { key: 'page', icon: BookOpen, label: 'Page Guide' },
     { key: 'contact', icon: User, label: 'This Contact' },
     { key: 'insight', icon: TrendingUp, label: 'Insights' },
+    { key: 'knowledge', icon: FileText, label: 'Knowledge' },
   ];
 
   return (
@@ -442,6 +583,76 @@ export function ZaziCopilot({ selectedContactId }: { selectedContactId?: string 
                 {!loading && insightContent && (
                   <button type="button" onClick={loadInsight} className="mt-3 text-xs text-teal-400 hover:underline">Refresh</button>
                 )}
+              </div>
+            )}
+
+            {tab === 'knowledge' && (
+              <div className="text-sm text-slate-300">
+                <div className="mb-4">
+                  <h3 className="text-sm font-semibold text-teal-400 mb-1">Knowledge Base</h3>
+                  <p className="text-xs text-slate-500 mb-3">
+                    Upload documents about your business — compensation plans, product guides, rules, prices, incentives. ZAZI will use this knowledge when answering your questions.
+                  </p>
+
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".pdf,.docx,.doc,.txt,.md"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-600/20 border border-teal-600/30 text-teal-400 rounded-lg hover:bg-teal-600/30 transition-colors disabled:opacity-50"
+                  >
+                    {uploading ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" /> Processing...</>
+                    ) : (
+                      <><Upload className="w-4 h-4" /> Upload Document</>
+                    )}
+                  </button>
+                  <p className="text-[10px] text-slate-600 mt-1.5 text-center">PDF, Word (.docx/.doc), or Text (.txt/.md) · Max 10MB</p>
+                </div>
+
+                {knowledgeDocs.length === 0 && docsLoaded && (
+                  <div className="text-center py-6">
+                    <FileText className="w-8 h-8 text-slate-700 mx-auto mb-2" />
+                    <p className="text-xs text-slate-600">No documents uploaded yet.</p>
+                    <p className="text-xs text-slate-600">Upload your business docs to train ZAZI.</p>
+                  </div>
+                )}
+
+                {knowledgeDocs.map(doc => (
+                  <div key={doc.id} className="flex items-center gap-3 px-3 py-2.5 bg-slate-800 rounded-lg border border-slate-700 mb-2">
+                    <FileText className="w-4 h-4 text-slate-500 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-slate-300 truncate">{doc.file_name}</p>
+                      <p className="text-[10px] text-slate-600">
+                        {formatFileSize(doc.file_size)} · {' '}
+                        <span className={
+                          doc.status === 'ready' ? 'text-emerald-500' :
+                          doc.status === 'processing' ? 'text-amber-500' :
+                          doc.status === 'error' ? 'text-red-500' : 'text-slate-500'
+                        }>
+                          {doc.status === 'ready' ? '✓ Ready' :
+                           doc.status === 'processing' ? '⏳ Processing' :
+                           doc.status === 'error' ? '✗ Error' :
+                           doc.status === 'empty' ? '⚠ No text found' : doc.status}
+                        </span>
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => deleteDoc(doc)}
+                      className="text-slate-600 hover:text-red-400 transition-colors"
+                      title="Delete document"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
               </div>
             )}
           </div>
