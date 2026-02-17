@@ -17,6 +17,13 @@ serve(async (req) => {
     // Get all users from profiles
     const { data: profiles } = await supabase.from("profiles").select("id, display_name, created_at");
 
+    // Get user emails from auth.users via admin API
+    const { data: { users: authUsers } } = await supabase.auth.admin.listUsers({ perPage: 1000 });
+    const emailMap: Record<string, string> = {};
+    for (const u of (authUsers || [])) {
+      emailMap[u.id] = u.email || '';
+    }
+
     // Get activity data for all users
     const { data: activities } = await supabase
       .from("user_activity")
@@ -54,6 +61,7 @@ serve(async (req) => {
       return {
         userId: uid,
         displayName: profile.display_name || "Unknown",
+        email: emailMap[uid] || "",
         joinedAt: profile.created_at,
         lastActive,
         totalActions,
