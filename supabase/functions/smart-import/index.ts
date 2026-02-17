@@ -17,7 +17,7 @@ const CRM_SCHEMA = {
   LeadTemperature: { label: "Lead Temperature", description: "Hot, Warm, or Cold", examples: ["Hot", "Warm", "Cold"] },
   CommunicationStatus: { label: "Communication Status", description: "New, In Progress, Pending, or Completed", examples: ["New", "In Progress"] },
   RegistrationStatus: { label: "Registration Status", description: "Registered, Not Registered, or Activated", examples: ["Registered", "Not Registered"] },
-  LeadType: { label: "Lead Type", description: "Prospect, Registered_Nopurchase, Purchase_Nostatus, Purchase_Status", examples: ["Prospect"] },
+  LeadType: { label: "Lead Type", description: "Prospect, Registered_Nopurchase, Purchase_Nostatus, Purchase_Status, or Expired (for inactive/expired members)", examples: ["Prospect", "Expired"] },
   InterestLevel: { label: "Interest Level", description: "High, Medium, or Low", examples: ["High", "Medium"] },
   FocusArea: { label: "Focus Area", description: "Health Transformation, Business Opportunity, or Both", examples: ["Health Transformation"] },
   LeadPath: { label: "Lead Path", description: "Customer, Distributor, or Not sure yet", examples: ["Customer", "Distributor"] },
