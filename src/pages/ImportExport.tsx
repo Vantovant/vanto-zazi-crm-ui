@@ -1104,6 +1104,21 @@ export function ImportExport() {
                   </div>
                   <Download className="w-4 h-4 text-emerald-400" />
                 </button>
+                <button type="button"
+                  onClick={() => {
+                    const expiredContacts = contacts.filter(c => c.LeadType === 'Expired');
+                    exportZaziMail(expiredContacts, true, 'expired-members');
+                  }}
+                  className="w-full flex items-center gap-3 p-3 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 rounded-lg transition-colors text-left">
+                  <div className="w-10 h-10 rounded-lg bg-rose-500/20 flex items-center justify-center flex-shrink-0">
+                    <AlertCircle className="w-5 h-5 text-rose-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-white">Expired Members</p>
+                    <p className="text-xs text-slate-400">{contacts.filter(c => c.LeadType === 'Expired').length} contacts · Re-engagement Tags</p>
+                  </div>
+                  <Download className="w-4 h-4 text-rose-400" />
+                </button>
               </div>
             </div>
             <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-5">
