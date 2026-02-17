@@ -13,6 +13,7 @@ import {
   UserX,
 } from 'lucide-react';
 import { LogActivityModal } from '../components/LogActivityModal';
+import { ContactDrawer } from '../components/ContactDrawer';
 import { useCrm } from '@/contexts/CrmContext';
 import { useContactActivities } from '@/hooks/useContactActivities';
 import { supabase } from '@/integrations/supabase/client';
@@ -50,6 +51,7 @@ function formatTimeAgo(dateStr: string) {
 
 export function Activities() {
   const [showLogActivity, setShowLogActivity] = useState(false);
+  const [drawerContactId, setDrawerContactId] = useState<string | null>(null);
   const { contacts } = useCrm();
   const { activities, loading, getNeglectedContacts } = useContactActivities();
   const [aiInsight, setAiInsight] = useState('');
@@ -194,7 +196,7 @@ export function Activities() {
                 <p className="text-sm text-slate-400">All contacts are up to date!</p>
               </div>
             ) : neglectedContacts.map((item) => (
-              <div key={item.contact_id} className="px-5 py-3 hover:bg-slate-700/30 transition-colors">
+              <div key={item.contact_id} className="px-5 py-3 hover:bg-slate-700/30 transition-colors cursor-pointer" onClick={() => setDrawerContactId(item.contact_id)}>
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-medium text-white">{item.contact?.FullName}</p>
                   <span className="text-xs font-medium text-amber-400">{item.daysSince}d ago</span>
@@ -221,7 +223,7 @@ export function Activities() {
                 <p className="text-sm text-slate-400">All contacts have been reached!</p>
               </div>
             ) : neverContactedList.map((contact) => (
-              <div key={contact.id} className="px-5 py-3 hover:bg-slate-700/30 transition-colors">
+              <div key={contact.id} className="px-5 py-3 hover:bg-slate-700/30 transition-colors cursor-pointer" onClick={() => setDrawerContactId(String(contact.id))}>
                 <p className="text-sm font-medium text-white">{contact.FullName}</p>
                 <p className="text-xs text-slate-500 mt-0.5">
                   {contact.LeadTemperature} · {contact.NextAction || 'No action set'}
@@ -277,7 +279,7 @@ export function Activities() {
               const colorClass = activityTypeColors[activity.activity_type] || 'bg-slate-500/20 text-slate-400';
               const contact = contacts.find(c => String(c.id) === activity.contact_id);
               return (
-                <div key={activity.id} className="px-5 py-4 hover:bg-slate-700/30 transition-colors">
+                <div key={activity.id} className="px-5 py-4 hover:bg-slate-700/30 transition-colors cursor-pointer" onClick={() => activity.contact_id && setDrawerContactId(activity.contact_id)}>
                   <div className="flex items-start gap-3">
                     <div className={`p-2 rounded-lg ${colorClass} mt-0.5`}>
                       <Icon className="w-4 h-4" />
@@ -308,6 +310,11 @@ export function Activities() {
       {showLogActivity && (
         <LogActivityModal onClose={() => setShowLogActivity(false)} />
       )}
+
+      {drawerContactId && (() => {
+        const c = contacts.find(ct => String(ct.id) === drawerContactId);
+        return c ? <ContactDrawer prospect={c} onClose={() => setDrawerContactId(null)} /> : null;
+      })()}
     </div>
   );
 }
