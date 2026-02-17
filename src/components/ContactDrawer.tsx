@@ -115,8 +115,8 @@ export function ContactDrawer({ prospect: initialProspect, onClose }: ContactDra
       };
       const resp = await supabase.functions.invoke('zazi-copilot', {
         body: {
-          action: 'contact_analysis',
-          message: `Generate a ready-to-send WhatsApp message for this contact. The message should be natural, friendly, and contextual based on their status and where they are in the journey. Keep it short (2-4 sentences max). Do NOT include any analysis — only output the message text itself, nothing else. No markdown, no quotes, just the plain message.`,
+          action: 'suggest_message',
+          message: `Generate a ready-to-send WhatsApp message for this contact.`,
           contactData,
           contactId: String(prospect.id),
         },

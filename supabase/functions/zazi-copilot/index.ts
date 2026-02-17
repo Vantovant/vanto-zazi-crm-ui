@@ -150,6 +150,9 @@ CRM CONTEXT:
     } else if (action === "contact_analysis") {
       systemPrompt += `\nAnalyze this contact and suggest the next best action. Show confidence score. Explain reasoning. Consider their position in the APLGO lifecycle and suggest specific MLM strategies.`;
       userMessage = `Analyze this contact and suggest next steps:\n${JSON.stringify(contactData, null, 2)}`;
+    } else if (action === "suggest_message") {
+      systemPrompt = `You generate ready-to-send WhatsApp messages for APLGO CRM contacts. The message must be natural, friendly, and contextual based on their status and journey. Keep it short (2-4 sentences max). Output ONLY the plain message text — no markdown, no quotes, no analysis, no headings, no labels. Just the message ready to copy-paste into WhatsApp.`;
+      userMessage = `Generate a WhatsApp message for this contact:\n${JSON.stringify(contactData, null, 2)}\n\nAdditional context: ${message || 'none'}`;
     } else if (action === "contact_chat") {
       systemPrompt += `\nThe user is asking a follow-up question about a specific contact. Here is the contact data:\n${JSON.stringify(contactData, null, 2)}\n\nAnswer their question using both the contact data and your APLGO/MLM expertise.`;
     } else if (action === "business_insight") {
