@@ -57,19 +57,30 @@ export function Activities() {
   const [aiInsight, setAiInsight] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
 
-  // Neglected contacts (no activity in 7+ days)
+  // Sort helper: Leg 1 first, then Leg 2, then unassigned
+  const legSortOrder = (assignedTo: string | undefined) => {
+    if (assignedTo === 'Manager_Leg_1') return 0;
+    if (assignedTo === 'Manager_Leg_2') return 1;
+    return 2;
+  };
+
+  // Neglected contacts (no activity in 7+ days), Leg 1 first
   const neglectedContacts = useMemo(() => {
     const neglected = getNeglectedContacts(7);
     return neglected.map(n => {
       const contact = contacts.find(c => String(c.id) === n.contact_id);
       return { ...n, contact };
-    }).filter(n => n.contact);
+    }).filter(n => n.contact)
+      .sort((a, b) => legSortOrder(a.contact?.AssignedTo) - legSortOrder(b.contact?.AssignedTo));
   }, [getNeglectedContacts, contacts]);
 
-  // Contacts with zero activity ever
+  // Contacts with zero activity ever, Leg 1 first
   const neverContactedList = useMemo(() => {
     const contactsWithActivity = new Set(activities.map(a => a.contact_id).filter(Boolean));
-    return contacts.filter(c => !contactsWithActivity.has(String(c.id))).slice(0, 10);
+    return contacts
+      .filter(c => !contactsWithActivity.has(String(c.id)))
+      .sort((a, b) => legSortOrder(a.AssignedTo) - legSortOrder(b.AssignedTo))
+      .slice(0, 10);
   }, [contacts, activities]);
 
   const handleAIAnalysis = async () => {
@@ -198,7 +209,15 @@ export function Activities() {
             ) : neglectedContacts.map((item) => (
               <div key={item.contact_id} className="px-5 py-3 hover:bg-slate-700/30 transition-colors cursor-pointer" onClick={() => setDrawerContactId(item.contact_id)}>
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-white">{item.contact?.FullName}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium text-white">{item.contact?.FullName}</p>
+                    {item.contact?.AssignedTo === 'Manager_Leg_1' && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-400">L1</span>
+                    )}
+                    {item.contact?.AssignedTo === 'Manager_Leg_2' && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-500/20 text-slate-400">L2</span>
+                    )}
+                  </div>
                   <span className="text-xs font-medium text-amber-400">{item.daysSince}d ago</span>
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5">
@@ -224,7 +243,15 @@ export function Activities() {
               </div>
             ) : neverContactedList.map((contact) => (
               <div key={contact.id} className="px-5 py-3 hover:bg-slate-700/30 transition-colors cursor-pointer" onClick={() => setDrawerContactId(String(contact.id))}>
-                <p className="text-sm font-medium text-white">{contact.FullName}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium text-white">{contact.FullName}</p>
+                  {contact.AssignedTo === 'Manager_Leg_1' && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-400">L1</span>
+                  )}
+                  {contact.AssignedTo === 'Manager_Leg_2' && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-500/20 text-slate-400">L2</span>
+                  )}
+                </div>
                 <p className="text-xs text-slate-500 mt-0.5">
                   {contact.LeadTemperature} · {contact.NextAction || 'No action set'}
                 </p>
