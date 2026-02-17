@@ -41,9 +41,20 @@ serve(async (req) => {
       .from("orders")
       .select("user_id");
 
-    // Build per-user stats
-    const userStats = (profiles || []).map((profile) => {
-      const uid = profile.id;
+    // Build profile map for quick lookup
+    const profileMap: Record<string, any> = {};
+    for (const p of (profiles || [])) {
+      profileMap[p.id] = p;
+    }
+
+    // Merge auth users + profiles so users without profiles still appear
+    const allUserIds = new Set<string>();
+    for (const p of (profiles || [])) allUserIds.add(p.id);
+    for (const u of (authUsers || [])) allUserIds.add(u.id);
+
+    const userStats = [...allUserIds].map((uid) => {
+      const profile = profileMap[uid];
+      const authUser = (authUsers || []).find(u => u.id === uid);
       const userActivities = (activities || []).filter((a) => a.user_id === uid);
       const userContacts = (contactCounts || []).filter((c) => c.user_id === uid).length;
       const userOrders = (orderCounts || []).filter((o) => o.user_id === uid).length;
@@ -52,7 +63,6 @@ serve(async (req) => {
       const totalActions = userActivities.length;
       const lastActive = userActivities.length > 0 ? userActivities[0].created_at : null;
 
-      // Page visit frequency
       const pageFreq: Record<string, number> = {};
       for (const a of userActivities) {
         pageFreq[a.page] = (pageFreq[a.page] || 0) + 1;
@@ -60,9 +70,9 @@ serve(async (req) => {
 
       return {
         userId: uid,
-        displayName: profile.display_name || "Unknown",
+        displayName: profile?.display_name || authUser?.user_metadata?.display_name || authUser?.email?.split('@')[0] || "Unknown",
         email: emailMap[uid] || "",
-        joinedAt: profile.created_at,
+        joinedAt: profile?.created_at || authUser?.created_at || null,
         lastActive,
         totalActions,
         contactsCreated: userContacts,
@@ -72,8 +82,15 @@ serve(async (req) => {
       };
     });
 
-    // Build AI summary for ZAZI
-    const { action } = await req.json().catch(() => ({ action: "stats" }));
+    const body = await req.json().catch(() => ({ action: "stats" }));
+    const { action } = body;
+
+    if (action === "delete_user" && body.userId) {
+      await supabase.auth.admin.deleteUser(body.userId);
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     if (action === "ai_summary") {
       const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
