@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import {
   X,
   Phone,
@@ -18,6 +18,7 @@ import {
 import type { Prospect } from '../data/mockData';
 import { EditContactModal } from './EditContactModal';
 import { useCrm } from '@/contexts/CrmContext';
+import { useContactActivities } from '@/hooks/useContactActivities';
 
 interface ContactDrawerProps {
   prospect: Prospect;
@@ -45,6 +46,7 @@ const regStatusColors: Record<string, string> = {
 
 export function ContactDrawer({ prospect: initialProspect, onClose }: ContactDrawerProps) {
   const { contacts } = useCrm();
+  const { logActivity } = useContactActivities();
   const [showEdit, setShowEdit] = useState(false);
 
   // Always use latest contact data from context
@@ -52,10 +54,17 @@ export function ContactDrawer({ prospect: initialProspect, onClose }: ContactDra
 
   const initials = prospect.FullName.split(' ').map(n => n[0]).join('');
 
-  const handleWhatsApp = () => {
+  const handleWhatsApp = useCallback(async () => {
     const phone = prospect.PhoneNumber.replace(/\s/g, '').replace('+', '');
-    if (phone) window.open(`https://wa.me/${phone}`, '_blank');
-  };
+    if (phone) {
+      await logActivity({
+        contact_id: String(prospect.id),
+        activity_type: 'whatsapp',
+        summary: `Opened WhatsApp chat with ${prospect.FullName}`,
+      });
+      window.open(`https://wa.me/${phone}`, '_blank');
+    }
+  }, [prospect, logActivity]);
 
   return (
     <>

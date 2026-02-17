@@ -100,6 +100,47 @@ export type Database = {
         }
         Relationships: []
       }
+      contact_activities: {
+        Row: {
+          activity_type: string
+          contact_id: string | null
+          created_at: string
+          id: string
+          next_action: string | null
+          notes: string | null
+          summary: string
+          user_id: string
+        }
+        Insert: {
+          activity_type?: string
+          contact_id?: string | null
+          created_at?: string
+          id?: string
+          next_action?: string | null
+          notes?: string | null
+          summary?: string
+          user_id: string
+        }
+        Update: {
+          activity_type?: string
+          contact_id?: string | null
+          created_at?: string
+          id?: string
+          next_action?: string | null
+          notes?: string | null
+          summary?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_activities_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contacts: {
         Row: {
           action_taken: string
