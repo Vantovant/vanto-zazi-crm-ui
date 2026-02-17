@@ -14,9 +14,10 @@ import {
   ShoppingCart,
 } from 'lucide-react';
 import { DataStatusBanner } from '../components/DataStatusBanner';
+import { ContactDrawer } from '../components/ContactDrawer';
 import { useCrm } from '@/contexts/CrmContext';
 import { useNavigate } from 'react-router-dom';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
 const kpiCardsMeta = [
   { label: 'Total Prospects', key: 'totalProspects' as const, icon: Users, color: 'bg-slate-600' },
@@ -35,6 +36,12 @@ const temperatureColors: Record<string, string> = {
 export function Dashboard() {
   const navigate = useNavigate();
   const { contacts: prospects, orders, dbActive, contactsLoading, ordersLoading } = useCrm();
+  const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
+
+  const selectedProspect = useMemo(() => {
+    if (!selectedContactId) return null;
+    return prospects.find(p => String(p.id) === selectedContactId) || null;
+  }, [selectedContactId, prospects]);
 
   const stats = useMemo(() => ({
     totalProspects: prospects.length,
@@ -192,7 +199,7 @@ export function Dashboard() {
                     <p className="text-xs text-slate-500">No follow-ups pending</p>
                   </div>
                 ) : followUps.map((item) => (
-                  <div key={item.id} className="px-4 py-3 hover:bg-slate-700/30 transition-colors cursor-pointer" onClick={() => navigate('/contacts')}>
+                  <div key={item.id} className="px-4 py-3 hover:bg-slate-700/30 transition-colors cursor-pointer" onClick={() => setSelectedContactId(String(item.id))}>
                     <p className="text-sm font-medium text-slate-200">{item.name}</p>
                     <p className="text-xs text-slate-500 mt-0.5">{item.action}</p>
                     <span className={`inline-block mt-1.5 text-xs font-medium px-1.5 py-0.5 rounded border ${temperatureColors[item.temperature] || ''}`}>
@@ -217,7 +224,7 @@ export function Dashboard() {
                     <p className="text-xs text-slate-500">No meetings scheduled</p>
                   </div>
                 ) : meetings.map((item) => (
-                  <div key={item.id} className="px-4 py-3 hover:bg-slate-700/30 transition-colors cursor-pointer" onClick={() => navigate('/contacts')}>
+                  <div key={item.id} className="px-4 py-3 hover:bg-slate-700/30 transition-colors cursor-pointer" onClick={() => setSelectedContactId(String(item.id))}>
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-medium text-slate-200">{item.name}</p>
                     </div>
@@ -244,7 +251,7 @@ export function Dashboard() {
                     <p className="text-xs text-slate-500">No hot leads needing action</p>
                   </div>
                 ) : hotLeadsNeedingAction.map((item) => (
-                  <div key={item.id} className="px-4 py-3 hover:bg-slate-700/30 transition-colors cursor-pointer" onClick={() => navigate('/contacts')}>
+                  <div key={item.id} className="px-4 py-3 hover:bg-slate-700/30 transition-colors cursor-pointer" onClick={() => setSelectedContactId(String(item.id))}>
                     <p className="text-sm font-medium text-slate-200">{item.name}</p>
                     <p className="text-xs text-slate-500 mt-0.5">{item.status}</p>
                     <p className="text-xs text-amber-400 mt-1">{item.nextAction}</p>
@@ -320,7 +327,7 @@ export function Dashboard() {
                 const Icon = activityIcons[activity.type] || CheckCircle;
                 const colorClass = activityColors[activity.type] || 'bg-slate-500/20 text-slate-400';
                 return (
-                  <div key={`${activity.type}-${activity.id}`} className="px-4 py-3.5 hover:bg-slate-700/30 transition-colors cursor-pointer" onClick={() => navigate('/contacts')}>
+                  <div key={`${activity.type}-${activity.id}`} className="px-4 py-3.5 hover:bg-slate-700/30 transition-colors cursor-pointer" onClick={() => setSelectedContactId(String(activity.id))}>
                     <div className="flex items-start gap-3">
                       <div className={`p-2 rounded-lg ${colorClass}`}>
                         <Icon className="w-4 h-4" />
@@ -347,6 +354,13 @@ export function Dashboard() {
           </div>
         </div>
       </div>
+
+      {selectedProspect && (
+        <ContactDrawer
+          prospect={selectedProspect}
+          onClose={() => setSelectedContactId(null)}
+        />
+      )}
     </div>
   );
 }
