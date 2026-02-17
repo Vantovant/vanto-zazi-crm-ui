@@ -404,7 +404,7 @@ Keep it punchy, motivational, and formatted with emojis and headers. Max 300 wor
                       </td>
                     </tr>
                   ) : recentProspects.map((prospect) => (
-                    <tr key={prospect.id} className="hover:bg-slate-700/30 transition-colors cursor-pointer" onClick={() => navigate('/contacts')}>
+                    <tr key={prospect.id} className="hover:bg-slate-700/30 transition-colors cursor-pointer" onClick={() => setSelectedContactId(String(prospect.id))}>
                       <td className="px-4 py-3">
                         <p className="text-sm font-medium text-slate-200">{prospect.FullName}</p>
                       </td>
