@@ -303,6 +303,17 @@ export function ImportExport() {
       for (const [k, v] of Object.entries(record)) {
         if (fieldToCol[k]) dbRow[fieldToCol[k]] = v;
       }
+      // Smart lead_type classification based on GO Status
+      const goStatus = ((dbRow.go_status as string) || '').trim().toLowerCase();
+      if (goStatus) {
+        const rankedStatuses = ['promoter', 'diamond', 'builder', 'mentor', 'associate', 'vip'];
+        if (rankedStatuses.some(r => goStatus.includes(r))) {
+          dbRow.lead_type = 'Purchase_Status';
+        } else if (goStatus === 'no status' || goStatus === 'no_status' || goStatus === 'nostatus') {
+          dbRow.lead_type = 'Purchase_Nostatus';
+        }
+      }
+
       allRows.push(dbRow);
     }
 
