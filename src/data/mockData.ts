@@ -79,7 +79,7 @@ export interface Prospect {
   LeadTemperature: 'Hot' | 'Warm' | 'Cold';
   CommunicationStatus: 'New' | 'In Progress' | 'Pending' | 'Completed';
   RegistrationStatus: 'Registered' | 'Not Registered' | 'Activated';
-  LeadType: 'Prospect' | 'Registered_Nopurchase' | 'Purchase_Nostatus' | 'Purchase_Status';
+  LeadType: 'Prospect' | 'Registered_Nopurchase' | 'Purchase_Nostatus' | 'Purchase_Status' | 'Expired';
   InterestLevel: 'High' | 'Medium' | 'Low';
   FocusArea: 'Health Transformation' | 'Business Opportunity' | 'Both';
   LeadPath: 'Customer' | 'Distributor' | 'Not sure yet';
@@ -452,7 +452,7 @@ export const prospectColumns = [
 export const filterOptions = {
   LeadTemperature: ['Hot', 'Warm', 'Cold'],
   RegistrationStatus: ['Registered', 'Not Registered', 'Activated'],
-  LeadType: ['Prospect', 'Registered_Nopurchase', 'Purchase_Nostatus', 'Purchase_Status'],
+  LeadType: ['Prospect', 'Registered_Nopurchase', 'Purchase_Nostatus', 'Purchase_Status', 'Expired'],
   FocusArea: ['Health Transformation', 'Business Opportunity', 'Both'],
   LeadPath: ['Customer', 'Distributor', 'Not sure yet'],
 };

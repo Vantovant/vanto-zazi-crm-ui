@@ -46,7 +46,11 @@ function autoMapHeader(header: string): string {
     name: 'FullName', fullname: 'FullName', nameandsurname: 'FullName', namesurname: 'FullName', surname: 'FullName', firstname: 'FullName', lastname: 'FullName',
     phone: 'PhoneNumber', phonenumber: 'PhoneNumber', mobile: 'PhoneNumber', cell: 'PhoneNumber', tel: 'PhoneNumber', telephone: 'PhoneNumber', cellphone: 'PhoneNumber', contactnumber: 'PhoneNumber',
     email: 'EmailAddress', emailaddress: 'EmailAddress', emailid: 'EmailAddress',
-    date: 'DateCaptured', datecaptured: 'DateCaptured', enrollmentdate: 'DateCaptured', dateofenrollment: 'DateCaptured', dateenrolled: 'DateCaptured',
+    date: 'DateCaptured', datecaptured: 'DateCaptured', enrollmentdate: 'DateCaptured', dateofenrollment: 'DateCaptured', dateenrolled: 'DateCaptured', dateofactivation: 'DateCaptured', activationdate: 'DateCaptured',
+    dateofmakinginactive: 'AdditionalNotes', datemakinginactive: 'AdditionalNotes',
+    highestachievedrankqualification: 'AdditionalNotes', highestrankqualification: 'AdditionalNotes', highestrank: 'AdditionalNotes',
+    level: 'AdditionalNotes', leg: 'AdditionalNotes',
+    contacts: 'PhoneNumber',
     temperature: 'LeadTemperature', leadtemperature: 'LeadTemperature', leadtemp: 'LeadTemperature', temp: 'LeadTemperature',
     commstatus: 'CommunicationStatus', communicationstatus: 'CommunicationStatus',
     regstatus: 'RegistrationStatus', registrationstatus: 'RegistrationStatus',
@@ -59,7 +63,7 @@ function autoMapHeader(header: string): string {
     actiontaken: 'ActionTaken', action: 'ActionTaken',
     nextaction: 'NextAction',
     meetingtime: 'MeetingTime', meeting: 'MeetingTime',
-    aplgoid: 'APLGoID', aplid: 'APLGoID', associateid: 'APLGoID', associatesid: 'APLGoID', id: 'APLGoID',
+    aplgoid: 'APLGoID', aplid: 'APLGoID', associateid: 'APLGoID', associatesid: 'APLGoID', associatesid2: 'APLGoID',
     associatestatus: 'AssociateStatus', assocstatus: 'AssociateStatus',
     additionalnotes: 'AdditionalNotes', notes: 'AdditionalNotes',
     gostatus: 'GOStatus', go_status: 'GOStatus',
@@ -317,6 +321,17 @@ export function ImportExport() {
       const fullName = (record.FullName || '').trim();
       if (!fullName) { failed++; continue; }
       record.FullName = fullName;
+
+      // Parse composite "Contacts" column: "Country, email, phone"
+      const contactsVal = (record.PhoneNumber || '').trim();
+      if (contactsVal.includes(',') && contactsVal.includes('@')) {
+        const parts = contactsVal.split(',').map(p => p.trim());
+        for (const part of parts) {
+          if (part.includes('@')) record.EmailAddress = record.EmailAddress || part;
+          else if (/^\+?\d[\d\s]{6,}$/.test(part.replace(/\s/g, ''))) record.PhoneNumber = part;
+          else if (!record.Country || record.Country === 'South Africa') record.Country = part;
+        }
+      }
       const dbRow: Record<string, unknown> = { user_id: user.id };
       for (const [k, v] of Object.entries(record)) {
         if (fieldToCol[k]) dbRow[fieldToCol[k]] = v;
@@ -329,14 +344,21 @@ export function ImportExport() {
         else delete dbRow.date_captured; // let DB use default
       }
 
-      // Smart lead_type classification based on GO Status
-      const goStatus = ((dbRow.go_status as string) || '').trim().toLowerCase();
-      if (goStatus) {
-        const rankedStatuses = ['promoter', 'diamond', 'builder', 'mentor', 'associate', 'vip'];
-        if (rankedStatuses.some(r => goStatus.includes(r))) {
-          dbRow.lead_type = 'Purchase_Status';
-        } else if (goStatus === 'no status' || goStatus === 'no_status' || goStatus === 'nostatus') {
-          dbRow.lead_type = 'Purchase_Nostatus';
+      // Detect expired member spreadsheets: if "Date of making inactive" header is present
+      const hasInactiveDate = fileHeaders.some(h => normalize(h).includes('makinginactive'));
+      if (hasInactiveDate) {
+        dbRow.lead_type = 'Expired';
+        dbRow.registration_status = dbRow.registration_status || 'Activated';
+      } else {
+        // Smart lead_type classification based on GO Status
+        const goStatus = ((dbRow.go_status as string) || '').trim().toLowerCase();
+        if (goStatus) {
+          const rankedStatuses = ['promoter', 'diamond', 'builder', 'mentor', 'associate', 'vip'];
+          if (rankedStatuses.some(r => goStatus.includes(r))) {
+            dbRow.lead_type = 'Purchase_Status';
+          } else if (goStatus === 'no status' || goStatus === 'no_status' || goStatus === 'nostatus') {
+            dbRow.lead_type = 'Purchase_Nostatus';
+          }
         }
       }
 
