@@ -449,27 +449,25 @@ export function ContactDrawer({ prospect: initialProspect, onClose }: ContactDra
             </div>
 
             {/* Notes Section - Editable */}
-            <div className="border-t border-slate-700 p-4">
+            <div className="border-t border-slate-700 p-4 pb-20 sm:pb-4">
               <div className="flex items-center justify-between mb-2">
                 <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Notes</h4>
-                {notesValue !== (prospect.AdditionalNotes || '') && (
-                  <button
-                    type="button"
-                    onClick={handleSaveNotes}
-                    disabled={notesSaving}
-                    className="flex items-center gap-1 px-2 py-1 text-xs font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white rounded-md transition-colors"
-                  >
-                    {notesSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
-                    Save
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={handleSaveNotes}
+                  disabled={notesSaving || notesValue === (prospect.AdditionalNotes || '')}
+                  className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md transition-colors"
+                >
+                  {notesSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                  Save Notes
+                </button>
               </div>
               <textarea
                 value={notesValue}
                 onChange={(e) => setNotesValue(e.target.value)}
                 placeholder="Add notes about this contact..."
-                rows={3}
-                className="w-full px-3 py-2 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500 placeholder:text-slate-500 resize-none"
+                rows={4}
+                className="w-full px-3 py-2 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500 placeholder:text-slate-500 resize-y"
               />
             </div>
           </div>
