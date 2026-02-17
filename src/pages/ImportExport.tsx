@@ -43,10 +43,10 @@ function autoMapHeader(header: string): string {
     if (normalize(field.key) === norm || normalize(field.label) === norm) return field.key;
   }
   const aliases: Record<string, string> = {
-    name: 'FullName', fullname: 'FullName',
-    phone: 'PhoneNumber', phonenumber: 'PhoneNumber', mobile: 'PhoneNumber', cell: 'PhoneNumber', tel: 'PhoneNumber', telephone: 'PhoneNumber',
-    email: 'EmailAddress', emailaddress: 'EmailAddress',
-    date: 'DateCaptured', datecaptured: 'DateCaptured',
+    name: 'FullName', fullname: 'FullName', nameandsurname: 'FullName', namesurname: 'FullName', surname: 'FullName', firstname: 'FullName', lastname: 'FullName',
+    phone: 'PhoneNumber', phonenumber: 'PhoneNumber', mobile: 'PhoneNumber', cell: 'PhoneNumber', tel: 'PhoneNumber', telephone: 'PhoneNumber', cellphone: 'PhoneNumber', contactnumber: 'PhoneNumber',
+    email: 'EmailAddress', emailaddress: 'EmailAddress', emailid: 'EmailAddress',
+    date: 'DateCaptured', datecaptured: 'DateCaptured', enrollmentdate: 'DateCaptured', dateofenrollment: 'DateCaptured', dateenrolled: 'DateCaptured',
     temperature: 'LeadTemperature', leadtemperature: 'LeadTemperature', leadtemp: 'LeadTemperature', temp: 'LeadTemperature',
     commstatus: 'CommunicationStatus', communicationstatus: 'CommunicationStatus',
     regstatus: 'RegistrationStatus', registrationstatus: 'RegistrationStatus',
@@ -59,11 +59,11 @@ function autoMapHeader(header: string): string {
     actiontaken: 'ActionTaken', action: 'ActionTaken',
     nextaction: 'NextAction',
     meetingtime: 'MeetingTime', meeting: 'MeetingTime',
-    aplgoid: 'APLGoID', aplid: 'APLGoID',
+    aplgoid: 'APLGoID', aplid: 'APLGoID', associateid: 'APLGoID', associatesid: 'APLGoID', id: 'APLGoID',
     associatestatus: 'AssociateStatus', assocstatus: 'AssociateStatus',
     additionalnotes: 'AdditionalNotes', notes: 'AdditionalNotes',
     gostatus: 'GOStatus', go_status: 'GOStatus',
-    city: 'City', province: 'Province', state: 'State', country: 'Country',
+    city: 'City', province: 'Province', state: 'State', country: 'Country', location: 'City',
   };
   return aliases[norm] || '';
 }
@@ -293,8 +293,9 @@ export function ImportExport() {
       const record: Record<string, string> = {};
       for (const field of mappedFields) {
         const csvHeader = columnMapping[field.key];
-        const colIdx = fileHeaders.indexOf(csvHeader);
-        if (colIdx !== -1 && row[colIdx] != null) record[field.key] = row[colIdx];
+        // Case-insensitive header lookup to handle AI returning slightly different casing
+        const colIdx = fileHeaders.findIndex(h => h.trim().toLowerCase() === csvHeader.trim().toLowerCase());
+        if (colIdx !== -1 && row[colIdx] != null) record[field.key] = String(row[colIdx]).trim();
       }
       const fullName = (record.FullName || '').trim();
       if (!fullName) { failed++; continue; }
