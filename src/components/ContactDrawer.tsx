@@ -109,9 +109,9 @@ export function ContactDrawer({ prospect: initialProspect, onClose }: ContactDra
         </div>
 
         {/* Content - Two Column Layout */}
-        <div className="flex-1 overflow-y-auto sm:overflow-hidden sm:flex sm:flex-row flex-col">
+        <div className="flex-1 overflow-y-auto sm:flex sm:flex-row flex-col">
           {/* LEFT COLUMN - Contact Summary */}
-          <div className="sm:w-[280px] sm:border-r border-b sm:border-b-0 border-slate-700 sm:overflow-y-auto">
+          <div className="sm:w-[280px] sm:min-w-[280px] sm:border-r border-b sm:border-b-0 border-slate-700 sm:overflow-y-auto">
             {/* Profile Header */}
             <div className="p-6 border-b border-slate-700/50">
               <div className="flex flex-col items-center text-center">
@@ -274,7 +274,7 @@ export function ContactDrawer({ prospect: initialProspect, onClose }: ContactDra
           </div>
 
           {/* RIGHT COLUMN - Activity & Notes */}
-          <div className="flex-1 flex flex-col sm:overflow-hidden min-h-[300px]">
+          <div className="flex-1 flex flex-col sm:overflow-hidden min-h-[400px] pb-8 sm:pb-0">
             {/* Activity Header */}
             <div className="px-6 py-4 border-b border-slate-700/50">
               <h4 className="font-semibold text-white">Activity & Notes</h4>
