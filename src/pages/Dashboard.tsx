@@ -192,7 +192,7 @@ export function Dashboard() {
                     <p className="text-xs text-slate-500">No follow-ups pending</p>
                   </div>
                 ) : followUps.map((item) => (
-                  <div key={item.id} className="px-4 py-3 hover:bg-slate-700/30 transition-colors">
+                  <div key={item.id} className="px-4 py-3 hover:bg-slate-700/30 transition-colors cursor-pointer" onClick={() => navigate('/contacts')}>
                     <p className="text-sm font-medium text-slate-200">{item.name}</p>
                     <p className="text-xs text-slate-500 mt-0.5">{item.action}</p>
                     <span className={`inline-block mt-1.5 text-xs font-medium px-1.5 py-0.5 rounded border ${temperatureColors[item.temperature] || ''}`}>
@@ -217,7 +217,7 @@ export function Dashboard() {
                     <p className="text-xs text-slate-500">No meetings scheduled</p>
                   </div>
                 ) : meetings.map((item) => (
-                  <div key={item.id} className="px-4 py-3 hover:bg-slate-700/30 transition-colors">
+                  <div key={item.id} className="px-4 py-3 hover:bg-slate-700/30 transition-colors cursor-pointer" onClick={() => navigate('/contacts')}>
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-medium text-slate-200">{item.name}</p>
                     </div>
@@ -244,7 +244,7 @@ export function Dashboard() {
                     <p className="text-xs text-slate-500">No hot leads needing action</p>
                   </div>
                 ) : hotLeadsNeedingAction.map((item) => (
-                  <div key={item.id} className="px-4 py-3 hover:bg-slate-700/30 transition-colors">
+                  <div key={item.id} className="px-4 py-3 hover:bg-slate-700/30 transition-colors cursor-pointer" onClick={() => navigate('/contacts')}>
                     <p className="text-sm font-medium text-slate-200">{item.name}</p>
                     <p className="text-xs text-slate-500 mt-0.5">{item.status}</p>
                     <p className="text-xs text-amber-400 mt-1">{item.nextAction}</p>
@@ -320,7 +320,7 @@ export function Dashboard() {
                 const Icon = activityIcons[activity.type] || CheckCircle;
                 const colorClass = activityColors[activity.type] || 'bg-slate-500/20 text-slate-400';
                 return (
-                  <div key={`${activity.type}-${activity.id}`} className="px-4 py-3.5 hover:bg-slate-700/30 transition-colors">
+                  <div key={`${activity.type}-${activity.id}`} className="px-4 py-3.5 hover:bg-slate-700/30 transition-colors cursor-pointer" onClick={() => navigate('/contacts')}>
                     <div className="flex items-start gap-3">
                       <div className={`p-2 rounded-lg ${colorClass}`}>
                         <Icon className="w-4 h-4" />
