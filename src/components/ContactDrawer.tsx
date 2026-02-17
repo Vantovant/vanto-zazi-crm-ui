@@ -16,10 +16,15 @@ import {
   Award,
   Loader2,
   Save,
+  Sparkles,
+  Copy,
+  Check,
+  Send,
 } from 'lucide-react';
 import type { Prospect } from '../data/mockData';
 import { EditContactModal } from './EditContactModal';
 import { useCrm } from '@/contexts/CrmContext';
+import { supabase } from '@/integrations/supabase/client';
 import { useContactActivities } from '@/hooks/useContactActivities';
 
 interface ContactDrawerProps {
@@ -52,6 +57,9 @@ export function ContactDrawer({ prospect: initialProspect, onClose }: ContactDra
   const [showEdit, setShowEdit] = useState(false);
   const [notesValue, setNotesValue] = useState('');
   const [notesSaving, setNotesSaving] = useState(false);
+  const [suggestedMsg, setSuggestedMsg] = useState('');
+  const [msgLoading, setMsgLoading] = useState(false);
+  const [msgCopied, setMsgCopied] = useState(false);
 
   // Always use latest contact data from context
   const prospect = contacts.find(c => String(c.id) === String(initialProspect.id)) || initialProspect;
@@ -69,17 +77,70 @@ export function ContactDrawer({ prospect: initialProspect, onClose }: ContactDra
     setNotesSaving(false);
   }, [prospect.id, notesValue, updateContact]);
 
-  const handleWhatsApp = useCallback(async () => {
+  const handleWhatsApp = useCallback(async (prefilledMsg?: string) => {
     const phone = prospect.PhoneNumber.replace(/\s/g, '').replace('+', '');
     if (phone) {
+      const msgSummary = prefilledMsg
+        ? `Sent AI-suggested WhatsApp message to ${prospect.FullName}`
+        : `Opened WhatsApp chat with ${prospect.FullName}`;
       await logActivity({
         contact_id: String(prospect.id),
         activity_type: 'whatsapp',
-        summary: `Opened WhatsApp chat with ${prospect.FullName}`,
+        summary: msgSummary,
+        notes: prefilledMsg || '',
       });
-      window.open(`https://wa.me/${phone}`, '_blank');
+      const url = prefilledMsg
+        ? `https://wa.me/${phone}?text=${encodeURIComponent(prefilledMsg)}`
+        : `https://wa.me/${phone}`;
+      window.open(url, '_blank');
     }
   }, [prospect, logActivity]);
+
+  const handleSuggestMessage = useCallback(async () => {
+    setMsgLoading(true);
+    setSuggestedMsg('');
+    try {
+      const contactData = {
+        name: prospect.FullName,
+        temperature: prospect.LeadTemperature,
+        type: prospect.LeadType,
+        status: prospect.CommunicationStatus,
+        registrationStatus: prospect.RegistrationStatus,
+        focusArea: prospect.FocusArea,
+        leadPath: prospect.LeadPath,
+        lastAction: prospect.ActionTaken,
+        nextAction: prospect.NextAction,
+        notes: prospect.AdditionalNotes,
+        goStatus: prospect.GOStatus,
+      };
+      const resp = await supabase.functions.invoke('zazi-copilot', {
+        body: {
+          action: 'contact_analysis',
+          message: `Generate a ready-to-send WhatsApp message for this contact. The message should be natural, friendly, and contextual based on their status and where they are in the journey. Keep it short (2-4 sentences max). Do NOT include any analysis — only output the message text itself, nothing else. No markdown, no quotes, just the plain message.`,
+          contactData,
+          contactId: String(prospect.id),
+        },
+      });
+      if (resp.error) throw resp.error;
+      const text = typeof resp.data === 'string' ? resp.data : await new Response(resp.data).text();
+      let result = '';
+      for (const line of text.split('\n')) {
+        if (!line.startsWith('data: ')) continue;
+        const json = line.slice(6).trim();
+        if (json === '[DONE]') break;
+        try {
+          const parsed = JSON.parse(json);
+          const content = parsed.choices?.[0]?.delta?.content;
+          if (content) result += content;
+        } catch {}
+      }
+      setSuggestedMsg(result.trim());
+    } catch (e) {
+      console.error('Suggest message error:', e);
+      setSuggestedMsg('Could not generate a message. Please try again.');
+    }
+    setMsgLoading(false);
+  }, [prospect]);
 
   return (
     <>
@@ -145,7 +206,7 @@ export function ContactDrawer({ prospect: initialProspect, onClose }: ContactDra
             {/* Quick Actions */}
             <div className="p-4 border-b border-slate-700/50">
               <div className="grid grid-cols-3 gap-2">
-                <button type="button" onClick={handleWhatsApp} className="flex flex-col items-center gap-1.5 p-3 rounded-lg bg-green-500/10 hover:bg-green-500/20 text-green-400 transition-colors">
+                <button type="button" onClick={() => handleWhatsApp()} className="flex flex-col items-center gap-1.5 p-3 rounded-lg bg-green-500/10 hover:bg-green-500/20 text-green-400 transition-colors">
                   <MessageCircle className="w-5 h-5" />
                   <span className="text-xs font-medium">WhatsApp</span>
                 </button>
@@ -281,6 +342,59 @@ export function ContactDrawer({ prospect: initialProspect, onClose }: ContactDra
             </div>
 
             <div className="flex-1 sm:overflow-y-auto p-6 space-y-4">
+              {/* AI Message Suggestion */}
+              <div className="bg-violet-500/10 border border-violet-500/20 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-violet-400" />
+                    <h5 className="text-xs font-semibold text-violet-300 uppercase">AI Message</h5>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleSuggestMessage}
+                    disabled={msgLoading}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white rounded-lg transition-colors"
+                  >
+                    {msgLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                    {suggestedMsg ? 'Regenerate' : 'Suggest Message'}
+                  </button>
+                </div>
+                {msgLoading ? (
+                  <div className="flex items-center gap-2 text-violet-400 py-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span className="text-sm">Crafting the perfect message...</span>
+                  </div>
+                ) : suggestedMsg ? (
+                  <div>
+                    <p className="text-sm text-slate-300 whitespace-pre-wrap mb-3">{suggestedMsg}</p>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(suggestedMsg);
+                          setMsgCopied(true);
+                          setTimeout(() => setMsgCopied(false), 2000);
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition-colors"
+                      >
+                        {msgCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                        {msgCopied ? 'Copied!' : 'Copy'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleWhatsApp(suggestedMsg)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors"
+                      >
+                        <Send className="w-3 h-3" />
+                        Send via WhatsApp
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-violet-400/70">Click "Suggest Message" to generate a smart, contextual WhatsApp message for {prospect.FullName}.</p>
+                )}
+              </div>
+
               {/* Next Action */}
               {prospect.NextAction && (
                 <div className="bg-teal-500/10 rounded-lg border border-teal-500/20 p-4">
