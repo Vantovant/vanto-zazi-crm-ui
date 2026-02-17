@@ -10,7 +10,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { action, message, route, contactData, contactId, crmSummary } = await req.json();
+    const { action, message, route, contactData, contactId, crmSummary, knowledgeContext } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
@@ -142,6 +142,10 @@ CRM CONTEXT:
     // Attach CRM data summary to all actions so ZAZI always has context
     if (crmSummary) {
       systemPrompt += `\n\nUSER'S CURRENT CRM DATA:\n${JSON.stringify(crmSummary, null, 2)}\n`;
+    }
+
+    if (knowledgeContext) {
+      systemPrompt += `\n\nUSER'S UPLOADED KNOWLEDGE BASE DOCUMENTS:\nThe following content was uploaded by the user to train you on their specific business details (compensation plans, product guides, rules, prices, incentives). Use this information to give accurate, company-specific answers:\n\n${knowledgeContext}\n`;
     }
 
     if (action === "page_guidance") {

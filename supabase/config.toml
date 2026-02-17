@@ -2,3 +2,6 @@ project_id = "urfyfuakgabieellbuce"
 
 [functions.zazi-copilot]
 verify_jwt = false
+
+[functions.parse-knowledge-doc]
+verify_jwt = false
