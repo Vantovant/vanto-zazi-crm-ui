@@ -12,12 +12,19 @@ import {
   AlertCircle,
   ChevronRight,
   ShoppingCart,
+  Newspaper,
+  Sparkles,
+  Loader2,
+  RefreshCw,
 } from 'lucide-react';
 import { DataStatusBanner } from '../components/DataStatusBanner';
 import { ContactDrawer } from '../components/ContactDrawer';
 import { useCrm } from '@/contexts/CrmContext';
 import { useNavigate } from 'react-router-dom';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback } from 'react';
+import { useContactActivities } from '@/hooks/useContactActivities';
+import { supabase } from '@/integrations/supabase/client';
+import ReactMarkdown from 'react-markdown';
 
 const kpiCardsMeta = [
   { label: 'Total Prospects', key: 'totalProspects' as const, icon: Users, color: 'bg-slate-600' },
@@ -36,7 +43,10 @@ const temperatureColors: Record<string, string> = {
 export function Dashboard() {
   const navigate = useNavigate();
   const { contacts: prospects, orders, dbActive, contactsLoading, ordersLoading } = useCrm();
+  const { activities, getNeglectedContacts } = useContactActivities();
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
+  const [newsContent, setNewsContent] = useState('');
+  const [newsLoading, setNewsLoading] = useState(false);
 
   const selectedProspect = useMemo(() => {
     if (!selectedContactId) return null;
@@ -141,6 +151,69 @@ export function Dashboard() {
 
   const loading = contactsLoading || ordersLoading;
 
+  const neglectedContacts = useMemo(() => getNeglectedContacts(7), [getNeglectedContacts]);
+
+  const handleGenerateNews = useCallback(async () => {
+    setNewsLoading(true);
+    setNewsContent('');
+
+    const crmSummary = {
+      totalContacts: prospects.length,
+      hotLeads: prospects.filter(p => p.LeadTemperature === 'Hot').length,
+      warmLeads: prospects.filter(p => p.LeadTemperature === 'Warm').length,
+      registered: prospects.filter(p => p.RegistrationStatus === 'Registered' || p.RegistrationStatus === 'Activated').length,
+      totalOrders: orders.length,
+      totalActivities: activities.length,
+      neglectedCount: neglectedContacts.length,
+      recentActivities: activities.slice(0, 10).map(a => ({
+        type: a.activity_type, summary: a.summary, date: a.created_at,
+      })),
+      recentOrders: orders.slice(0, 5).map(o => ({
+        product: o.product, amount: o.amount, contact: o.contactName, status: o.status, date: o.orderDate,
+      })),
+      topProspects: prospects.slice(0, 5).map(p => ({
+        name: p.FullName, temperature: p.LeadTemperature, type: p.LeadType, status: p.RegistrationStatus,
+      })),
+    };
+
+    try {
+      const resp = await supabase.functions.invoke('zazi-copilot', {
+        body: {
+          action: 'business_insight',
+          message: `You are ZAZI Mail — an AI journalist for this CRM user. Write a short, engaging news briefing (like a newsletter) covering:
+
+1. **📊 CRM Activity Digest** — What's happened recently: contacts added, activities logged, orders placed. Highlight key numbers.
+2. **🏆 Team Milestones** — Any contacts that got registered, activated, or upgraded. Celebrate wins.
+3. **💡 MLM Growth Tip** — One actionable APLGO/network marketing tip for today.
+4. **🚀 Platform Update** — Mention that ZAZI AI now suggests WhatsApp messages, tracks relationship health, and logs activities with timestamps.
+5. **⚠️ Action Required** — Neglected contacts or hot leads that need attention.
+
+Keep it punchy, motivational, and formatted with emojis and headers. Max 300 words. Use the user's real CRM data provided.`,
+          crmSummary,
+        },
+      });
+
+      if (resp.error) throw resp.error;
+
+      const text = typeof resp.data === 'string' ? resp.data : await new Response(resp.data).text();
+      let result = '';
+      for (const line of text.split('\n')) {
+        if (!line.startsWith('data: ')) continue;
+        const json = line.slice(6).trim();
+        if (json === '[DONE]') break;
+        try {
+          const parsed = JSON.parse(json);
+          const content = parsed.choices?.[0]?.delta?.content;
+          if (content) result += content;
+        } catch {}
+      }
+      setNewsContent(result || 'No news available at this time.');
+    } catch (e) {
+      console.error('News generation error:', e);
+      setNewsContent('Unable to generate news briefing. Please try again.');
+    }
+    setNewsLoading(false);
+  }, [prospects, orders, activities, neglectedContacts]);
   return (
     <div className="space-y-6">
       <DataStatusBanner dbActive={dbActive} />
@@ -175,7 +248,45 @@ export function Dashboard() {
         ))}
       </div>
 
-      {/* Main Grid */}
+      {/* ZAZI Mail — AI News Briefing */}
+      <div className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-700 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-lg bg-violet-500/20">
+              <Newspaper className="w-4 h-4 text-violet-400" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-white">ZAZI Mail</h3>
+              <p className="text-xs text-slate-500">Your AI news journalist</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleGenerateNews}
+            disabled={newsLoading}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white rounded-lg transition-colors"
+          >
+            {newsLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+            {newsContent ? 'Refresh' : 'Get Briefing'}
+          </button>
+        </div>
+        {newsLoading ? (
+          <div className="p-6 flex items-center gap-3 text-violet-400">
+            <Loader2 className="w-5 h-5 animate-spin" />
+            <span className="text-sm">ZAZI is writing your briefing...</span>
+          </div>
+        ) : newsContent ? (
+          <div className="p-5 prose prose-sm prose-invert max-w-none text-slate-300 max-h-80 overflow-y-auto">
+            <ReactMarkdown>{newsContent}</ReactMarkdown>
+          </div>
+        ) : (
+          <div className="p-6 text-center">
+            <Sparkles className="w-8 h-8 text-violet-500/50 mx-auto mb-2" />
+            <p className="text-sm text-slate-500">Click <span className="text-violet-400 font-medium">"Get Briefing"</span> for your personalized CRM news, team milestones, and growth tips.</p>
+          </div>
+        )}
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Today's Focus - Takes 2 columns */}
         <div className="lg:col-span-2 space-y-4">
