@@ -21,6 +21,7 @@ function rowToOrder(row: OrderRow): Order {
   return {
     id: row.id as unknown as number,
     orderId: row.order_id,
+    contactId: row.contact_id,
     contactName: row.contact_name,
     product: row.product,
     quantity: row.quantity,

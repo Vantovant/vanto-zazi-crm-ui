@@ -105,7 +105,7 @@ export function Dashboard() {
   // Recent orders for activity feed
   const recentOrderActivity = useMemo(() => {
     return orders.slice(0, 4).map(o => ({
-      id: o.id,
+      id: o.contactId || o.id,
       type: 'order' as const,
       contact: o.contactName,
       description: `${o.product} — R${o.amount.toLocaleString()} (${o.status})`,
