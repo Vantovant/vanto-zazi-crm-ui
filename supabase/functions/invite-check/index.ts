@@ -14,10 +14,11 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { action, token } = await req.json();
+    const { action, token: rawToken } = await req.json();
+    const token = (rawToken || "").trim().toUpperCase();
 
     if (action === "validate") {
-      // Check if token exists and is unused
+      // Check if token exists and is unused (case-insensitive match)
       const { data, error } = await supabase
         .from("invites")
         .select("id, token, label, is_used")
@@ -25,13 +26,13 @@ serve(async (req) => {
         .maybeSingle();
 
       if (error || !data) {
-        return new Response(JSON.stringify({ valid: false, error: "Invalid invite link" }), {
+        return new Response(JSON.stringify({ valid: false, error: "Invalid invite code" }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
       if (data.is_used) {
-        return new Response(JSON.stringify({ valid: false, error: "This invite has already been used" }), {
+        return new Response(JSON.stringify({ valid: false, error: "This invite code has already been used" }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -43,11 +44,9 @@ serve(async (req) => {
 
     if (action === "redeem") {
       // Mark token as used after successful signup
-      const { userId } = await req.json().catch(() => ({ userId: null }));
-
       const { data, error } = await supabase
         .from("invites")
-        .update({ is_used: true, used_by: userId, used_at: new Date().toISOString() })
+        .update({ is_used: true, used_at: new Date().toISOString() })
         .eq("token", token)
         .eq("is_used", false)
         .select()

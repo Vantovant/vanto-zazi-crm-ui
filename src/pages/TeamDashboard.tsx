@@ -22,6 +22,7 @@ import ReactMarkdown from 'react-markdown';
 interface UserStat {
   userId: string;
   displayName: string;
+  email: string;
   joinedAt: string;
   lastActive: string | null;
   totalActions: number;
@@ -82,11 +83,20 @@ export function TeamDashboard() {
     setInvites(data || []);
   };
 
+  const generateCode = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code = '';
+    for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+    return code;
+  };
+
   const createInvite = async () => {
     if (!user) return;
+    const token = generateCode();
     await (supabase.from('invites') as any).insert({
       created_by: user.id,
       label: newLabel || 'Tester',
+      token,
     });
     setNewLabel('');
     fetchInvites();
@@ -97,10 +107,8 @@ export function TeamDashboard() {
     fetchInvites();
   };
 
-  const copyLink = (token: string, id: string) => {
-    const publishedUrl = 'https://vanto-zazi-bloom.lovable.app';
-    const url = `${publishedUrl}/auth?invite=${token}`;
-    navigator.clipboard.writeText(url);
+  const copyCode = (token: string, id: string) => {
+    navigator.clipboard.writeText(token);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
   };
@@ -222,10 +230,11 @@ export function TeamDashboard() {
         <div className="p-4 border-b border-slate-700 flex items-center justify-between">
           <h3 className="text-sm font-semibold text-white flex items-center gap-2">
             <Link className="w-4 h-4 text-teal-400" />
-            Invite Links ({invites.filter(i => !i.is_used).length} available · {invites.filter(i => i.is_used).length} used)
+            Invite Codes ({invites.filter(i => !i.is_used).length} available · {invites.filter(i => i.is_used).length} used)
           </h3>
         </div>
         <div className="p-4 space-y-3">
+          <p className="text-xs text-slate-400">Share invite codes with testers. They enter the code on the signup page at <span className="text-teal-400 font-medium">vanto-zazi-bloom.lovable.app</span></p>
           {/* Create new invite */}
           <div className="flex gap-2">
             <input
@@ -255,21 +264,21 @@ export function TeamDashboard() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium text-white">{inv.label || 'Tester'}</span>
+                      <span className="text-sm font-mono font-bold tracking-widest text-teal-300 bg-teal-500/10 px-2 py-0.5 rounded">
+                        {inv.token}
+                      </span>
                       <span className={`text-xs px-2 py-0.5 rounded-full ${inv.is_used ? 'bg-slate-700 text-slate-400' : 'bg-teal-500/20 text-teal-400'}`}>
                         {inv.is_used ? 'Used' : 'Available'}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-500 mt-0.5 truncate font-mono">
-                      https://vanto-zazi-bloom.lovable.app/auth?invite={inv.token}
-                    </p>
                   </div>
                   <div className="flex items-center gap-1 ml-3">
                     {!inv.is_used && (
                       <button
                         type="button"
-                        onClick={() => copyLink(inv.token, inv.id)}
+                        onClick={() => copyCode(inv.token, inv.id)}
                         className="p-2 text-slate-400 hover:text-white transition-colors"
-                        title="Copy link"
+                        title="Copy code"
                       >
                         {copiedId === inv.id ? <Check className="w-4 h-4 text-teal-400" /> : <Copy className="w-4 h-4" />}
                       </button>
@@ -342,7 +351,10 @@ export function TeamDashboard() {
                         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-slate-600 to-slate-700 flex items-center justify-center text-white text-xs font-semibold">
                           {s.displayName.split(' ').map(n => n[0]).join('').slice(0, 2)}
                         </div>
-                        <span className="text-white font-medium">{s.displayName}</span>
+                        <div>
+                          <span className="text-white font-medium block">{s.displayName}</span>
+                          {s.email && <span className="text-xs text-slate-500">{s.email}</span>}
+                        </div>
                       </div>
                     </td>
                     <td className="px-4 py-3 text-slate-400 text-xs">{formatDate(s.joinedAt)}</td>
