@@ -461,6 +461,7 @@ export const filterOptions = {
 export interface Order {
   id: number;
   orderId: string;
+  contactId?: string | null;
   contactName: string;
   product: string;
   quantity: number;
