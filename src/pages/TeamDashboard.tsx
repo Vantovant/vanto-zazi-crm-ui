@@ -234,7 +234,7 @@ export function TeamDashboard() {
           </h3>
         </div>
         <div className="p-4 space-y-3">
-          <p className="text-xs text-slate-400">Share invite codes with testers. They enter the code on the signup page at <span className="text-teal-400 font-medium">vanto-zazi-bloom.lovable.app</span></p>
+          <p className="text-xs text-slate-400">Share invite codes with testers. They enter the code on the signup page at <span className="text-teal-400 font-medium">crm.onlinecourseformlm.com</span></p>
           {/* Create new invite */}
           <div className="flex gap-2">
             <input
