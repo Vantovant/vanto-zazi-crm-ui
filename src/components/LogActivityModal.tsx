@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X, ClipboardList, Loader2, MessageCircle, Phone, Calendar, FileText, CheckCircle } from 'lucide-react';
 import { useCrm } from '@/contexts/CrmContext';
+import { useContactActivities } from '@/hooks/useContactActivities';
 
 interface LogActivityModalProps {
   onClose: () => void;
@@ -17,6 +18,7 @@ const activityTypes = [
 
 export function LogActivityModal({ onClose, prefillContactName }: LogActivityModalProps) {
   const { contacts, updateContact } = useCrm();
+  const { logActivity } = useContactActivities();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
@@ -45,6 +47,15 @@ export function LogActivityModal({ onClose, prefillContactName }: LogActivityMod
     // Update the contact's action_taken and next_action fields
     const activityType = activityTypes.find(t => t.value === form.type);
     const actionText = `${activityType?.label}: ${form.summary} (${new Date().toLocaleDateString()})`;
+
+    // Log to contact_activities table with timestamp
+    await logActivity({
+      contact_id: String(selectedContactId),
+      activity_type: form.type,
+      summary: form.summary,
+      notes: form.notes,
+      next_action: form.nextAction,
+    });
 
     await updateContact(String(selectedContactId), {
       ActionTaken: actionText,

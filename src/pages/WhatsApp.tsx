@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import {
   Search,
   Phone,
@@ -6,11 +6,13 @@ import {
   MessageCircle,
   ClipboardList,
   Bell,
-  AlertCircle,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { LogActivityModal } from '../components/LogActivityModal';
 import { AddFollowUpModal } from '../components/AddFollowUpModal';
 import { useCrm } from '@/contexts/CrmContext';
+import { useContactActivities } from '@/hooks/useContactActivities';
 
 const temperatureColors: Record<string, string> = {
   Hot: 'bg-rose-500',
@@ -20,12 +22,13 @@ const temperatureColors: Record<string, string> = {
 
 export function WhatsApp() {
   const { contacts } = useCrm();
+  const { logActivity } = useContactActivities();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [showLogActivity, setShowLogActivity] = useState(false);
   const [showFollowUp, setShowFollowUp] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-  // Filter contacts with phone numbers
   const contactsWithPhone = useMemo(() => {
     return contacts.filter(c => c.PhoneNumber && c.PhoneNumber.trim() !== '');
   }, [contacts]);
@@ -44,12 +47,26 @@ export function WhatsApp() {
     ? contacts.find(c => String(c.id) === selectedContactId)
     : filteredContacts[0] || null;
 
-  const handleOpenWhatsApp = () => {
-    if (selectedContact) {
-      const phone = selectedContact.PhoneNumber.replace(/\s/g, '').replace('+', '');
-      window.open(`https://wa.me/${phone}`, '_blank');
-    }
-  };
+  const handleOpenWhatsApp = useCallback(async () => {
+    if (!selectedContact) return;
+    const phone = selectedContact.PhoneNumber.replace(/\s/g, '').replace('+', '');
+    
+    // Log the WhatsApp activity with timestamp
+    await logActivity({
+      contact_id: String(selectedContact.id),
+      activity_type: 'whatsapp',
+      summary: `Opened WhatsApp chat with ${selectedContact.FullName}`,
+    });
+    
+    window.open(`https://wa.me/${phone}`, '_blank');
+  }, [selectedContact, logActivity]);
+
+  const handleCopyNumber = useCallback(() => {
+    if (!selectedContact) return;
+    navigator.clipboard.writeText(selectedContact.PhoneNumber);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, [selectedContact]);
 
   return (
     <div className="h-[calc(100vh-56px-48px)] flex rounded-xl overflow-hidden border border-slate-700 bg-slate-800/30">
@@ -157,6 +174,15 @@ export function WhatsApp() {
                 </button>
                 <button
                   type="button"
+                  onClick={handleCopyNumber}
+                  className="flex items-center gap-2 px-3 py-2 text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition-colors"
+                  title="Copy phone number (use if WhatsApp link is blocked)"
+                >
+                  {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                  <span className="hidden xl:inline">{copied ? 'Copied!' : 'Copy #'}</span>
+                </button>
+                <button
+                  type="button"
                   onClick={handleOpenWhatsApp}
                   className="flex items-center gap-2 px-3 py-2 text-sm font-medium bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors"
                 >
@@ -170,17 +196,6 @@ export function WhatsApp() {
           {/* Contact Details */}
           <div className="flex-1 overflow-y-auto p-6">
             <div className="max-w-md mx-auto space-y-6">
-              {/* Phase 2B Notice */}
-              <div className="flex items-start gap-3 p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-                <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium text-amber-400">WhatsApp Integration — Coming in Phase 2B</p>
-                  <p className="text-xs text-amber-400/70 mt-1">
-                    Direct messaging will be available in the next phase. For now, use "Open in WhatsApp" to message contacts, and log activity here to track interactions.
-                  </p>
-                </div>
-              </div>
-
               {/* Contact Info Card */}
               <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5 space-y-4">
                 <h3 className="text-sm font-semibold text-white">Contact Details</h3>
