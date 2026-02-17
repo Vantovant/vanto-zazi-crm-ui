@@ -29,6 +29,7 @@ export function EditContactModal({ prospect, onClose, onSaved }: EditContactModa
     NextAction: prospect.NextAction || '',
     AdditionalNotes: prospect.AdditionalNotes || '',
     GOStatus: prospect.GOStatus || '',
+    SponsorName: prospect.SponsorName || '',
   });
 
   const update = (key: string, value: string) => setForm(prev => ({ ...prev, [key]: value }));
@@ -138,7 +139,7 @@ export function EditContactModal({ prospect, onClose, onSaved }: EditContactModa
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-1.5">Focus Area</label>
                 <select value={form.FocusArea} onChange={e => update('FocusArea', e.target.value)} className="w-full px-3 py-2.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500">
@@ -150,6 +151,10 @@ export function EditContactModal({ prospect, onClose, onSaved }: EditContactModa
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-1.5">GO Status</label>
                 <input type="text" value={form.GOStatus} onChange={e => update('GOStatus', e.target.value)} placeholder="e.g. No Status, Promoter" className="w-full px-4 py-2.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500 placeholder:text-slate-500" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">Sponsor</label>
+                <input type="text" value={form.SponsorName} onChange={e => update('SponsorName', e.target.value)} placeholder="Sponsor name" className="w-full px-4 py-2.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500 placeholder:text-slate-500" />
               </div>
             </div>
 
