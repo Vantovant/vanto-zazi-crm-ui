@@ -40,24 +40,27 @@
 .vz-tag-expired { background: #6b728025; color: #9ca3af; border: 1px solid #6b728050; }
 .vz-tag-unknown { background: #9ca3af15; color: #9ca3af; border: 1px solid #9ca3af30; }
 
-/* Add to CRM button */
+/* Add to CRM button — Eazybe style green badge */
 .vz-add-btn {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
-  padding: 1px 6px;
+  padding: 2px 8px;
   border-radius: 4px;
-  line-height: 16px;
+  line-height: 18px;
   white-space: nowrap;
   cursor: pointer;
-  background: #22c55e20;
-  color: #4ade80;
-  border: 1px solid #22c55e40;
+  background: #22c55e;
+  color: #fff;
+  border: none;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
   transition: all 0.15s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
 }
 
-.vz-add-btn:hover { background: #22c55e40; transform: scale(1.05); }
+.vz-add-btn:hover { background: #16a34a; transform: scale(1.05); }
 
 /* Edit pencil icon */
 .vz-edit-icon {
