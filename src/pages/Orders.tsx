@@ -5,11 +5,13 @@ import {
   ShoppingCart,
   X,
   Calendar,
+  Sparkles,
 } from 'lucide-react';
 import { orderFilterOptions, type Order } from '../data/mockData';
 import { DataStatusBanner } from '../components/DataStatusBanner';
 import { useCrm } from '@/contexts/CrmContext';
 import { AddOrderModal } from '@/components/AddOrderModal';
+import { SmartPasteOrdersModal } from '@/components/SmartPasteOrdersModal';
 
 const statusColors: Record<string, string> = {
   Pending: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
@@ -38,6 +40,7 @@ export function Orders() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [dateRange, setDateRange] = useState({ from: '', to: '' });
   const [showAddOrder, setShowAddOrder] = useState(false);
+  const [showSmartPaste, setShowSmartPaste] = useState(false);
 
   const uniqueContacts = useMemo(() => {
     return [...new Set(orders.map(o => o.contactName))];
@@ -67,7 +70,7 @@ export function Orders() {
 
       return true;
     });
-  }, [searchQuery, activeFilters, dateRange]);
+  }, [orders, searchQuery, activeFilters, dateRange]);
 
   const clearFilter = (key: FilterKey) => {
     setActiveFilters((prev) => ({ ...prev, [key]: '' }));
@@ -90,14 +93,24 @@ export function Orders() {
             {ordersLoading ? 'Loading...' : `${filteredOrders.length} orders · R${totalRevenue.toLocaleString()} total`}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowAddOrder(true)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-teal-600 hover:bg-teal-500 text-white text-sm font-medium rounded-lg transition-colors"
-        >
-          <ShoppingCart className="w-4 h-4" />
-          New Order
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowSmartPaste(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            <Sparkles className="w-4 h-4" />
+            Smart Paste
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowAddOrder(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-teal-600 hover:bg-teal-500 text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            <ShoppingCart className="w-4 h-4" />
+            New Order
+          </button>
+        </div>
       </div>
 
       {/* Filters Bar */}
@@ -283,9 +296,12 @@ export function Orders() {
                 <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-400 uppercase tracking-wider">Contact</th>
                 <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-400 uppercase tracking-wider">Product</th>
                 <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-400 uppercase tracking-wider">Qty</th>
+                <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-400 uppercase tracking-wider">Type</th>
+                <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-400 uppercase tracking-wider">PV</th>
                 <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-400 uppercase tracking-wider">Amount</th>
                 <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</th>
                 <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-400 uppercase tracking-wider">Date</th>
+                <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-400 uppercase tracking-wider">Source</th>
                 <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-400 uppercase tracking-wider">Badges</th>
               </tr>
             </thead>
@@ -309,6 +325,22 @@ export function Orders() {
                     <span className="text-sm text-slate-400">{order.quantity}</span>
                   </td>
                   <td className="px-5 py-4">
+                    {order.purchaseType ? (
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded ${
+                        order.purchaseType === 'Upgrade'
+                          ? 'bg-violet-500/20 text-violet-400'
+                          : 'bg-teal-500/20 text-teal-400'
+                      }`}>
+                        {order.purchaseType}
+                      </span>
+                    ) : (
+                      <span className="text-slate-600">—</span>
+                    )}
+                  </td>
+                  <td className="px-5 py-4">
+                    <span className="text-sm text-slate-400">{order.pvAmount ? `${order.pvAmount} PV` : '—'}</span>
+                  </td>
+                  <td className="px-5 py-4">
                     <span className="text-sm font-medium text-slate-200">R{order.amount.toLocaleString()}</span>
                   </td>
                   <td className="px-5 py-4">
@@ -318,6 +350,13 @@ export function Orders() {
                   </td>
                   <td className="px-5 py-4">
                     <span className="text-sm text-slate-400">{order.orderDate}</span>
+                  </td>
+                  <td className="px-5 py-4">
+                    <span className={`text-xs px-2 py-0.5 rounded ${
+                      order.source === 'backoffice-paste' ? 'bg-violet-500/10 text-violet-400' : 'text-slate-500'
+                    }`}>
+                      {order.source === 'backoffice-paste' ? 'Backoffice' : order.source === 'manual' ? 'Manual' : order.source || '—'}
+                    </span>
                   </td>
                   <td className="px-5 py-4">
                     <div className="flex gap-1.5 flex-wrap">
@@ -390,6 +429,24 @@ export function Orders() {
                       <span className="text-slate-300">{selectedOrder.badges.join(', ')}</span>
                     </div>
                   )}
+                  {selectedOrder.purchaseType && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-500">Type</span>
+                      <span className="text-slate-300">{selectedOrder.purchaseType}</span>
+                    </div>
+                  )}
+                  {(selectedOrder.pvAmount ?? 0) > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-500">PV Amount</span>
+                      <span className="text-slate-300">{selectedOrder.pvAmount} PV</span>
+                    </div>
+                  )}
+                  {selectedOrder.source && selectedOrder.source !== 'manual' && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-500">Source</span>
+                      <span className="text-slate-300">{selectedOrder.source === 'backoffice-paste' ? 'Backoffice Paste' : selectedOrder.source}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -407,6 +464,10 @@ export function Orders() {
 
       {showAddOrder && (
         <AddOrderModal onClose={() => setShowAddOrder(false)} />
+      )}
+
+      {showSmartPaste && (
+        <SmartPasteOrdersModal onClose={() => setShowSmartPaste(false)} />
       )}
     </div>
   );

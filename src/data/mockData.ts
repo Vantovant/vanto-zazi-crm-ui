@@ -469,6 +469,9 @@ export interface Order {
   status: 'Pending' | 'Paid' | 'Delivered' | 'Activated';
   orderDate: string;
   badges: ('Activated' | 'First Order' | 'Upgrade')[];
+  purchaseType?: string;
+  pvAmount?: number;
+  source?: string;
 }
 
 export const orders: Order[] = [
