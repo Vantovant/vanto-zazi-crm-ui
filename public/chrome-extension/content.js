@@ -537,7 +537,7 @@ function injectSyncButton() {
   btn.innerHTML = '🟢';
   btn.title = 'Vanto Zazi CRM — Click extension icon to sync';
   btn.style.cssText = `
-    position: fixed; bottom: 20px; right: 20px; z-index: 99999;
+    position: fixed; bottom: 20px; left: 20px; z-index: 99999;
     width: 40px; height: 40px; border-radius: 50%;
     background: #1e293b; border: 2px solid #22c55e;
     display: flex; align-items: center; justify-content: center;
