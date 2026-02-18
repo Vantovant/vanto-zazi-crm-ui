@@ -67,7 +67,33 @@ $('syncBtn').addEventListener('click', async () => {
       return;
     }
 
-    const response = await chrome.tabs.sendMessage(tab.id, { action: 'scrape_contacts' });
+    // Ensure content script is injected
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        files: ['content.js'],
+      });
+      await chrome.scripting.insertCSS({
+        target: { tabId: tab.id },
+        files: ['content.css'],
+      });
+    } catch (injectErr) {
+      // Already injected or will work via manifest — continue
+    }
+
+    // Small delay to let content script initialize
+    await new Promise(r => setTimeout(r, 500));
+
+    let response;
+    try {
+      response = await chrome.tabs.sendMessage(tab.id, { action: 'scrape_contacts' });
+    } catch (msgErr) {
+      $('syncResult').textContent = '❌ Content script not ready. Please refresh WhatsApp Web and try again.';
+      $('syncResult').classList.remove('hidden');
+      $('syncBtn').disabled = false;
+      $('syncBtn').textContent = 'Sync WhatsApp Contacts';
+      return;
+    }
     const contacts = response?.contacts || [];
 
     if (contacts.length === 0) {
