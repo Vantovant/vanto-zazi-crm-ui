@@ -3,7 +3,7 @@
   "name": "Vanto Zazi - WhatsApp CRM Sync",
   "version": "1.0.0",
   "description": "Sync WhatsApp Web contacts back to your Vanto Zazi CRM",
-  "permissions": ["storage", "activeTab"],
+  "permissions": ["storage", "activeTab", "scripting"],
   "host_permissions": ["https://web.whatsapp.com/*"],
   "action": {
     "default_popup": "popup.html",
