@@ -65,8 +65,9 @@ export function Dashboard() {
     const totalRevenue = orders.reduce((s, o) => s + o.amount, 0);
     const paidTotal = orders.filter(o => o.status === 'Paid').reduce((s, o) => s + o.amount, 0);
     const pendingTotal = orders.filter(o => o.status === 'Pending').reduce((s, o) => s + o.amount, 0);
-    const totalPV = orders.reduce((s, o) => s + (o.pvAmount || 0), 0);
-    return { totalRevenue, paidTotal, pendingTotal, totalPV, count: orders.length };
+    const activityPV = orders.filter(o => o.purchaseType === 'Activity').reduce((s, o) => s + (o.pvAmount || 0), 0);
+    const upgradePV = orders.filter(o => o.purchaseType === 'Upgrade').reduce((s, o) => s + (o.pvAmount || 0), 0);
+    return { totalRevenue, paidTotal, pendingTotal, activityPV, upgradePV, count: orders.length };
   }, [orders]);
 
   const recentProspects = prospects.slice(0, 5);
@@ -257,7 +258,7 @@ Keep it punchy, motivational, and formatted with emojis and headers. Max 300 wor
       </div>
 
       {/* Order Revenue Summary */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-4">
           <div className="flex items-center gap-2 mb-2">
             <div className="bg-teal-500/20 p-1.5 rounded-lg">
@@ -286,14 +287,23 @@ Keep it punchy, motivational, and formatted with emojis and headers. Max 300 wor
           </div>
           <p className="text-xl font-bold text-amber-300">R{orderStats.pendingTotal.toLocaleString()}</p>
         </div>
-        <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-4">
+        <div className="bg-slate-800/50 rounded-xl border border-teal-500/20 p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="bg-teal-500/20 p-1.5 rounded-lg">
+              <Sparkles className="w-3.5 h-3.5 text-teal-400" />
+            </div>
+            <span className="text-xs font-medium text-teal-400">Activity PV</span>
+          </div>
+          <p className="text-xl font-bold text-teal-300">{orderStats.activityPV.toLocaleString()}</p>
+        </div>
+        <div className="bg-slate-800/50 rounded-xl border border-violet-500/20 p-4">
           <div className="flex items-center gap-2 mb-2">
             <div className="bg-violet-500/20 p-1.5 rounded-lg">
               <Sparkles className="w-3.5 h-3.5 text-violet-400" />
             </div>
-            <span className="text-xs font-medium text-slate-400">Total PV</span>
+            <span className="text-xs font-medium text-violet-400">Upgrade PV</span>
           </div>
-          <p className="text-xl font-bold text-white">{orderStats.totalPV.toLocaleString()}</p>
+          <p className="text-xl font-bold text-violet-300">{orderStats.upgradePV.toLocaleString()}</p>
         </div>
       </div>
 
