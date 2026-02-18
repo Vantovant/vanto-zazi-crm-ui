@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.parse-backoffice-orders]
 verify_jwt = false
+
+[functions.whatsapp-sync]
+verify_jwt = false
