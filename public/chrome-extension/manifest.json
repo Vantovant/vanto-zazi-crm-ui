@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Vanto Zazi - WhatsApp CRM Sync",
+  "version": "1.0.0",
+  "description": "Sync WhatsApp Web contacts back to your Vanto Zazi CRM",
+  "permissions": ["storage", "activeTab"],
+  "host_permissions": ["https://web.whatsapp.com/*"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "icon48.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://web.whatsapp.com/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+}
