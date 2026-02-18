@@ -6,6 +6,7 @@ import { productCatalog, type Product } from '@/data/productCatalog';
 interface OrderLine {
   product: Product;
   quantity: number;
+  sellingPrice: number; // defaults to stock price, user can override
 }
 
 interface AddOrderModalProps {
@@ -65,7 +66,7 @@ export function AddOrderModal({ onClose }: AddOrderModalProps) {
       if (existing >= 0) {
         return prev.map((l, i) => i === existing ? { ...l, quantity: l.quantity + 1 } : l);
       }
-      return [...prev, { product, quantity: 1 }];
+      return [...prev, { product, quantity: 1, sellingPrice: product.priceIncVat }];
     });
     setProductSearch('');
     setShowProductDropdown(false);
@@ -76,11 +77,15 @@ export function AddOrderModal({ onClose }: AddOrderModalProps) {
     setLines(prev => prev.map((l, i) => i === idx ? { ...l, quantity: qty } : l));
   };
 
+  const updatePrice = (idx: number, price: number) => {
+    setLines(prev => prev.map((l, i) => i === idx ? { ...l, sellingPrice: price } : l));
+  };
+
   const removeLine = (idx: number) => {
     setLines(prev => prev.filter((_, i) => i !== idx));
   };
 
-  const totalAmount = lines.reduce((s, l) => s + l.product.priceIncVat * l.quantity, 0);
+  const totalAmount = lines.reduce((s, l) => s + l.sellingPrice * l.quantity, 0);
   const totalPV = lines.reduce((s, l) => s + l.product.pv * l.quantity, 0);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -98,7 +103,7 @@ export function AddOrderModal({ onClose }: AddOrderModalProps) {
         contact_id: selectedContactId || undefined,
         product: line.product.name,
         quantity: line.quantity,
-        amount: line.product.priceIncVat * line.quantity,
+        amount: line.sellingPrice * line.quantity,
         status: status as 'Pending' | 'Paid' | 'Delivered' | 'Activated',
         orderDate,
         badges: [],
@@ -233,8 +238,23 @@ export function AddOrderModal({ onClose }: AddOrderModalProps) {
                         <span className="text-sm font-medium text-slate-200">{line.product.name}</span>
                         <span className={`text-xs px-1.5 py-0.5 rounded ${rangeColor[line.product.range]}`}>{line.product.range}</span>
                       </div>
-                      <div className="text-xs text-slate-500 mt-0.5">
-                        R{line.product.priceIncVat.toLocaleString()} × {line.quantity} = R{(line.product.priceIncVat * line.quantity).toLocaleString()} · {line.product.pv * line.quantity} PV
+                      <div className="flex items-center gap-2 mt-1">
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-slate-500">R</span>
+                          <input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            value={line.sellingPrice}
+                            onChange={e => updatePrice(idx, parseFloat(e.target.value) || 0)}
+                            className="w-20 px-1.5 py-0.5 text-xs bg-slate-700 border border-slate-600 rounded text-slate-200 focus:outline-none focus:ring-1 focus:ring-teal-500/40"
+                          />
+                        </div>
+                        <span className="text-xs text-slate-500">× {line.quantity} = R{(line.sellingPrice * line.quantity).toLocaleString()}</span>
+                        <span className="text-xs text-slate-500">· {line.product.pv * line.quantity} PV</span>
+                        {line.sellingPrice !== line.product.priceIncVat && (
+                          <span className="text-xs text-amber-400/70" title={`Stock price: R${line.product.priceIncVat}`}>edited</span>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5">
