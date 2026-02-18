@@ -95,6 +95,8 @@ function injectTags() {
   chatRows.forEach((row) => {
     // Skip if already tagged
     if (row.querySelector('.vz-crm-tags')) return;
+    // Skip groups
+    if (isGroupChat(row)) return;
 
     // Find contact name
     let name = null;
@@ -303,6 +305,22 @@ function removeAllTags() {
   document.querySelectorAll('.vz-crm-tags').forEach(el => el.remove());
 }
 
+// ===== Check if a chat row is a group =====
+function isGroupChat(row) {
+  // Group indicators: group metadata, multiple participants
+  if (row.querySelector('[data-testid="group-subject"]')) return true;
+  if (row.querySelector('[data-icon="default-group"]')) return true;
+  if (row.querySelector('[data-icon="community"]')) return true;
+  // Check for group avatar icon
+  const avatarImg = row.querySelector('[data-testid="cell-frame-primary"] img');
+  if (!avatarImg) {
+    // No profile pic AND has group-style default icon
+    const groupIcon = row.querySelector('[data-testid="default-group"]');
+    if (groupIcon) return true;
+  }
+  return false;
+}
+
 // ===== Scrape contacts (for popup sync) =====
 function scrapeWhatsAppContacts() {
   const contacts = [];
@@ -318,6 +336,9 @@ function scrapeWhatsAppContacts() {
 
   chatRows.forEach((row) => {
     try {
+      // Skip groups
+      if (isGroupChat(row)) return;
+
       let name = null;
       const titleEl = row.querySelector('[data-testid="cell-frame-title"] span[title]');
       if (titleEl) name = titleEl.getAttribute('title')?.trim();
@@ -330,6 +351,8 @@ function scrapeWhatsAppContacts() {
         if (chatName) name = chatName.textContent?.trim();
       }
       if (!name || name.length < 2) return;
+
+      // Skip names that look like groups (commas = multiple participants, emojis commonly used for groups)
       if (name.includes(',') || name.includes('📌') || name.includes('👥')) return;
 
       const cleanName = name.replace(/[\s\-\(\)\+]/g, '');
