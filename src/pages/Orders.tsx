@@ -79,7 +79,7 @@ export function Orders() {
   const activeFilterCount = Object.values(activeFilters).filter(Boolean).length + (dateRange.from || dateRange.to ? 1 : 0);
 
   const totalRevenue = filteredOrders.reduce((sum, o) => sum + o.amount, 0);
-  const paidTotal = filteredOrders.filter(o => o.status === 'Paid').reduce((sum, o) => sum + o.amount, 0);
+  const paidTotal = filteredOrders.filter(o => ['Paid', 'Delivered', 'Activated'].includes(o.status)).reduce((sum, o) => sum + o.amount, 0);
   const pendingTotal = filteredOrders.filter(o => o.status === 'Pending').reduce((sum, o) => sum + o.amount, 0);
   const activityPV = filteredOrders.filter(o => o.purchaseType === 'Activity').reduce((sum, o) => sum + (o.pvAmount || 0), 0);
   const upgradePV = filteredOrders.filter(o => o.purchaseType === 'Upgrade').reduce((sum, o) => sum + (o.pvAmount || 0), 0);
