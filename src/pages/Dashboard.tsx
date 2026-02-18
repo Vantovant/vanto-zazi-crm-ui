@@ -63,7 +63,7 @@ export function Dashboard() {
 
   const orderStats = useMemo(() => {
     const totalRevenue = orders.reduce((s, o) => s + o.amount, 0);
-    const paidTotal = orders.filter(o => o.status === 'Paid').reduce((s, o) => s + o.amount, 0);
+    const paidTotal = orders.filter(o => ['Paid', 'Delivered', 'Activated'].includes(o.status)).reduce((s, o) => s + o.amount, 0);
     const pendingTotal = orders.filter(o => o.status === 'Pending').reduce((s, o) => s + o.amount, 0);
     const activityPV = orders.filter(o => o.purchaseType === 'Activity').reduce((s, o) => s + (o.pvAmount || 0), 0);
     const upgradePV = orders.filter(o => o.purchaseType === 'Upgrade').reduce((s, o) => s + (o.pvAmount || 0), 0);
