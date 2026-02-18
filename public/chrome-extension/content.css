@@ -2,3 +2,149 @@
 #vanto-zazi-sync-btn {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
+
+/* ===== CRM Tag Badges ===== */
+.vz-crm-tags {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 1px;
+  flex-wrap: nowrap;
+  max-width: 200px;
+  overflow: hidden;
+}
+
+.vz-tag {
+  font-size: 9px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 3px;
+  line-height: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.vz-tag:hover {
+  opacity: 0.85;
+}
+
+/* Temperature tags */
+.vz-tag-hot { background: #dc262620; color: #ef4444; border: 1px solid #ef444440; }
+.vz-tag-warm { background: #f59e0b20; color: #f59e0b; border: 1px solid #f59e0b40; }
+.vz-tag-cold { background: #3b82f620; color: #3b82f6; border: 1px solid #3b82f640; }
+
+/* Lead type tags */
+.vz-tag-prospect { background: #8b5cf620; color: #8b5cf6; border: 1px solid #8b5cf640; }
+.vz-tag-registered { background: #06b6d420; color: #06b6d4; border: 1px solid #06b6d440; }
+.vz-tag-purchase { background: #22c55e20; color: #22c55e; border: 1px solid #22c55e40; }
+.vz-tag-expired { background: #6b728020; color: #6b7280; border: 1px solid #6b728040; }
+.vz-tag-unknown { background: #9ca3af15; color: #9ca3af; border: 1px solid #9ca3af30; }
+
+/* ===== Quick-tag Dropdown ===== */
+.vz-dropdown-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 99998;
+}
+
+.vz-dropdown {
+  position: fixed;
+  z-index: 99999;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 6px 0;
+  min-width: 180px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.vz-dropdown-header {
+  padding: 6px 12px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid #334155;
+  margin-bottom: 4px;
+}
+
+.vz-dropdown-item {
+  padding: 6px 12px;
+  font-size: 12px;
+  color: #e2e8f0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.1s;
+}
+
+.vz-dropdown-item:hover {
+  background: #334155;
+}
+
+.vz-dropdown-item.active {
+  background: #22c55e15;
+  color: #4ade80;
+}
+
+.vz-dropdown-divider {
+  height: 1px;
+  background: #334155;
+  margin: 4px 0;
+}
+
+/* ===== Notes Preview Tooltip ===== */
+.vz-notes-tooltip {
+  position: fixed;
+  z-index: 99999;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 10px 12px;
+  max-width: 280px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  pointer-events: none;
+}
+
+.vz-notes-tooltip-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #94a3b8;
+  margin-bottom: 4px;
+}
+
+.vz-notes-tooltip-body {
+  font-size: 12px;
+  color: #e2e8f0;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.vz-notes-tooltip-empty {
+  color: #64748b;
+  font-style: italic;
+}
+
+/* ===== Notes icon ===== */
+.vz-notes-icon {
+  cursor: pointer;
+  font-size: 12px;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+
+.vz-notes-icon:hover {
+  opacity: 1;
+}
+
+.vz-notes-icon.has-notes {
+  opacity: 0.9;
+}
