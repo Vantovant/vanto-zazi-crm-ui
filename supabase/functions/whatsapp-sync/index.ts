@@ -67,7 +67,10 @@ Deno.serve(async (req) => {
       for (const wa of waContacts) {
         const phone = (wa.phone || "").replace(/\s/g, "");
         const name = wa.name || "Unknown";
+        // Skip entries without a phone number (likely groups or unnamed contacts)
         if (!phone) continue;
+        // Skip group-like names
+        if (name.includes(",") || name.includes("📌") || name.includes("👥")) continue;
 
         const match = existingByPhone.get(phone);
         if (match) {
