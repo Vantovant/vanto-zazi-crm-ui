@@ -36,9 +36,8 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { headers, sampleRows } = await req.json();
+    const { headers, sampleRows, userApiKeys } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     const systemPrompt = `You are a data mapping expert for the Vanto Zazi CRM (an APLGO MLM business CRM).
 
@@ -66,14 +65,33 @@ HEADERS: ${JSON.stringify(headers)}
 SAMPLE DATA (first 5 rows):
 ${sampleRows.map((row: string[], i: number) => `Row ${i + 1}: ${JSON.stringify(row)}`).join("\n")}`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    // Determine provider - try Lovable first, fallback to user keys
+    let aiUrl = "https://ai.gateway.lovable.dev/v1/chat/completions";
+    let aiHeaders: Record<string, string> = { "Content-Type": "application/json" };
+    let aiModel = "google/gemini-3-flash-preview";
+
+    const pref = userApiKeys?.preferred_provider || "lovable";
+    if (pref === "gemini" && userApiKeys?.gemini_api_key) {
+      aiUrl = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+      aiHeaders.Authorization = `Bearer ${userApiKeys.gemini_api_key}`;
+      aiModel = "gemini-2.5-flash";
+    } else if (pref === "openai" && userApiKeys?.openai_api_key) {
+      aiUrl = "https://api.openai.com/v1/chat/completions";
+      aiHeaders.Authorization = `Bearer ${userApiKeys.openai_api_key}`;
+      aiModel = "gpt-4o-mini";
+    } else if (LOVABLE_API_KEY) {
+      aiHeaders.Authorization = `Bearer ${LOVABLE_API_KEY}`;
+    } else {
+      return new Response(JSON.stringify({ error: "No AI provider configured." }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const response = await fetch(aiUrl, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
+      headers: aiHeaders,
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: aiModel,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
