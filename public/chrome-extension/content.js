@@ -1,6 +1,6 @@
 // Content script for WhatsApp Web
-// Listens for messages from the popup to scrape contacts
-// Injects CRM tags (lead temp, lead type, notes) into WhatsApp chat list
+// Injects CRM tags (lead temp, lead type, notes) inline next to contact names
+// Eazybe-style tagging directly in WhatsApp Web
 
 const SUPABASE_URL = 'https://urfyfuakgabieellbuce.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVyZnlmdWFrZ2FiaWVlbGxidWNlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA2NDE2NjcsImV4cCI6MjA4NjIxNzY2N30.4JaSzSQUsz0__rAqTLFc5W3sJUkayahwAHHLf0zUDAk';
@@ -33,6 +33,7 @@ async function fetchCrmContacts() {
     });
     if (res.ok) {
       crmContacts = await res.json();
+      console.log(`[Vanto Zazi] Loaded ${crmContacts.length} CRM contacts`);
     }
   } catch (e) {
     console.log('[Vanto Zazi] Failed to fetch CRM contacts:', e.message);
@@ -43,12 +44,12 @@ async function fetchCrmContacts() {
 function findCrmContact(waName) {
   if (!waName || !crmContacts.length) return null;
   const lower = waName.toLowerCase().trim();
-  
-  // Try exact name match
+
+  // Exact name match
   let match = crmContacts.find(c => c.full_name?.toLowerCase().trim() === lower);
   if (match) return match;
 
-  // Try phone match (if waName looks like a phone number)
+  // Phone match (if waName looks like a phone number)
   const cleanName = waName.replace(/[\s\-\(\)\+]/g, '');
   if (/^\d{7,15}$/.test(cleanName)) {
     match = crmContacts.find(c => {
@@ -58,10 +59,10 @@ function findCrmContact(waName) {
     if (match) return match;
   }
 
-  // Try partial match (first + last name)
+  // Partial match
   match = crmContacts.find(c => {
     const crmName = c.full_name?.toLowerCase().trim() || '';
-    return crmName && (lower.includes(crmName) || crmName.includes(lower));
+    return crmName && crmName.length > 3 && (lower.includes(crmName) || crmName.includes(lower));
   });
   return match || null;
 }
@@ -72,7 +73,7 @@ function getTempConfig(temp) {
   if (t === 'hot') return { label: '🔴 Hot', cls: 'vz-tag-hot' };
   if (t === 'warm') return { label: '🟡 Warm', cls: 'vz-tag-warm' };
   if (t === 'cold') return { label: '🔵 Cold', cls: 'vz-tag-cold' };
-  return { label: '⚪ ' + (temp || 'N/A'), cls: 'vz-tag-unknown' };
+  return { label: '⚪ N/A', cls: 'vz-tag-unknown' };
 }
 
 // ===== Lead type config =====
@@ -85,90 +86,145 @@ function getTypeConfig(type) {
   return { label: type || 'Unknown', cls: 'vz-tag-unknown' };
 }
 
-// ===== Inject tags into chat rows =====
+// ===== Check if a chat row is a group =====
+function isGroupChat(row) {
+  if (row.querySelector('[data-testid="group-subject"]')) return true;
+  if (row.querySelector('[data-icon="default-group"]')) return true;
+  if (row.querySelector('[data-icon="community"]')) return true;
+  const groupIcon = row.querySelector('[data-testid="default-group"]');
+  if (groupIcon) return true;
+  return false;
+}
+
+// ===== Inject tags INLINE next to name (Eazybe style) =====
 function injectTags() {
-  // Find chat rows
   let chatRows = document.querySelectorAll('[data-testid="cell-frame-container"]');
   if (!chatRows.length) chatRows = document.querySelectorAll('[role="listitem"]');
   if (!chatRows.length) chatRows = document.querySelectorAll('#pane-side [role="row"]');
 
   chatRows.forEach((row) => {
-    // Skip if already tagged
     if (row.querySelector('.vz-crm-tags')) return;
-    // Skip groups
     if (isGroupChat(row)) return;
 
     // Find contact name
     let name = null;
-    const titleEl = row.querySelector('[data-testid="cell-frame-title"] span[title]');
-    if (titleEl) name = titleEl.getAttribute('title')?.trim();
+    let titleSpan = row.querySelector('[data-testid="cell-frame-title"] span[title]');
+    if (titleSpan) name = titleSpan.getAttribute('title')?.trim();
     if (!name) {
-      const anyTitle = row.querySelector('span[title]');
-      if (anyTitle) name = anyTitle.getAttribute('title')?.trim();
+      titleSpan = row.querySelector('span[title]');
+      if (titleSpan) name = titleSpan.getAttribute('title')?.trim();
     }
     if (!name || name.length < 2) return;
-
-    // Skip groups
     if (name.includes(',') || name.includes('📌') || name.includes('👥')) return;
 
     const contact = findCrmContact(name);
-    if (!contact) return;
 
-    // Create tags container
-    const tagsDiv = document.createElement('div');
+    // Create inline tags container
+    const tagsDiv = document.createElement('span');
     tagsDiv.className = 'vz-crm-tags';
 
-    // Temperature tag
-    const tempConf = getTempConfig(contact.lead_temperature);
-    const tempTag = document.createElement('span');
-    tempTag.className = `vz-tag ${tempConf.cls}`;
-    tempTag.textContent = tempConf.label;
-    tempTag.title = 'Click to change temperature';
-    tempTag.addEventListener('click', (e) => {
-      e.stopPropagation();
-      e.preventDefault();
-      showDropdown(e, contact, 'temperature');
-    });
-    tagsDiv.appendChild(tempTag);
+    if (contact) {
+      // ---- MATCHED: show temperature + lead type + notes icon ----
 
-    // Lead type tag
-    const typeConf = getTypeConfig(contact.lead_type);
-    const typeTag = document.createElement('span');
-    typeTag.className = `vz-tag ${typeConf.cls}`;
-    typeTag.textContent = typeConf.label;
-    typeTag.title = 'Click to change lead type';
-    typeTag.addEventListener('click', (e) => {
-      e.stopPropagation();
-      e.preventDefault();
-      showDropdown(e, contact, 'lead_type');
-    });
-    tagsDiv.appendChild(typeTag);
+      // Temperature tag (clickable)
+      const tempConf = getTempConfig(contact.lead_temperature);
+      const tempTag = document.createElement('span');
+      tempTag.className = `vz-tag ${tempConf.cls}`;
+      tempTag.textContent = tempConf.label;
+      tempTag.title = 'Click to change temperature';
+      tempTag.addEventListener('click', (e) => {
+        e.stopPropagation(); e.preventDefault();
+        showDropdown(e, contact, 'temperature');
+      });
+      tagsDiv.appendChild(tempTag);
 
-    // Notes icon
-    const notesIcon = document.createElement('span');
-    notesIcon.className = `vz-notes-icon ${contact.additional_notes ? 'has-notes' : ''}`;
-    notesIcon.textContent = contact.additional_notes ? '📝' : '📋';
-    notesIcon.title = contact.additional_notes || 'No notes';
-    notesIcon.addEventListener('mouseenter', (e) => showNotesTooltip(e, contact));
-    notesIcon.addEventListener('mouseleave', hideNotesTooltip);
-    notesIcon.addEventListener('click', (e) => {
-      e.stopPropagation();
-      e.preventDefault();
-    });
-    tagsDiv.appendChild(notesIcon);
+      // Lead type tag (clickable)
+      const typeConf = getTypeConfig(contact.lead_type);
+      const typeTag = document.createElement('span');
+      typeTag.className = `vz-tag ${typeConf.cls}`;
+      typeTag.textContent = typeConf.label;
+      typeTag.title = 'Click to change lead type';
+      typeTag.addEventListener('click', (e) => {
+        e.stopPropagation(); e.preventDefault();
+        showDropdown(e, contact, 'lead_type');
+      });
+      tagsDiv.appendChild(typeTag);
 
-    // Insert after the title element
-    const titleContainer = row.querySelector('[data-testid="cell-frame-title"]');
-    if (titleContainer) {
-      titleContainer.parentElement.appendChild(tagsDiv);
+      // Notes icon
+      const notesIcon = document.createElement('span');
+      notesIcon.className = `vz-notes-icon ${contact.additional_notes ? 'has-notes' : ''}`;
+      notesIcon.textContent = contact.additional_notes ? '📝' : '📋';
+      notesIcon.title = contact.additional_notes || 'No notes';
+      notesIcon.addEventListener('mouseenter', (e) => showNotesTooltip(e, contact));
+      notesIcon.addEventListener('mouseleave', hideNotesTooltip);
+      notesIcon.addEventListener('click', (e) => { e.stopPropagation(); e.preventDefault(); });
+      tagsDiv.appendChild(notesIcon);
+
     } else {
-      // Fallback: append to the row
-      const firstSpanTitle = row.querySelector('span[title]');
-      if (firstSpanTitle && firstSpanTitle.parentElement) {
-        firstSpanTitle.parentElement.appendChild(tagsDiv);
-      }
+      // ---- UNMATCHED: show "+ CRM" button to quick-add ----
+      const addBtn = document.createElement('span');
+      addBtn.className = 'vz-add-btn';
+      addBtn.textContent = '➕ CRM';
+      addBtn.title = 'Add this contact to your CRM';
+      addBtn.addEventListener('click', async (e) => {
+        e.stopPropagation(); e.preventDefault();
+        await quickAddContact(name, row);
+      });
+      tagsDiv.appendChild(addBtn);
+    }
+
+    // INSERT INLINE: place tags right after the name span
+    if (titleSpan) {
+      titleSpan.parentElement.style.overflow = 'visible';
+      titleSpan.parentElement.style.display = 'flex';
+      titleSpan.parentElement.style.alignItems = 'center';
+      titleSpan.after(tagsDiv);
     }
   });
+}
+
+// ===== Quick-add contact to CRM from WhatsApp =====
+async function quickAddContact(name, row) {
+  if (!accessToken) {
+    console.log('[Vanto Zazi] Not logged in — open extension popup to connect.');
+    return;
+  }
+
+  // Extract phone if name looks like a number
+  const cleanName = name.replace(/[\s\-\(\)\+]/g, '');
+  const phone = /^\d{7,15}$/.test(cleanName) ? name : '';
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/contacts`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation',
+      },
+      body: JSON.stringify({
+        full_name: name,
+        phone_number: phone,
+        lead_type: 'Prospect',
+        lead_temperature: 'Warm',
+        communication_status: 'New',
+        additional_notes: 'Added from WhatsApp Web',
+      }),
+    });
+
+    if (res.ok) {
+      // Refresh and re-inject
+      removeAllTags();
+      await fetchCrmContacts();
+      injectTags();
+    } else {
+      const err = await res.json();
+      console.log('[Vanto Zazi] Failed to add contact:', err.message || err);
+    }
+  } catch (e) {
+    console.log('[Vanto Zazi] Error adding contact:', e.message);
+  }
 }
 
 // ===== Quick-tag Dropdown =====
@@ -187,7 +243,6 @@ function showDropdown(event, contact, field) {
   dropdown.style.top = (rect.bottom + 4) + 'px';
   dropdown.style.left = rect.left + 'px';
 
-  // Ensure dropdown stays in viewport
   setTimeout(() => {
     const dRect = dropdown.getBoundingClientRect();
     if (dRect.right > window.innerWidth) {
@@ -229,7 +284,6 @@ function showDropdown(event, contact, field) {
       e.stopPropagation();
       await updateContactField(contact.id, field === 'temperature' ? 'lead_temperature' : 'lead_type', opt.value);
       closeDropdown();
-      // Refresh tags
       removeAllTags();
       await fetchCrmContacts();
       injectTags();
@@ -284,7 +338,6 @@ function showNotesTooltip(event, contact) {
 
   document.body.appendChild(tooltip);
 
-  // Reposition if off screen
   setTimeout(() => {
     const tRect = tooltip.getBoundingClientRect();
     if (tRect.right > window.innerWidth) {
@@ -305,22 +358,6 @@ function removeAllTags() {
   document.querySelectorAll('.vz-crm-tags').forEach(el => el.remove());
 }
 
-// ===== Check if a chat row is a group =====
-function isGroupChat(row) {
-  // Group indicators: group metadata, multiple participants
-  if (row.querySelector('[data-testid="group-subject"]')) return true;
-  if (row.querySelector('[data-icon="default-group"]')) return true;
-  if (row.querySelector('[data-icon="community"]')) return true;
-  // Check for group avatar icon
-  const avatarImg = row.querySelector('[data-testid="cell-frame-primary"] img');
-  if (!avatarImg) {
-    // No profile pic AND has group-style default icon
-    const groupIcon = row.querySelector('[data-testid="default-group"]');
-    if (groupIcon) return true;
-  }
-  return false;
-}
-
 // ===== Scrape contacts (for popup sync) =====
 function scrapeWhatsAppContacts() {
   const contacts = [];
@@ -336,7 +373,6 @@ function scrapeWhatsAppContacts() {
 
   chatRows.forEach((row) => {
     try {
-      // Skip groups
       if (isGroupChat(row)) return;
 
       let name = null;
@@ -346,32 +382,19 @@ function scrapeWhatsAppContacts() {
         const anyTitle = row.querySelector('span[title]');
         if (anyTitle) name = anyTitle.getAttribute('title')?.trim();
       }
-      if (!name) {
-        const chatName = row.querySelector('[data-testid="conversation-info-header-chat-title"]');
-        if (chatName) name = chatName.textContent?.trim();
-      }
       if (!name || name.length < 2) return;
-
-      // Skip names that look like groups (commas = multiple participants, emojis commonly used for groups)
       if (name.includes(',') || name.includes('📌') || name.includes('👥')) return;
 
       const cleanName = name.replace(/[\s\-\(\)\+]/g, '');
       const isPhoneNumber = /^\d{7,15}$/.test(cleanName);
 
-      const contact = {
-        name: name,
-        phone: isPhoneNumber ? name : '',
-        source: 'whatsapp_web',
-      };
-
+      const contact = { name, phone: isPhoneNumber ? name : '', source: 'whatsapp_web' };
       const key = contact.name.toLowerCase();
       if (!seen.has(key)) {
         seen.add(key);
         contacts.push(contact);
       }
-    } catch (e) {
-      // Skip problematic rows
-    }
+    } catch (e) { /* skip */ }
   });
 
   return contacts;
@@ -404,21 +427,14 @@ function injectSyncButton() {
 
 // ===== Initialize =====
 async function init() {
-  // Wait for WhatsApp to load
   await new Promise(r => setTimeout(r, 3000));
   injectSyncButton();
 
-  // Fetch CRM data and inject tags
   await fetchCrmContacts();
-  if (crmContacts.length > 0) {
-    injectTags();
-  }
+  injectTags();
 
-  // Re-inject tags periodically (WhatsApp re-renders chat list)
-  setInterval(async () => {
-    if (crmContacts.length === 0) {
-      await fetchCrmContacts();
-    }
+  // Re-inject tags every 5s (WhatsApp re-renders the chat list)
+  setInterval(() => {
     injectTags();
   }, 5000);
 

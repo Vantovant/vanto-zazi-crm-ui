@@ -3,44 +3,67 @@
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
-/* ===== CRM Tag Badges ===== */
+/* ===== CRM Tag Badges — Inline next to name (Eazybe style) ===== */
 .vz-crm-tags {
-  display: flex;
+  display: inline-flex !important;
   align-items: center;
-  gap: 3px;
-  margin-top: 1px;
-  flex-wrap: nowrap;
-  max-width: 200px;
-  overflow: hidden;
+  gap: 4px;
+  margin-left: 6px;
+  vertical-align: middle;
+  flex-shrink: 0;
 }
 
 .vz-tag {
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 600;
-  padding: 1px 5px;
-  border-radius: 3px;
-  line-height: 14px;
+  padding: 1px 7px;
+  border-radius: 4px;
+  line-height: 16px;
   white-space: nowrap;
   cursor: pointer;
-  transition: opacity 0.15s;
+  transition: opacity 0.15s, transform 0.1s;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  display: inline-block;
 }
 
 .vz-tag:hover {
   opacity: 0.85;
+  transform: scale(1.05);
 }
 
 /* Temperature tags */
-.vz-tag-hot { background: #dc262620; color: #ef4444; border: 1px solid #ef444440; }
-.vz-tag-warm { background: #f59e0b20; color: #f59e0b; border: 1px solid #f59e0b40; }
-.vz-tag-cold { background: #3b82f620; color: #3b82f6; border: 1px solid #3b82f640; }
+.vz-tag-hot { background: #dc262625; color: #ef4444; border: 1px solid #ef444450; }
+.vz-tag-warm { background: #f59e0b25; color: #eab308; border: 1px solid #f59e0b50; }
+.vz-tag-cold { background: #3b82f625; color: #60a5fa; border: 1px solid #3b82f650; }
 
 /* Lead type tags */
-.vz-tag-prospect { background: #8b5cf620; color: #8b5cf6; border: 1px solid #8b5cf640; }
-.vz-tag-registered { background: #06b6d420; color: #06b6d4; border: 1px solid #06b6d440; }
-.vz-tag-purchase { background: #22c55e20; color: #22c55e; border: 1px solid #22c55e40; }
-.vz-tag-expired { background: #6b728020; color: #6b7280; border: 1px solid #6b728040; }
+.vz-tag-prospect { background: #8b5cf625; color: #a78bfa; border: 1px solid #8b5cf650; }
+.vz-tag-registered { background: #06b6d425; color: #22d3ee; border: 1px solid #06b6d450; }
+.vz-tag-purchase { background: #22c55e25; color: #4ade80; border: 1px solid #22c55e50; }
+.vz-tag-expired { background: #6b728025; color: #9ca3af; border: 1px solid #6b728050; }
 .vz-tag-unknown { background: #9ca3af15; color: #9ca3af; border: 1px solid #9ca3af30; }
+
+/* Add to CRM button */
+.vz-add-btn {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+  line-height: 16px;
+  white-space: nowrap;
+  cursor: pointer;
+  background: #22c55e20;
+  color: #4ade80;
+  border: 1px solid #22c55e40;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  display: inline-block;
+  transition: all 0.15s;
+}
+
+.vz-add-btn:hover {
+  background: #22c55e40;
+  transform: scale(1.05);
+}
 
 /* ===== Quick-tag Dropdown ===== */
 .vz-dropdown-overlay {
@@ -56,7 +79,7 @@
   border: 1px solid #334155;
   border-radius: 8px;
   padding: 6px 0;
-  min-width: 180px;
+  min-width: 200px;
   box-shadow: 0 8px 24px rgba(0,0,0,0.4);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
@@ -73,7 +96,7 @@
 }
 
 .vz-dropdown-item {
-  padding: 6px 12px;
+  padding: 7px 12px;
   font-size: 12px;
   color: #e2e8f0;
   cursor: pointer;
@@ -136,9 +159,11 @@
 /* ===== Notes icon ===== */
 .vz-notes-icon {
   cursor: pointer;
-  font-size: 12px;
+  font-size: 13px;
   opacity: 0.6;
   transition: opacity 0.15s;
+  display: inline-block;
+  vertical-align: middle;
 }
 
 .vz-notes-icon:hover {
@@ -147,4 +172,13 @@
 
 .vz-notes-icon.has-notes {
   opacity: 0.9;
+}
+
+/* Force title row to allow inline tags */
+[data-testid="cell-frame-title"] {
+  overflow: visible !important;
+}
+
+[data-testid="cell-frame-title"] > span {
+  display: inline !important;
 }
