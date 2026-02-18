@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Bell, UserPlus, ClipboardList, LogOut, Lock, X, Menu } from 'lucide-react';
+import { Search, Bell, UserPlus, ClipboardList, LogOut, Lock, X, Menu, Cpu } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCrm } from '@/contexts/CrmContext';
 import { ChangePasswordModal } from './ChangePasswordModal';
 import { AddContactModal } from './AddContactModal';
+import { AISettingsModal } from './AISettingsModal';
 
 function useSearch(contacts: any[]) {
   const [query, setQuery] = useState('');
@@ -26,6 +27,7 @@ export function Topbar({ onMenuToggle }: { onMenuToggle: () => void }) {
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [showAddContact, setShowAddContact] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showAISettings, setShowAISettings] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLDivElement>(null);
 
@@ -166,6 +168,16 @@ export function Topbar({ onMenuToggle }: { onMenuToggle: () => void }) {
             )}
           </div>
 
+          {/* AI Settings */}
+          <button
+            type="button"
+            onClick={() => setShowAISettings(true)}
+            className="p-2 rounded-lg text-slate-400 hover:bg-slate-700 hover:text-slate-200 transition-colors"
+            title="AI Settings"
+          >
+            <Cpu className="w-5 h-5" />
+          </button>
+
           {/* Change Password */}
           <button
             type="button"
@@ -203,6 +215,9 @@ export function Topbar({ onMenuToggle }: { onMenuToggle: () => void }) {
       )}
       {showAddContact && (
         <AddContactModal onClose={() => setShowAddContact(false)} />
+      )}
+      {showAISettings && (
+        <AISettingsModal onClose={() => setShowAISettings(false)} />
       )}
     </>
   );

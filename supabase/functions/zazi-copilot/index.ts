@@ -12,7 +12,6 @@ serve(async (req) => {
   try {
     const { action, message, route, contactData, contactId, crmSummary, knowledgeContext } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     const authHeader = req.headers.get("Authorization");
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -28,6 +27,13 @@ serve(async (req) => {
       });
       const { data: { user } } = await userClient.auth.getUser();
       userId = user?.id || null;
+    }
+
+    // Fetch user's personal API keys and preference
+    let userApiKeys: { openai_api_key?: string; gemini_api_key?: string; preferred_provider?: string } | null = null;
+    if (userId) {
+      const { data } = await supabase.from("user_api_keys").select("*").eq("user_id", userId).maybeSingle();
+      userApiKeys = data;
     }
 
     let systemPrompt = `You are ZAZI, an expert AI copilot for the Vanto Zazi CRM system. You are a dual expert in:
@@ -176,45 +182,122 @@ CRM CONTEXT:
       });
     }
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userMessage },
-        ],
-        stream: true,
-      }),
-    });
+    // Determine which AI provider to use
+    // Priority: user preference > lovable (with fallback on 402)
+    type AiProvider = { url: string; headers: Record<string, string>; model: string; stream: boolean };
 
-    if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted. Please add credits in Settings." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const t = await response.text();
-      console.error("AI gateway error:", response.status, t);
-      return new Response(JSON.stringify({ error: "AI service unavailable" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    function getLovableProvider(): AiProvider | null {
+      if (!LOVABLE_API_KEY) return null;
+      return {
+        url: "https://ai.gateway.lovable.dev/v1/chat/completions",
+        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+        model: "google/gemini-3-flash-preview",
+        stream: true,
+      };
+    }
+
+    function getGeminiProvider(key: string): AiProvider {
+      return {
+        url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        model: "gemini-2.5-flash",
+        stream: true,
+      };
+    }
+
+    function getOpenaiProvider(key: string): AiProvider {
+      return {
+        url: "https://api.openai.com/v1/chat/completions",
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        model: "gpt-4o-mini",
+        stream: true,
+      };
+    }
+
+    function getUserProvider(): AiProvider | null {
+      if (!userApiKeys) return null;
+      const pref = userApiKeys.preferred_provider || "lovable";
+      if (pref === "gemini" && userApiKeys.gemini_api_key) return getGeminiProvider(userApiKeys.gemini_api_key);
+      if (pref === "openai" && userApiKeys.openai_api_key) return getOpenaiProvider(userApiKeys.openai_api_key);
+      // Fallback: try whichever key exists
+      if (userApiKeys.gemini_api_key) return getGeminiProvider(userApiKeys.gemini_api_key);
+      if (userApiKeys.openai_api_key) return getOpenaiProvider(userApiKeys.openai_api_key);
+      return null;
+    }
+
+    // Build ordered list of providers to try
+    const providerQueue: AiProvider[] = [];
+    const userPref = userApiKeys?.preferred_provider || "lovable";
+    
+    if (userPref !== "lovable") {
+      const up = getUserProvider();
+      if (up) providerQueue.push(up);
+      const lp = getLovableProvider();
+      if (lp) providerQueue.push(lp); // fallback
+    } else {
+      const lp = getLovableProvider();
+      if (lp) providerQueue.push(lp);
+      const up = getUserProvider();
+      if (up) providerQueue.push(up); // fallback on 402/429
+    }
+
+    if (providerQueue.length === 0) {
+      return new Response(JSON.stringify({ error: "No AI provider configured. Please add your API keys in AI Settings." }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    return new Response(response.body, {
-      headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+    const aiMessages = [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userMessage },
+    ];
+
+    let lastResponse: Response | null = null;
+    for (const provider of providerQueue) {
+      const response = await fetch(provider.url, {
+        method: "POST",
+        headers: provider.headers,
+        body: JSON.stringify({
+          model: provider.model,
+          messages: aiMessages,
+          stream: provider.stream,
+        }),
+      });
+
+      if (response.ok) {
+        return new Response(response.body, {
+          headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+        });
+      }
+
+      // If rate limited or credits exhausted, try next provider
+      if (response.status === 429 || response.status === 402) {
+        lastResponse = response;
+        console.log(`Provider ${provider.url} returned ${response.status}, trying next...`);
+        continue;
+      }
+
+      // Other errors — still try next
+      const t = await response.text();
+      console.error("AI provider error:", provider.url, response.status, t);
+      lastResponse = response;
+      continue;
+    }
+
+    // All providers failed
+    const finalStatus = lastResponse?.status || 500;
+    if (finalStatus === 429) {
+      return new Response(JSON.stringify({ error: "Rate limit exceeded on all providers. Please try again in a moment." }), {
+        status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (finalStatus === 402) {
+      return new Response(JSON.stringify({ error: "AI credits exhausted on all providers. Add your own API key in AI Settings (⚙️ icon in top bar)." }), {
+        status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    return new Response(JSON.stringify({ error: "AI service unavailable across all providers" }), {
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
     console.error("zazi-copilot error:", e);
