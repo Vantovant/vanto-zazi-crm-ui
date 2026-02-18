@@ -6,32 +6,72 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const contacts = scrapeWhatsAppContacts();
     sendResponse({ contacts });
   }
-  return true; // keep channel open for async
+  return true;
 });
 
 function scrapeWhatsAppContacts() {
   const contacts = [];
   const seen = new Set();
 
-  // WhatsApp Web chat list items — each row has a contact name and sometimes a phone
-  const chatRows = document.querySelectorAll('[data-testid="cell-frame-container"]');
+  // Strategy 1: Try data-testid selectors (current WhatsApp Web)
+  let chatRows = document.querySelectorAll('[data-testid="cell-frame-container"]');
+  
+  // Strategy 2: Try list item role selectors
+  if (!chatRows.length) {
+    chatRows = document.querySelectorAll('[role="listitem"]');
+  }
+
+  // Strategy 3: Try the chat list pane directly
+  if (!chatRows.length) {
+    chatRows = document.querySelectorAll('#pane-side [role="row"]');
+  }
+
+  // Strategy 4: Broad fallback — any element with a title in the side panel
+  if (!chatRows.length) {
+    const sidePanel = document.querySelector('#pane-side') || document.querySelector('[data-testid="chat-list"]');
+    if (sidePanel) {
+      chatRows = sidePanel.querySelectorAll('div[class]');
+    }
+  }
 
   chatRows.forEach((row) => {
     try {
-      // Get the contact name from the title span
-      const nameEl = row.querySelector('[data-testid="cell-frame-title"] span[title]');
-      const name = nameEl?.getAttribute('title')?.trim();
-      if (!name) return;
+      // Try multiple ways to find the contact name
+      let name = null;
 
-      // Skip group chats (usually have commas or special chars)
-      if (name.includes(',') || name.includes('📌')) return;
+      // Method 1: cell-frame-title with span[title]
+      const titleEl = row.querySelector('[data-testid="cell-frame-title"] span[title]');
+      if (titleEl) {
+        name = titleEl.getAttribute('title')?.trim();
+      }
 
-      // Try to detect if the name is actually a phone number
+      // Method 2: Any span with a title attribute inside the row
+      if (!name) {
+        const anyTitle = row.querySelector('span[title]');
+        if (anyTitle) {
+          name = anyTitle.getAttribute('title')?.trim();
+        }
+      }
+
+      // Method 3: Look for specific chat name elements
+      if (!name) {
+        const chatName = row.querySelector('[data-testid="conversation-info-header-chat-title"]');
+        if (chatName) {
+          name = chatName.textContent?.trim();
+        }
+      }
+
+      if (!name || name.length < 2) return;
+
+      // Skip group chats (usually have commas, or group indicators)
+      if (name.includes(',') || name.includes('📌') || name.includes('👥')) return;
+
+      // Detect if the name is actually a phone number
       const cleanName = name.replace(/[\s\-\(\)\+]/g, '');
       const isPhoneNumber = /^\d{7,15}$/.test(cleanName);
 
       const contact = {
-        name: isPhoneNumber ? name : name,
+        name: name,
         phone: isPhoneNumber ? name : '',
         source: 'whatsapp_web',
       };
@@ -50,7 +90,7 @@ function scrapeWhatsAppContacts() {
   return contacts;
 }
 
-// Also inject a small floating button on WhatsApp Web for quick sync
+// Inject a small floating button on WhatsApp Web for quick sync
 function injectSyncButton() {
   if (document.getElementById('vanto-zazi-sync-btn')) return;
 
