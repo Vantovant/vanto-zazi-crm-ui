@@ -61,6 +61,14 @@ export function Dashboard() {
     registered: prospects.filter(p => p.RegistrationStatus === 'Registered' || p.RegistrationStatus === 'Activated').length,
   }), [prospects]);
 
+  const orderStats = useMemo(() => {
+    const totalRevenue = orders.reduce((s, o) => s + o.amount, 0);
+    const paidTotal = orders.filter(o => o.status === 'Paid').reduce((s, o) => s + o.amount, 0);
+    const pendingTotal = orders.filter(o => o.status === 'Pending').reduce((s, o) => s + o.amount, 0);
+    const totalPV = orders.reduce((s, o) => s + (o.pvAmount || 0), 0);
+    return { totalRevenue, paidTotal, pendingTotal, totalPV, count: orders.length };
+  }, [orders]);
+
   const recentProspects = prospects.slice(0, 5);
 
   // Derive follow-ups from contacts with NextAction set
@@ -246,6 +254,47 @@ Keep it punchy, motivational, and formatted with emojis and headers. Max 300 wor
             <p className="text-xs font-medium text-slate-400 mt-1">{kpi.label}</p>
           </div>
         ))}
+      </div>
+
+      {/* Order Revenue Summary */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="bg-teal-500/20 p-1.5 rounded-lg">
+              <ShoppingCart className="w-3.5 h-3.5 text-teal-400" />
+            </div>
+            <span className="text-xs font-medium text-slate-400">Total Orders</span>
+          </div>
+          <p className="text-xl font-bold text-white">{orderStats.count}</p>
+          <p className="text-xs text-slate-500 mt-0.5">R{orderStats.totalRevenue.toLocaleString()}</p>
+        </div>
+        <div className="bg-slate-800/50 rounded-xl border border-cyan-500/20 p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="bg-cyan-500/20 p-1.5 rounded-lg">
+              <CheckCircle className="w-3.5 h-3.5 text-cyan-400" />
+            </div>
+            <span className="text-xs font-medium text-cyan-400">Paid</span>
+          </div>
+          <p className="text-xl font-bold text-cyan-300">R{orderStats.paidTotal.toLocaleString()}</p>
+        </div>
+        <div className="bg-slate-800/50 rounded-xl border border-amber-500/20 p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="bg-amber-500/20 p-1.5 rounded-lg">
+              <Clock className="w-3.5 h-3.5 text-amber-400" />
+            </div>
+            <span className="text-xs font-medium text-amber-400">Pending</span>
+          </div>
+          <p className="text-xl font-bold text-amber-300">R{orderStats.pendingTotal.toLocaleString()}</p>
+        </div>
+        <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="bg-violet-500/20 p-1.5 rounded-lg">
+              <Sparkles className="w-3.5 h-3.5 text-violet-400" />
+            </div>
+            <span className="text-xs font-medium text-slate-400">Total PV</span>
+          </div>
+          <p className="text-xl font-bold text-white">{orderStats.totalPV.toLocaleString()}</p>
+        </div>
       </div>
 
       {/* ZAZI Mail — AI News Briefing */}
