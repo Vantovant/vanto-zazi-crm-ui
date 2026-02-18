@@ -3,7 +3,7 @@
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
-/* ===== CRM Tag Badges — Inline next to name (Eazybe style) ===== */
+/* ===== CRM Tag Badges — Inline next to name ===== */
 .vz-crm-tags {
   display: inline-flex !important;
   align-items: center;
@@ -26,10 +26,7 @@
   display: inline-block;
 }
 
-.vz-tag:hover {
-  opacity: 0.85;
-  transform: scale(1.05);
-}
+.vz-tag:hover { opacity: 0.85; transform: scale(1.05); }
 
 /* Temperature tags */
 .vz-tag-hot { background: #dc262625; color: #ef4444; border: 1px solid #ef444450; }
@@ -60,10 +57,36 @@
   transition: all 0.15s;
 }
 
-.vz-add-btn:hover {
-  background: #22c55e40;
-  transform: scale(1.05);
+.vz-add-btn:hover { background: #22c55e40; transform: scale(1.05); }
+
+/* Edit pencil icon */
+.vz-edit-icon {
+  cursor: pointer;
+  font-size: 11px;
+  opacity: 0.5;
+  transition: opacity 0.15s;
+  display: inline-block;
+  vertical-align: middle;
 }
+
+.vz-edit-icon:hover { opacity: 1; }
+
+/* Notes icon */
+.vz-notes-icon {
+  cursor: pointer;
+  font-size: 13px;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.vz-notes-icon:hover { opacity: 1; }
+.vz-notes-icon.has-notes { opacity: 0.9; }
+
+/* Force title row to allow inline tags */
+[data-testid="cell-frame-title"] { overflow: visible !important; }
+[data-testid="cell-frame-title"] > span { display: inline !important; }
 
 /* ===== Quick-tag Dropdown ===== */
 .vz-dropdown-overlay {
@@ -106,79 +129,169 @@
   transition: background 0.1s;
 }
 
-.vz-dropdown-item:hover {
-  background: #334155;
+.vz-dropdown-item:hover { background: #334155; }
+.vz-dropdown-item.active { background: #22c55e15; color: #4ade80; }
+
+/* ===== EDIT PANEL — Full inline editor ===== */
+.vz-edit-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 99998;
+  background: rgba(0, 0, 0, 0.3);
 }
 
-.vz-dropdown-item.active {
-  background: #22c55e15;
-  color: #4ade80;
-}
-
-.vz-dropdown-divider {
-  height: 1px;
-  background: #334155;
-  margin: 4px 0;
-}
-
-/* ===== Notes Preview Tooltip ===== */
-.vz-notes-tooltip {
+.vz-edit-panel {
   position: fixed;
   z-index: 99999;
   background: #1e293b;
   border: 1px solid #334155;
-  border-radius: 8px;
-  padding: 10px 12px;
-  max-width: 280px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  border-radius: 12px;
+  padding: 0;
+  width: 300px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.5);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  pointer-events: none;
 }
 
-.vz-notes-tooltip-title {
-  font-size: 11px;
+.vz-edit-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid #334155;
+  font-size: 14px;
   font-weight: 600;
-  color: #94a3b8;
+  color: #f1f5f9;
+}
+
+.vz-edit-close {
+  cursor: pointer;
+  color: #64748b;
+  font-size: 16px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 0.1s;
+}
+
+.vz-edit-close:hover {
+  background: #334155;
+  color: #f1f5f9;
+}
+
+.vz-edit-field {
+  padding: 8px 16px;
+}
+
+.vz-edit-field label {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
   margin-bottom: 4px;
 }
 
-.vz-notes-tooltip-body {
-  font-size: 12px;
+.vz-edit-field input,
+.vz-edit-field textarea {
+  width: 100%;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  padding: 8px 10px;
   color: #e2e8f0;
-  line-height: 1.4;
-  white-space: pre-wrap;
-  max-height: 120px;
-  overflow-y: auto;
-}
-
-.vz-notes-tooltip-empty {
-  color: #64748b;
-  font-style: italic;
-}
-
-/* ===== Notes icon ===== */
-.vz-notes-icon {
-  cursor: pointer;
   font-size: 13px;
-  opacity: 0.6;
-  transition: opacity 0.15s;
-  display: inline-block;
-  vertical-align: middle;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
 }
 
-.vz-notes-icon:hover {
-  opacity: 1;
+.vz-edit-field input:focus,
+.vz-edit-field textarea:focus {
+  border-color: #22c55e;
 }
 
-.vz-notes-icon.has-notes {
-  opacity: 0.9;
+.vz-edit-field textarea {
+  resize: vertical;
+  min-height: 60px;
 }
 
-/* Force title row to allow inline tags */
-[data-testid="cell-frame-title"] {
-  overflow: visible !important;
+/* Pills for temperature and lead type */
+.vz-edit-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
-[data-testid="cell-frame-title"] > span {
-  display: inline !important;
+.vz-pill {
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  background: #0f172a;
+  color: #94a3b8;
+  border: 1px solid #334155;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.vz-pill:hover {
+  border-color: #475569;
+  color: #e2e8f0;
+}
+
+.vz-pill.active {
+  background: #22c55e20;
+  color: #4ade80;
+  border-color: #22c55e50;
+}
+
+/* Action buttons */
+.vz-edit-actions {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid #334155;
+}
+
+.vz-btn-cancel {
+  flex: 1;
+  padding: 8px;
+  background: #334155;
+  color: #94a3b8;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.1s;
+}
+
+.vz-btn-cancel:hover { background: #475569; color: #e2e8f0; }
+
+.vz-btn-save {
+  flex: 2;
+  padding: 8px;
+  background: #22c55e;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.1s;
+}
+
+.vz-btn-save:hover { background: #16a34a; }
+.vz-btn-save:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.vz-edit-status {
+  padding: 0 16px 10px;
+  font-size: 11px;
+  text-align: center;
+  min-height: 16px;
 }

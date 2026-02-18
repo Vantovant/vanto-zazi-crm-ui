@@ -1,6 +1,6 @@
 // Content script for WhatsApp Web
 // Injects CRM tags (lead temp, lead type, notes) inline next to contact names
-// Eazybe-style tagging directly in WhatsApp Web
+// Eazybe-style tagging + inline editing directly in WhatsApp Web
 
 const SUPABASE_URL = 'https://urfyfuakgabieellbuce.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVyZnlmdWFrZ2FiaWVlbGxidWNlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA2NDE2NjcsImV4cCI6MjA4NjIxNzY2N30.4JaSzSQUsz0__rAqTLFc5W3sJUkayahwAHHLf0zUDAk';
@@ -24,7 +24,7 @@ async function fetchCrmContacts() {
   if (!accessToken) return;
 
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/contacts?select=id,full_name,phone_number,lead_temperature,lead_type,additional_notes,interest_level,communication_status`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/contacts?select=id,full_name,phone_number,email_address,lead_temperature,lead_type,additional_notes,interest_level,communication_status`, {
       headers: {
         'apikey': SUPABASE_ANON_KEY,
         'Authorization': `Bearer ${accessToken}`,
@@ -45,11 +45,9 @@ function findCrmContact(waName) {
   if (!waName || !crmContacts.length) return null;
   const lower = waName.toLowerCase().trim();
 
-  // Exact name match
   let match = crmContacts.find(c => c.full_name?.toLowerCase().trim() === lower);
   if (match) return match;
 
-  // Phone match (if waName looks like a phone number)
   const cleanName = waName.replace(/[\s\-\(\)\+]/g, '');
   if (/^\d{7,15}$/.test(cleanName)) {
     match = crmContacts.find(c => {
@@ -59,7 +57,6 @@ function findCrmContact(waName) {
     if (match) return match;
   }
 
-  // Partial match
   match = crmContacts.find(c => {
     const crmName = c.full_name?.toLowerCase().trim() || '';
     return crmName && crmName.length > 3 && (lower.includes(crmName) || crmName.includes(lower));
@@ -91,12 +88,11 @@ function isGroupChat(row) {
   if (row.querySelector('[data-testid="group-subject"]')) return true;
   if (row.querySelector('[data-icon="default-group"]')) return true;
   if (row.querySelector('[data-icon="community"]')) return true;
-  const groupIcon = row.querySelector('[data-testid="default-group"]');
-  if (groupIcon) return true;
+  if (row.querySelector('[data-testid="default-group"]')) return true;
   return false;
 }
 
-// ===== Inject tags INLINE next to name (Eazybe style) =====
+// ===== Inject tags INLINE next to name =====
 function injectTags() {
   let chatRows = document.querySelectorAll('[data-testid="cell-frame-container"]');
   if (!chatRows.length) chatRows = document.querySelectorAll('[role="listitem"]');
@@ -106,7 +102,6 @@ function injectTags() {
     if (row.querySelector('.vz-crm-tags')) return;
     if (isGroupChat(row)) return;
 
-    // Find contact name
     let name = null;
     let titleSpan = row.querySelector('[data-testid="cell-frame-title"] span[title]');
     if (titleSpan) name = titleSpan.getAttribute('title')?.trim();
@@ -119,14 +114,11 @@ function injectTags() {
 
     const contact = findCrmContact(name);
 
-    // Create inline tags container
     const tagsDiv = document.createElement('span');
     tagsDiv.className = 'vz-crm-tags';
 
     if (contact) {
-      // ---- MATCHED: show temperature + lead type + notes icon ----
-
-      // Temperature tag (clickable)
+      // Temperature tag
       const tempConf = getTempConfig(contact.lead_temperature);
       const tempTag = document.createElement('span');
       tempTag.className = `vz-tag ${tempConf.cls}`;
@@ -138,7 +130,7 @@ function injectTags() {
       });
       tagsDiv.appendChild(tempTag);
 
-      // Lead type tag (clickable)
+      // Lead type tag
       const typeConf = getTypeConfig(contact.lead_type);
       const typeTag = document.createElement('span');
       typeTag.className = `vz-tag ${typeConf.cls}`;
@@ -154,26 +146,37 @@ function injectTags() {
       const notesIcon = document.createElement('span');
       notesIcon.className = `vz-notes-icon ${contact.additional_notes ? 'has-notes' : ''}`;
       notesIcon.textContent = contact.additional_notes ? '📝' : '📋';
-      notesIcon.title = contact.additional_notes || 'No notes';
-      notesIcon.addEventListener('mouseenter', (e) => showNotesTooltip(e, contact));
-      notesIcon.addEventListener('mouseleave', hideNotesTooltip);
-      notesIcon.addEventListener('click', (e) => { e.stopPropagation(); e.preventDefault(); });
+      notesIcon.title = 'Click to view/edit notes';
+      notesIcon.addEventListener('click', (e) => {
+        e.stopPropagation(); e.preventDefault();
+        showEditPanel(e, contact);
+      });
       tagsDiv.appendChild(notesIcon);
 
+      // Edit pencil icon
+      const editIcon = document.createElement('span');
+      editIcon.className = 'vz-edit-icon';
+      editIcon.textContent = '✏️';
+      editIcon.title = 'Edit contact in CRM';
+      editIcon.addEventListener('click', (e) => {
+        e.stopPropagation(); e.preventDefault();
+        showEditPanel(e, contact);
+      });
+      tagsDiv.appendChild(editIcon);
+
     } else {
-      // ---- UNMATCHED: show "+ CRM" button to quick-add ----
+      // Unmatched: show "+ CRM" button
       const addBtn = document.createElement('span');
       addBtn.className = 'vz-add-btn';
       addBtn.textContent = '➕ CRM';
       addBtn.title = 'Add this contact to your CRM';
       addBtn.addEventListener('click', async (e) => {
         e.stopPropagation(); e.preventDefault();
-        await quickAddContact(name, row);
+        await quickAddContact(name);
       });
       tagsDiv.appendChild(addBtn);
     }
 
-    // INSERT INLINE: place tags right after the name span
     if (titleSpan) {
       titleSpan.parentElement.style.overflow = 'visible';
       titleSpan.parentElement.style.display = 'flex';
@@ -183,14 +186,189 @@ function injectTags() {
   });
 }
 
+// ===== EDIT PANEL — Full inline editor =====
+function showEditPanel(event, contact) {
+  closeEditPanel();
+  closeDropdown();
+
+  const overlay = document.createElement('div');
+  overlay.className = 'vz-edit-overlay';
+  overlay.addEventListener('click', closeEditPanel);
+
+  const panel = document.createElement('div');
+  panel.className = 'vz-edit-panel';
+  panel.id = 'vz-edit-panel';
+
+  // Position near the click
+  const rect = event.target.getBoundingClientRect();
+  panel.style.top = Math.min(rect.bottom + 8, window.innerHeight - 420) + 'px';
+  panel.style.left = Math.min(rect.left, window.innerWidth - 320) + 'px';
+
+  // Prevent overlay click from closing when clicking panel
+  panel.addEventListener('click', (e) => e.stopPropagation());
+
+  const tempOptions = [
+    { value: 'Hot', icon: '🔴' },
+    { value: 'Warm', icon: '🟡' },
+    { value: 'Cold', icon: '🔵' },
+  ];
+
+  const typeOptions = [
+    { value: 'Prospect', icon: '🟣' },
+    { value: 'Registered_Nopurchase', label: 'Registered', icon: '🔵' },
+    { value: 'Purchase_Nostatus', label: 'Purchase (No Status)', icon: '🟢' },
+    { value: 'Purchase_Status', label: 'Purchase (Active)', icon: '✅' },
+    { value: 'Expired', icon: '⚫' },
+  ];
+
+  const currentTemp = (contact.lead_temperature || 'Warm');
+  const currentType = (contact.lead_type || 'Prospect');
+
+  panel.innerHTML = `
+    <div class="vz-edit-header">
+      <span>✏️ Edit Contact</span>
+      <span class="vz-edit-close" id="vz-edit-close">✕</span>
+    </div>
+
+    <div class="vz-edit-field">
+      <label>Full Name</label>
+      <input type="text" id="vz-edit-name" value="${escapeHtml(contact.full_name || '')}" />
+    </div>
+
+    <div class="vz-edit-field">
+      <label>Phone</label>
+      <input type="text" id="vz-edit-phone" value="${escapeHtml(contact.phone_number || '')}" />
+    </div>
+
+    <div class="vz-edit-field">
+      <label>Email</label>
+      <input type="email" id="vz-edit-email" value="${escapeHtml(contact.email_address || '')}" />
+    </div>
+
+    <div class="vz-edit-field">
+      <label>Lead Temperature</label>
+      <div class="vz-edit-pills" id="vz-edit-temp">
+        ${tempOptions.map(o => `<span class="vz-pill ${currentTemp.toLowerCase() === o.value.toLowerCase() ? 'active' : ''}" data-value="${o.value}">${o.icon} ${o.value}</span>`).join('')}
+      </div>
+    </div>
+
+    <div class="vz-edit-field">
+      <label>Lead Type</label>
+      <div class="vz-edit-pills" id="vz-edit-type">
+        ${typeOptions.map(o => `<span class="vz-pill ${currentType.toLowerCase() === o.value.toLowerCase() ? 'active' : ''}" data-value="${o.value}">${o.icon} ${o.label || o.value}</span>`).join('')}
+      </div>
+    </div>
+
+    <div class="vz-edit-field">
+      <label>Notes</label>
+      <textarea id="vz-edit-notes" rows="3">${escapeHtml(contact.additional_notes || '')}</textarea>
+    </div>
+
+    <div class="vz-edit-actions">
+      <button class="vz-btn-cancel" id="vz-edit-cancel">Cancel</button>
+      <button class="vz-btn-save" id="vz-edit-save">💾 Save to CRM</button>
+    </div>
+
+    <div class="vz-edit-status" id="vz-edit-status"></div>
+  `;
+
+  overlay.appendChild(panel);
+  document.body.appendChild(overlay);
+
+  // Pill selection handlers
+  let selectedTemp = currentTemp;
+  let selectedType = currentType;
+
+  panel.querySelectorAll('#vz-edit-temp .vz-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      panel.querySelectorAll('#vz-edit-temp .vz-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      selectedTemp = pill.dataset.value;
+    });
+  });
+
+  panel.querySelectorAll('#vz-edit-type .vz-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      panel.querySelectorAll('#vz-edit-type .vz-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      selectedType = pill.dataset.value;
+    });
+  });
+
+  // Close button
+  panel.querySelector('#vz-edit-close').addEventListener('click', closeEditPanel);
+  panel.querySelector('#vz-edit-cancel').addEventListener('click', closeEditPanel);
+
+  // Save button
+  panel.querySelector('#vz-edit-save').addEventListener('click', async () => {
+    const statusEl = panel.querySelector('#vz-edit-status');
+    const saveBtn = panel.querySelector('#vz-edit-save');
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+    statusEl.textContent = '';
+
+    const updates = {
+      full_name: panel.querySelector('#vz-edit-name').value.trim(),
+      phone_number: panel.querySelector('#vz-edit-phone').value.trim(),
+      email_address: panel.querySelector('#vz-edit-email').value.trim(),
+      lead_temperature: selectedTemp,
+      lead_type: selectedType,
+      additional_notes: panel.querySelector('#vz-edit-notes').value.trim(),
+    };
+
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/contacts?id=eq.${contact.id}`, {
+        method: 'PATCH',
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal',
+        },
+        body: JSON.stringify(updates),
+      });
+
+      if (res.ok) {
+        statusEl.textContent = '✅ Saved to CRM!';
+        statusEl.style.color = '#4ade80';
+        // Refresh tags
+        setTimeout(async () => {
+          closeEditPanel();
+          removeAllTags();
+          await fetchCrmContacts();
+          injectTags();
+        }, 800);
+      } else {
+        const err = await res.json();
+        statusEl.textContent = '❌ ' + (err.message || 'Save failed');
+        statusEl.style.color = '#f87171';
+        saveBtn.disabled = false;
+        saveBtn.textContent = '💾 Save to CRM';
+      }
+    } catch (e) {
+      statusEl.textContent = '❌ ' + e.message;
+      statusEl.style.color = '#f87171';
+      saveBtn.disabled = false;
+      saveBtn.textContent = '💾 Save to CRM';
+    }
+  });
+}
+
+function closeEditPanel() {
+  document.querySelectorAll('.vz-edit-overlay').forEach(el => el.remove());
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 // ===== Quick-add contact to CRM from WhatsApp =====
-async function quickAddContact(name, row) {
+async function quickAddContact(name) {
   if (!accessToken) {
-    console.log('[Vanto Zazi] Not logged in — open extension popup to connect.');
+    console.log('[Vanto Zazi] Not logged in');
     return;
   }
 
-  // Extract phone if name looks like a number
   const cleanName = name.replace(/[\s\-\(\)\+]/g, '');
   const phone = /^\d{7,15}$/.test(cleanName) ? name : '';
 
@@ -214,13 +392,9 @@ async function quickAddContact(name, row) {
     });
 
     if (res.ok) {
-      // Refresh and re-inject
       removeAllTags();
       await fetchCrmContacts();
       injectTags();
-    } else {
-      const err = await res.json();
-      console.log('[Vanto Zazi] Failed to add contact:', err.message || err);
     }
   } catch (e) {
     console.log('[Vanto Zazi] Error adding contact:', e.message);
@@ -237,7 +411,6 @@ function showDropdown(event, contact, field) {
 
   const dropdown = document.createElement('div');
   dropdown.className = 'vz-dropdown';
-  dropdown.id = 'vz-active-dropdown';
 
   const rect = event.target.getBoundingClientRect();
   dropdown.style.top = (rect.bottom + 4) + 'px';
@@ -245,12 +418,8 @@ function showDropdown(event, contact, field) {
 
   setTimeout(() => {
     const dRect = dropdown.getBoundingClientRect();
-    if (dRect.right > window.innerWidth) {
-      dropdown.style.left = (window.innerWidth - dRect.width - 8) + 'px';
-    }
-    if (dRect.bottom > window.innerHeight) {
-      dropdown.style.top = (rect.top - dRect.height - 4) + 'px';
-    }
+    if (dRect.right > window.innerWidth) dropdown.style.left = (window.innerWidth - dRect.width - 8) + 'px';
+    if (dRect.bottom > window.innerHeight) dropdown.style.top = (rect.top - dRect.height - 4) + 'px';
   }, 0);
 
   let options = [];
@@ -318,42 +487,7 @@ async function updateContactField(contactId, field, value) {
   }
 }
 
-// ===== Notes Tooltip =====
-function showNotesTooltip(event, contact) {
-  hideNotesTooltip();
-  const tooltip = document.createElement('div');
-  tooltip.className = 'vz-notes-tooltip';
-  tooltip.id = 'vz-notes-tooltip';
-
-  const rect = event.target.getBoundingClientRect();
-  tooltip.style.top = (rect.bottom + 6) + 'px';
-  tooltip.style.left = rect.left + 'px';
-
-  tooltip.innerHTML = `
-    <div class="vz-notes-tooltip-title">📝 Notes — ${contact.full_name}</div>
-    <div class="vz-notes-tooltip-body ${contact.additional_notes ? '' : 'vz-notes-tooltip-empty'}">
-      ${contact.additional_notes || 'No notes yet. Add notes in the CRM.'}
-    </div>
-  `;
-
-  document.body.appendChild(tooltip);
-
-  setTimeout(() => {
-    const tRect = tooltip.getBoundingClientRect();
-    if (tRect.right > window.innerWidth) {
-      tooltip.style.left = (window.innerWidth - tRect.width - 8) + 'px';
-    }
-    if (tRect.bottom > window.innerHeight) {
-      tooltip.style.top = (rect.top - tRect.height - 6) + 'px';
-    }
-  }, 0);
-}
-
-function hideNotesTooltip() {
-  document.querySelectorAll('.vz-notes-tooltip').forEach(el => el.remove());
-}
-
-// ===== Remove all injected tags (for refresh) =====
+// ===== Remove all injected tags =====
 function removeAllTags() {
   document.querySelectorAll('.vz-crm-tags').forEach(el => el.remove());
 }
@@ -374,7 +508,6 @@ function scrapeWhatsAppContacts() {
   chatRows.forEach((row) => {
     try {
       if (isGroupChat(row)) return;
-
       let name = null;
       const titleEl = row.querySelector('[data-testid="cell-frame-title"] span[title]');
       if (titleEl) name = titleEl.getAttribute('title')?.trim();
@@ -387,13 +520,9 @@ function scrapeWhatsAppContacts() {
 
       const cleanName = name.replace(/[\s\-\(\)\+]/g, '');
       const isPhoneNumber = /^\d{7,15}$/.test(cleanName);
-
       const contact = { name, phone: isPhoneNumber ? name : '', source: 'whatsapp_web' };
       const key = contact.name.toLowerCase();
-      if (!seen.has(key)) {
-        seen.add(key);
-        contacts.push(contact);
-      }
+      if (!seen.has(key)) { seen.add(key); contacts.push(contact); }
     } catch (e) { /* skip */ }
   });
 
@@ -403,7 +532,6 @@ function scrapeWhatsAppContacts() {
 // ===== Inject floating sync button =====
 function injectSyncButton() {
   if (document.getElementById('vanto-zazi-sync-btn')) return;
-
   const btn = document.createElement('div');
   btn.id = 'vanto-zazi-sync-btn';
   btn.innerHTML = '🟢';
@@ -419,9 +547,7 @@ function injectSyncButton() {
   `;
   btn.addEventListener('mouseenter', () => btn.style.transform = 'scale(1.1)');
   btn.addEventListener('mouseleave', () => btn.style.transform = 'scale(1)');
-  btn.addEventListener('click', () => {
-    alert('Click the Vanto Zazi extension icon in your toolbar to sync contacts.');
-  });
+  btn.addEventListener('click', () => alert('Click the Vanto Zazi extension icon in your toolbar to sync contacts.'));
   document.body.appendChild(btn);
 }
 
@@ -429,16 +555,10 @@ function injectSyncButton() {
 async function init() {
   await new Promise(r => setTimeout(r, 3000));
   injectSyncButton();
-
   await fetchCrmContacts();
   injectTags();
 
-  // Re-inject tags every 5s (WhatsApp re-renders the chat list)
-  setInterval(() => {
-    injectTags();
-  }, 5000);
-
-  // Refresh CRM data every 2 minutes
+  setInterval(() => injectTags(), 5000);
   setInterval(fetchCrmContacts, 120000);
 }
 
