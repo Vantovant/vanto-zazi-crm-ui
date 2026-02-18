@@ -15,6 +15,9 @@ interface OrderRow {
   status: string;
   order_date: string;
   badges: string[];
+  purchase_type: string;
+  pv_amount: number;
+  source: string;
 }
 
 function rowToOrder(row: OrderRow): Order {
@@ -29,6 +32,9 @@ function rowToOrder(row: OrderRow): Order {
     status: row.status as Order['status'],
     orderDate: row.order_date,
     badges: (row.badges || []) as Order['badges'],
+    purchaseType: row.purchase_type || '',
+    pvAmount: Number(row.pv_amount) || 0,
+    source: row.source || 'manual',
   };
 }
 
@@ -75,6 +81,9 @@ export function useOrders() {
         status: order.status,
         order_date: order.orderDate,
         badges: order.badges || [],
+        purchase_type: order.purchaseType || '',
+        pv_amount: order.pvAmount || 0,
+        source: order.source || 'manual',
       })
       .select()
       .single();

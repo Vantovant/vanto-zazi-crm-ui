@@ -278,7 +278,10 @@ export type Database = {
           order_date: string
           order_id: string
           product: string
+          purchase_type: string
+          pv_amount: number
           quantity: number
+          source: string
           status: string
           updated_at: string
           user_id: string
@@ -293,7 +296,10 @@ export type Database = {
           order_date?: string
           order_id?: string
           product?: string
+          purchase_type?: string
+          pv_amount?: number
           quantity?: number
+          source?: string
           status?: string
           updated_at?: string
           user_id: string
@@ -308,7 +314,10 @@ export type Database = {
           order_date?: string
           order_id?: string
           product?: string
+          purchase_type?: string
+          pv_amount?: number
           quantity?: number
+          source?: string
           status?: string
           updated_at?: string
           user_id?: string

@@ -1,0 +1,5 @@
+
+ALTER TABLE public.orders
+  ADD COLUMN IF NOT EXISTS purchase_type text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS pv_amount numeric NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'manual';

@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.parse-knowledge-doc]
 verify_jwt = false
+
+[functions.parse-backoffice-orders]
+verify_jwt = false
