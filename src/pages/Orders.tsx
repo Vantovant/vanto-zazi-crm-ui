@@ -81,7 +81,8 @@ export function Orders() {
   const totalRevenue = filteredOrders.reduce((sum, o) => sum + o.amount, 0);
   const paidTotal = filteredOrders.filter(o => o.status === 'Paid').reduce((sum, o) => sum + o.amount, 0);
   const pendingTotal = filteredOrders.filter(o => o.status === 'Pending').reduce((sum, o) => sum + o.amount, 0);
-  const totalPV = filteredOrders.reduce((sum, o) => sum + (o.pvAmount || 0), 0);
+  const activityPV = filteredOrders.filter(o => o.purchaseType === 'Activity').reduce((sum, o) => sum + (o.pvAmount || 0), 0);
+  const upgradePV = filteredOrders.filter(o => o.purchaseType === 'Upgrade').reduce((sum, o) => sum + (o.pvAmount || 0), 0);
 
   return (
     <div className="space-y-5">
@@ -93,7 +94,7 @@ export function Orders() {
         <div>
           <h1 className="text-2xl font-semibold text-white">Orders</h1>
           <p className="text-sm text-slate-400 mt-0.5">
-            {ordersLoading ? 'Loading...' : `${filteredOrders.length} orders · ${totalPV} PV`}
+            {ordersLoading ? 'Loading...' : `${filteredOrders.length} orders`}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -117,7 +118,7 @@ export function Orders() {
       </div>
 
       {/* Revenue Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-4">
           <p className="text-xs font-medium text-slate-400">Total Revenue</p>
           <p className="text-xl font-bold text-white mt-1">R{totalRevenue.toLocaleString()}</p>
@@ -130,9 +131,13 @@ export function Orders() {
           <p className="text-xs font-medium text-amber-400">Pending</p>
           <p className="text-xl font-bold text-amber-300 mt-1">R{pendingTotal.toLocaleString()}</p>
         </div>
-        <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-4">
-          <p className="text-xs font-medium text-slate-400">Total PV</p>
-          <p className="text-xl font-bold text-white mt-1">{totalPV.toLocaleString()}</p>
+        <div className="bg-slate-800/50 rounded-xl border border-teal-500/20 p-4">
+          <p className="text-xs font-medium text-teal-400">Activity PV</p>
+          <p className="text-xl font-bold text-teal-300 mt-1">{activityPV.toLocaleString()}</p>
+        </div>
+        <div className="bg-slate-800/50 rounded-xl border border-violet-500/20 p-4">
+          <p className="text-xs font-medium text-violet-400">Upgrade PV</p>
+          <p className="text-xl font-bold text-violet-300 mt-1">{upgradePV.toLocaleString()}</p>
         </div>
       </div>
 
