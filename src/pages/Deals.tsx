@@ -24,6 +24,10 @@ interface Deal {
   orderCount: number;
   totalOrderValue: number;
   lastOrderDate: string | null;
+  upgradePV: number;
+  activityPV: number;
+  upgradeZAR: number;
+  activityZAR: number;
 }
 
 // Minimum investment by GO-Status rank (USD value × 15 ZAR conversion)
@@ -49,9 +53,13 @@ function deriveDealStatus(contact: Prospect, contactOrders: Order[]): Deal {
   const status: DealStatus = hasRank ? 'activated-with-status' : 'activated-no-status';
   const statusLabel = hasRank ? goStatus : 'Activation Only';
 
-  // Use actual orders if available, otherwise estimate from GO-Status
   const minValue = estimatedMinValue(goStatus);
   const displayValue = totalOrderValue > 0 ? totalOrderValue : minValue;
+
+  const upgradePV = contactOrders.filter(o => o.purchaseType === 'Upgrade').reduce((s, o) => s + (o.pvAmount || 0), 0);
+  const activityPV = contactOrders.filter(o => o.purchaseType === 'Activity').reduce((s, o) => s + (o.pvAmount || 0), 0);
+  const upgradeZAR = contactOrders.filter(o => o.purchaseType === 'Upgrade').reduce((s, o) => s + o.amount, 0);
+  const activityZAR = contactOrders.filter(o => o.purchaseType === 'Activity').reduce((s, o) => s + o.amount, 0);
 
   return {
     contact,
@@ -61,6 +69,10 @@ function deriveDealStatus(contact: Prospect, contactOrders: Order[]): Deal {
     orderCount: contactOrders.length,
     totalOrderValue: displayValue,
     lastOrderDate: lastOrder?.orderDate || null,
+    upgradePV,
+    activityPV,
+    upgradeZAR,
+    activityZAR,
   };
 }
 
@@ -114,6 +126,14 @@ export function Deals() {
       'activated-with-status': deals.filter((d) => d.status === 'activated-with-status').length,
     };
   }, [deals]);
+
+  const pvTotals = useMemo(() => ({
+    upgradePV: deals.reduce((s, d) => s + d.upgradePV, 0),
+    activityPV: deals.reduce((s, d) => s + d.activityPV, 0),
+    upgradeZAR: deals.reduce((s, d) => s + d.upgradeZAR, 0),
+    activityZAR: deals.reduce((s, d) => s + d.activityZAR, 0),
+    paidZAR: deals.reduce((s, d) => s + d.upgradeZAR + d.activityZAR, 0),
+  }), [deals]);
 
   const selectedProspect = selectedContactId ? prospects.find((p) => p.id === selectedContactId) : null;
 
@@ -252,6 +272,28 @@ export function Deals() {
         </button>
       </div>
 
+      {/* PV & Revenue Summary */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="bg-slate-800/50 rounded-xl border border-violet-500/20 p-4">
+          <p className="text-xs font-medium text-violet-400">Upgrade PV</p>
+          <p className="text-xl font-bold text-violet-300 mt-1">{pvTotals.upgradePV.toLocaleString()}</p>
+          <p className="text-xs text-slate-500 mt-0.5">R{pvTotals.upgradeZAR.toLocaleString()}</p>
+        </div>
+        <div className="bg-slate-800/50 rounded-xl border border-teal-500/20 p-4">
+          <p className="text-xs font-medium text-teal-400">Activity PV</p>
+          <p className="text-xl font-bold text-teal-300 mt-1">{pvTotals.activityPV.toLocaleString()}</p>
+          <p className="text-xs text-slate-500 mt-0.5">R{pvTotals.activityZAR.toLocaleString()}</p>
+        </div>
+        <div className="bg-slate-800/50 rounded-xl border border-cyan-500/20 p-4">
+          <p className="text-xs font-medium text-cyan-400">Paid Revenue</p>
+          <p className="text-xl font-bold text-cyan-300 mt-1">R{pvTotals.paidZAR.toLocaleString()}</p>
+        </div>
+        <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-4">
+          <p className="text-xs font-medium text-slate-400">Total Deals</p>
+          <p className="text-xl font-bold text-white mt-1">{deals.length}</p>
+        </div>
+      </div>
+
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
         {/* Search */}
@@ -347,7 +389,7 @@ export function Deals() {
                   </p>
                 </div>
 
-                {/* Order Stats — always show estimated min investment based on GO-Status */}
+                {/* Order Stats */}
                 <div className="text-right flex-shrink-0">
                   {deal.orderCount > 0 ? (
                     <>
@@ -356,6 +398,14 @@ export function Deals() {
                         {deal.orderCount} order{deal.orderCount > 1 ? 's' : ''}
                         {deal.lastOrderDate && ` · ${deal.lastOrderDate}`}
                       </p>
+                      <div className="flex items-center gap-3 mt-1 justify-end">
+                        {deal.upgradePV > 0 && (
+                          <span className="text-xs text-violet-400">{deal.upgradePV} Upgrade PV</span>
+                        )}
+                        {deal.activityPV > 0 && (
+                          <span className="text-xs text-teal-400">{deal.activityPV} Activity PV</span>
+                        )}
+                      </div>
                     </>
                   ) : (
                     <>
