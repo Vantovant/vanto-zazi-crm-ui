@@ -89,6 +89,11 @@ function isGroupChat(row) {
   if (row.querySelector('[data-icon="default-group"]')) return true;
   if (row.querySelector('[data-icon="community"]')) return true;
   if (row.querySelector('[data-testid="default-group"]')) return true;
+  if (row.querySelector('[data-icon="default-group-large"]')) return true;
+  if (row.querySelector('[data-icon="group"]')) return true;
+  // Check for multiple participant avatars (group indicator)
+  const avatars = row.querySelectorAll('img[draggable="false"]');
+  if (avatars.length > 1) return true;
   return false;
 }
 
@@ -110,7 +115,7 @@ function injectTags() {
       if (titleSpan) name = titleSpan.getAttribute('title')?.trim();
     }
     if (!name || name.length < 2) return;
-    if (name.includes(',') || name.includes('📌') || name.includes('👥')) return;
+    if (name.includes(',') || name.includes('📌') || name.includes('👥') || name.includes('🏠') || name.includes('🏢')) return;
 
     const contact = findCrmContact(name);
 
