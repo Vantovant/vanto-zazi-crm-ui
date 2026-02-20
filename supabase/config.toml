@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.crm-webhook]
 verify_jwt = false
+
+[functions.outbound-webhook]
+verify_jwt = false
