@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Prospect } from '@/data/mockData';
+import { pushOutboundEvent } from '@/hooks/useOutboundWebhook';
 
 // DB row type
 interface ContactRow {
@@ -133,6 +134,7 @@ export function useContacts() {
       return null;
     }
     await fetchContacts();
+    pushOutboundEvent('contact.created', { ...prospectToInsert(prospect, user.id), id: (data as { id: string }).id });
     return data;
   };
 
@@ -169,6 +171,7 @@ export function useContacts() {
       return false;
     }
     await fetchContacts();
+    pushOutboundEvent('contact.updated', { id, ...dbUpdates });
     return true;
   };
 

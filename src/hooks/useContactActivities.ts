@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { pushOutboundEvent } from '@/hooks/useOutboundWebhook';
 
 export interface ContactActivity {
   id: string;
@@ -50,6 +51,12 @@ export function useContactActivities() {
     });
     if (!error) {
       await fetchActivities();
+      pushOutboundEvent('activity.created', {
+        contact_id: params.contact_id || null,
+        activity_type: params.activity_type,
+        summary: params.summary,
+        notes: params.notes || '',
+      });
       return true;
     }
     console.error('Log activity error:', error);
