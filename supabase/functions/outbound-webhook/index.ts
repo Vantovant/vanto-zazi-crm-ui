@@ -9,7 +9,7 @@ const corsHeaders = {
 // External WhatsApp CRM endpoint
 const EXTERNAL_ENDPOINT =
   "https://nqyyvqcmcyggvlcswkio.supabase.co/functions/v1/crm-webhook";
-const SHARED_SECRET = "50c55093544a96d14343fc1bc652738a";
+const SHARED_SECRET = Deno.env.get("WEBHOOK_SECRET") ?? "50c55093544a96d14343fc1bc652738a";
 
 async function pushToExternalCRM(payload: Record<string, unknown>) {
   try {
