@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Order } from '@/data/mockData';
+import { pushOutboundEvent } from '@/hooks/useOutboundWebhook';
 
 interface OrderRow {
   id: string;
@@ -92,6 +93,13 @@ export function useOrders() {
       return null;
     }
     await fetchOrders();
+    pushOutboundEvent('order.created', {
+      contact_name: order.contactName,
+      contact_phone: '',
+      product: order.product,
+      quantity: order.quantity,
+      amount: order.amount,
+    });
     return data;
   };
 
