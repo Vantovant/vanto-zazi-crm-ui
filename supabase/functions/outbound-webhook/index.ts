@@ -50,23 +50,21 @@ Deno.serve(async (req) => {
     { global: { headers: { Authorization: authHeader } } }
   );
 
-  const token = authHeader.replace("Bearer ", "");
-  const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
-  if (claimsError || !claimsData?.claims) {
+  // Get the authenticated user's email to send as identity
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
-  const userId = claimsData.claims.sub;
+  const userEmail = user.email;
+  const userId = user.id;
 
   try {
     const body = await req.json();
-    const { event, data, external_user_id } = body;
-
-    // external_user_id is the user's ID in the external WhatsApp CRM system
-    const extUserId = external_user_id || userId;
+    const { event, data } = body;
 
     let result: { status: number; body: string } | null = null;
 
@@ -76,7 +74,7 @@ Deno.serve(async (req) => {
         const contact = data;
         result = await pushToExternalCRM({
           action: "upsert_contact",
-          user_id: extUserId,
+          email: userEmail, // Email-based identity resolution
           contact: {
             full_name: contact.full_name,
             phone_number: contact.phone_number,
@@ -98,7 +96,7 @@ Deno.serve(async (req) => {
         const activity = data;
         result = await pushToExternalCRM({
           action: "log_chat",
-          user_id: extUserId,
+          email: userEmail,
           phone: activity.phone || "",
           name: activity.contact_name || "",
           message_preview: activity.summary || activity.notes || "",
@@ -108,10 +106,9 @@ Deno.serve(async (req) => {
 
       case "order.created": {
         const order = data;
-        // Push as a contact note — external CRM logs it as an activity
         result = await pushToExternalCRM({
           action: "log_chat",
-          user_id: extUserId,
+          email: userEmail,
           phone: order.contact_phone || "",
           name: order.contact_name || "",
           message_preview: `New order: ${order.product || "Product"} × ${order.quantity || 1} — R${order.amount || 0}`,
@@ -130,6 +127,7 @@ Deno.serve(async (req) => {
       JSON.stringify({
         success: true,
         event,
+        source_email: userEmail,
         external_response: result,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }

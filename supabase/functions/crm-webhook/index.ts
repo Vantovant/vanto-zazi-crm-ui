@@ -6,6 +6,24 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-webhook-secret, x-supabase-client-platform, x-supabase-client-platform-version",
 };
 
+/**
+ * Resolves a local Zazi user UUID from an email address.
+ * NEVER trust external UUIDs — always resolve locally.
+ */
+async function resolveLocalUserId(
+  supabase: any,
+  email: string
+): Promise<string | null> {
+  if (!email) return null;
+  const { data } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("email", email.toLowerCase().trim())
+    .limit(1)
+    .single();
+  return data?.id || null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -30,13 +48,22 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { action, user_id } = body;
+    const { action, email } = body;
 
-    if (!user_id) {
-      return new Response(JSON.stringify({ error: "user_id is required" }), {
+    // ── Resolve local user by email — NEVER trust external user_id ────────
+    if (!email) {
+      return new Response(JSON.stringify({ error: "email is required to resolve local user" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    const localUserId = await resolveLocalUserId(supabase, email);
+    if (!localUserId) {
+      return new Response(
+        JSON.stringify({ error: `No matching local user found for email: ${email}` }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // ── ACTION: sync_contacts ─────────────────────────────────────────────
@@ -50,11 +77,10 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Fetch existing contacts for this user, matched by phone
       const { data: existing } = await supabase
         .from("contacts")
         .select("id, full_name, phone_number")
-        .eq("user_id", user_id);
+        .eq("user_id", localUserId);
 
       const existingByPhone = new Map(
         (existing || []).map((c: any) => [c.phone_number.replace(/\s/g, ""), c])
@@ -76,7 +102,8 @@ Deno.serve(async (req) => {
           matched.push(match.full_name);
         } else {
           const { error: insertErr } = await supabase.from("contacts").insert({
-            user_id,
+            user_id: localUserId,
+            assigned_to: localUserId,
             full_name: name,
             phone_number: phone,
             email_address: wa.email || "",
@@ -98,6 +125,7 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({
           success: true,
+          resolved_user_id: localUserId,
           created: created.length,
           matched: matched.length,
           errors,
@@ -125,14 +153,14 @@ Deno.serve(async (req) => {
       const { data: contacts } = await supabase
         .from("contacts")
         .select("id, full_name")
-        .eq("user_id", user_id)
+        .eq("user_id", localUserId)
         .eq("phone_number", cleanPhone)
         .limit(1);
 
       const contact = contacts?.[0];
 
       await supabase.from("contact_activities").insert({
-        user_id,
+        user_id: localUserId,
         contact_id: contact?.id || null,
         activity_type: "whatsapp",
         summary: `WhatsApp chat with ${contact?.full_name || name || cleanPhone}`,
@@ -142,6 +170,7 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({
           success: true,
+          resolved_user_id: localUserId,
           contact_id: contact?.id || null,
           contact_name: contact?.full_name || null,
         }),
@@ -162,20 +191,20 @@ Deno.serve(async (req) => {
 
       const phone = (contact.phone_number || "").replace(/\s/g, "");
 
-      // Check if exists by phone
       let existingId: string | null = null;
       if (phone) {
         const { data: found } = await supabase
           .from("contacts")
           .select("id")
-          .eq("user_id", user_id)
+          .eq("user_id", localUserId)
           .eq("phone_number", phone)
           .limit(1);
         existingId = found?.[0]?.id || null;
       }
 
       const contactData = {
-        user_id,
+        user_id: localUserId,
+        assigned_to: localUserId,
         full_name: contact.full_name,
         phone_number: phone,
         email_address: contact.email_address || "",
@@ -202,7 +231,7 @@ Deno.serve(async (req) => {
           });
         }
         return new Response(
-          JSON.stringify({ success: true, action: "updated", contact_id: existingId }),
+          JSON.stringify({ success: true, action: "updated", contact_id: existingId, resolved_user_id: localUserId }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       } else {
@@ -219,7 +248,7 @@ Deno.serve(async (req) => {
           });
         }
         return new Response(
-          JSON.stringify({ success: true, action: "created", contact_id: inserted.id }),
+          JSON.stringify({ success: true, action: "created", contact_id: inserted.id, resolved_user_id: localUserId }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
