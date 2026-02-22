@@ -3,25 +3,44 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-webhook-secret, x-supabase-client-platform, x-supabase-client-platform-version",
+    "authorization, x-client-info, apikey, content-type, x-webhook-secret, x-supabase-client-platform, x-supabase-client-platform-version, x-user-email, x-owner-email",
 };
 
 /**
  * Resolves a local Zazi user UUID from an email address.
  * NEVER trust external UUIDs — always resolve locally.
  */
-async function resolveLocalUserId(
-  supabase: any,
-  email: string
-): Promise<string | null> {
-  if (!email) return null;
-  const { data } = await supabase
+async function resolveLocalUserId(supabase: any, email: string): Promise<string | null> {
+  const norm = (email ?? "").toLowerCase().trim();
+  if (!norm) return null;
+
+  // 1) Try profiles first
+  const { data: prof } = await supabase
     .from("profiles")
     .select("id")
-    .eq("email", email.toLowerCase().trim())
+    .eq("email", norm)
     .limit(1)
-    .single();
-  return data?.id || null;
+    .maybeSingle();
+
+  if (prof?.id) return prof.id;
+
+  // 2) If profile is missing but the Auth user exists, create the profile automatically
+  try {
+    const { data: authRes } = await supabase.auth.admin.getUserByEmail(norm);
+    const userId = authRes?.user?.id;
+
+    if (userId) {
+      await supabase.from("profiles").upsert(
+        { id: userId, email: norm, full_name: norm },
+        { onConflict: "id" }
+      );
+      return userId;
+    }
+  } catch (_) {
+    // ignore and fall through
+  }
+
+  return null;
 }
 
 Deno.serve(async (req) => {
@@ -48,26 +67,42 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { action, email } = body;
+const action = body?.action;
 
-    // ── Resolve local user by email — NEVER trust external user_id ────────
-    if (!email) {
-      return new Response(JSON.stringify({ error: "email is required to resolve local user" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+// ── Resolve local user by email — NEVER trust external user_id ────────
+// Caller SHOULD send an email, but we also accept it via headers or a safe server-side default.
+const emailFromBody =
+  body?.email ?? body?.user_email ?? body?.owner_email ?? body?.ownerEmail ?? null;
+const emailFromHeader =
+  req.headers.get("x-user-email") ?? req.headers.get("x-owner-email") ?? null;
+const fallbackEmail =
+      Deno.env.get("DEFAULT_OWNER_EMAIL") ??
+      Deno.env.get("ZAZI_DEFAULT_OWNER_EMAIL") ??
+      "vanto@onlinecourseformlm.com";
 
-    const localUserId = await resolveLocalUserId(supabase, email);
-    if (!localUserId) {
-      return new Response(
-        JSON.stringify({ error: `No matching local user found for email: ${email}` }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+const email = emailFromBody ?? emailFromHeader ?? fallbackEmail;
 
-    // ── ACTION: sync_contacts ─────────────────────────────────────────────
-    if (action === "sync_contacts") {
+if (!email) {
+  return new Response(
+    JSON.stringify({
+      error: "email is required to resolve local user",
+      hint:
+        "Send body.email OR header x-user-email/x-owner-email, or set DEFAULT_OWNER_EMAIL on this function.",
+    }),
+    { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+  );
+}
+
+const localUserId = await resolveLocalUserId(supabase, email);
+
+if (!localUserId) {
+  return new Response(
+    JSON.stringify({ error: `Could not resolve/create local user for email: ${email}` }),
+    { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+  );
+}
+
+if (action === "sync_contacts") {
       const { contacts: waContacts } = body;
 
       if (!Array.isArray(waContacts) || waContacts.length === 0) {
