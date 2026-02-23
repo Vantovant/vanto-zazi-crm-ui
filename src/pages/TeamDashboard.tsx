@@ -44,6 +44,21 @@ export function TeamDashboard() {
   const [invites, setInvites] = useState<any[]>([]);
   const [newLabel, setNewLabel] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const checkAdmin = async () => {
+      if (!user) { setIsAdmin(false); return; }
+      const { data } = await supabase
+        .from('user_roles' as any)
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('role', 'admin')
+        .maybeSingle();
+      setIsAdmin(!!data);
+    };
+    checkAdmin();
+  }, [user]);
 
   const fetchStats = async () => {
     setLoading(true);
@@ -145,10 +160,17 @@ export function TeamDashboard() {
   const totalContacts = stats.reduce((sum, s) => sum + s.contactsCreated, 0);
   const totalOrders = stats.reduce((sum, s) => sum + s.ordersCreated, 0);
 
-  const OWNER_ID = 'b8028d7d-6a08-45ef-a369-b438c440bea3';
-  const isOwner = user?.id === OWNER_ID;
 
-  if (!isOwner) {
+
+  if (isAdmin === null) {
+    return (
+      <div className="flex items-center justify-center h-[60vh]">
+        <p className="text-slate-400">Loading...</p>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
         <div className="text-center">
