@@ -69,8 +69,8 @@ Deno.serve(async (req) => {
   }
   const tsSeconds = Number(tsHeader);
   const nowSeconds = Math.floor(Date.now() / 1000);
-  const MAX_DRIFT_SECONDS = 300; // 5 minutes
-  if (Number.isNaN(tsSeconds) || Math.abs(nowSeconds - tsSeconds) > MAX_DRIFT_SECONDS) {
+  const MAX_DRIFT_SECONDS = 120; // 2 minutes
+  if (Number.isNaN(tsSeconds) || tsSeconds > nowSeconds + 5 || (nowSeconds - tsSeconds) > MAX_DRIFT_SECONDS) {
     return new Response(JSON.stringify({ error: "Request expired or invalid timestamp" }), {
       status: 403,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
