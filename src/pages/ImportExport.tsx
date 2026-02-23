@@ -1074,6 +1074,21 @@ export function ImportExport() {
               <div className="space-y-3">
                 <button type="button"
                   onClick={() => {
+                    const noStatusContacts = contacts.filter(c => c.LeadType === 'Purchase_Nostatus');
+                    exportZaziMail(noStatusContacts, false, 'purchase-nostatus');
+                  }}
+                  className="w-full flex items-center gap-3 p-3 bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 rounded-lg transition-colors text-left">
+                  <div className="w-10 h-10 rounded-lg bg-teal-500/20 flex items-center justify-center flex-shrink-0">
+                    <Users className="w-5 h-5 text-teal-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-white">Purchase — No Status</p>
+                    <p className="text-xs text-slate-400">{contacts.filter(c => c.LeadType === 'Purchase_Nostatus').length} contacts · Activation Nurture Sequence</p>
+                  </div>
+                  <Download className="w-4 h-4 text-teal-400" />
+                </button>
+                <button type="button"
+                  onClick={() => {
                     const purchaseContacts = contacts.filter(c => c.LeadType === 'Purchase_Status');
                     const activationOnly = purchaseContacts.filter(c => !c.GOStatus || c.GOStatus === 'No status' || c.GOStatus === '');
                     exportZaziMail(activationOnly, false, 'activation-only');
