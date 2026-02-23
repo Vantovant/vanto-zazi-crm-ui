@@ -59,6 +59,24 @@ Deno.serve(async (req) => {
     });
   }
 
+  // ── Replay protection via timestamp header ─────────────────────────────
+  const tsHeader = req.headers.get("x-webhook-timestamp");
+  if (!tsHeader) {
+    return new Response(JSON.stringify({ error: "Missing x-webhook-timestamp header" }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+  const tsSeconds = Number(tsHeader);
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const MAX_DRIFT_SECONDS = 300; // 5 minutes
+  if (Number.isNaN(tsSeconds) || Math.abs(nowSeconds - tsSeconds) > MAX_DRIFT_SECONDS) {
+    return new Response(JSON.stringify({ error: "Request expired or invalid timestamp" }), {
+      status: 403,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   // ── Use service role key so RLS is bypassed for webhook writes ──────────
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
