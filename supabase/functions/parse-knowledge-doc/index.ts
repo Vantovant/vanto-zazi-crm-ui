@@ -224,7 +224,7 @@ function findFileInZip(zipBytes: Uint8Array, targetName: string): string | null 
         const compressedData = zipBytes.slice(dataStart, dataStart + compressedSize);
         try {
           // Try raw inflate using DecompressionStream
-          const ds = new DecompressionStream("raw");
+          const ds = new DecompressionStream("deflate-raw" as CompressionFormat);
           const writer = ds.writable.getWriter();
           writer.write(compressedData);
           writer.close();
