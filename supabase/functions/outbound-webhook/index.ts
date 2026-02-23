@@ -9,7 +9,10 @@ const corsHeaders = {
 // External WhatsApp CRM endpoint
 const EXTERNAL_ENDPOINT =
   "https://nqyyvqcmcyggvlcswkio.supabase.co/functions/v1/crm-webhook";
-const SHARED_SECRET = Deno.env.get("WEBHOOK_SECRET") ?? "50c55093544a96d14343fc1bc652738a";
+const SHARED_SECRET = Deno.env.get("WEBHOOK_SECRET");
+if (!SHARED_SECRET) {
+  console.error("[outbound-webhook] WEBHOOK_SECRET environment variable is not configured");
+}
 
 async function pushToExternalCRM(payload: Record<string, unknown>) {
   try {
@@ -35,7 +38,14 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Validate JWT — only authenticated users can trigger this
+  if (!SHARED_SECRET) {
+    return new Response(JSON.stringify({ error: "Webhook secret not configured" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+
   const authHeader = req.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
