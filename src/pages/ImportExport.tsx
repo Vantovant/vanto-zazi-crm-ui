@@ -424,10 +424,12 @@ export function ImportExport() {
       } else {
         sequence = 'Activation_Nurture_Sequence';
       }
+      const lifecycleTag = contact.LeadType ? contact.LeadType : '';
       const tags = [
         'Activated_Distributor',
         isRanked ? 'Has_GO_Status' : 'Activation_Only_R375',
         rankTag,
+        lifecycleTag,
         contact.FocusArea ? contact.FocusArea.replace(/\s+/g, '_') : '',
         contact.LeadTemperature ? `Temp_${contact.LeadTemperature}` : '',
         contact.InterestLevel ? `Interest_${contact.InterestLevel}` : '',
