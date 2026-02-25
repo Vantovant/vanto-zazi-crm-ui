@@ -58,7 +58,7 @@ export function Auth() {
             setSubmitting={setSubmitting}
           />
 
-          <div className="mt-6 text-center">
+          <div className="mt-6 text-center space-y-2">
             <button
               type="button"
               onClick={() => { setIsSignUp(!isSignUp); setError(''); setMessage(''); }}
@@ -66,6 +66,9 @@ export function Auth() {
             >
               {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
             </button>
+            {!isSignUp && (
+              <ForgotPasswordLink />
+            )}
           </div>
         </div>
       </div>
@@ -228,6 +231,50 @@ function AuthForm({
       >
         {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
         {isSignUp ? 'Create Account' : 'Sign In'}
+      </button>
+    </form>
+  );
+}
+
+function ForgotPasswordLink() {
+  const [show, setShow] = useState(false);
+  const [email, setEmail] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSending(true);
+    setError('');
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    if (error) { setError(error.message); } else { setSent(true); }
+    setSending(false);
+  };
+
+  if (!show) {
+    return (
+      <button type="button" onClick={() => setShow(true)} className="block mx-auto text-sm text-slate-400 hover:text-slate-300 transition-colors">
+        Forgot your password?
+      </button>
+    );
+  }
+
+  if (sent) {
+    return <p className="text-sm text-teal-400 text-center">Check your email for a reset link.</p>;
+  }
+
+  return (
+    <form onSubmit={handleSend} className="mt-2 space-y-2">
+      <input
+        type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Enter your email" required
+        className="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 placeholder:text-slate-500"
+      />
+      {error && <p className="text-xs text-rose-400">{error}</p>}
+      <button type="submit" disabled={sending} className="w-full py-2 text-sm font-medium bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors disabled:opacity-50">
+        {sending ? 'Sending…' : 'Send Reset Link'}
       </button>
     </form>
   );
