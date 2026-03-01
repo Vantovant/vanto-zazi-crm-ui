@@ -154,6 +154,7 @@ export type Database = {
           created_at: string
           date_captured: string
           email_address: string
+          email_normalized: string | null
           focus_area: string
           full_name: string
           go_status: string
@@ -164,6 +165,7 @@ export type Database = {
           lead_type: string
           meeting_time: string
           next_action: string
+          phone_normalized: string | null
           phone_number: string
           province: string
           registration_status: string
@@ -184,6 +186,7 @@ export type Database = {
           created_at?: string
           date_captured?: string
           email_address?: string
+          email_normalized?: string | null
           focus_area?: string
           full_name: string
           go_status?: string
@@ -194,6 +197,7 @@ export type Database = {
           lead_type?: string
           meeting_time?: string
           next_action?: string
+          phone_normalized?: string | null
           phone_number?: string
           province?: string
           registration_status?: string
@@ -214,6 +218,7 @@ export type Database = {
           created_at?: string
           date_captured?: string
           email_address?: string
+          email_normalized?: string | null
           focus_area?: string
           full_name?: string
           go_status?: string
@@ -224,6 +229,7 @@ export type Database = {
           lead_type?: string
           meeting_time?: string
           next_action?: string
+          phone_normalized?: string | null
           phone_number?: string
           province?: string
           registration_status?: string
@@ -264,6 +270,36 @@ export type Database = {
           token?: string
           used_at?: string | null
           used_by?: string | null
+        }
+        Relationships: []
+      }
+      merge_log: {
+        Row: {
+          created_at: string
+          id: string
+          key_type: string
+          key_value: string
+          merged_ids: string[]
+          primary_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          key_type?: string
+          key_value?: string
+          merged_ids?: string[]
+          primary_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          key_type?: string
+          key_value?: string
+          merged_ids?: string[]
+          primary_id?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -486,6 +522,8 @@ export type Database = {
         Returns: boolean
       }
       is_self_profile: { Args: { profile_id: string }; Returns: boolean }
+      normalize_email: { Args: { raw: string }; Returns: string }
+      normalize_phone: { Args: { raw: string }; Returns: string }
     }
     Enums: {
       app_role: "admin" | "user"

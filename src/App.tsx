@@ -12,6 +12,7 @@ import { Activities } from './pages/Activities';
 import { ImportExport } from './pages/ImportExport';
 import { Deals } from './pages/Deals';
 import { TeamDashboard } from './pages/TeamDashboard';
+import { Duplicates } from './pages/Duplicates';
 
 function App() {
   return (
@@ -36,6 +37,7 @@ function App() {
             <Route path="deals" element={<Deals />} />
             <Route path="whatsapp" element={<WhatsApp />} />
             <Route path="import-export" element={<ImportExport />} />
+            <Route path="duplicates" element={<Duplicates />} />
             <Route path="team" element={<TeamDashboard />} />
             <Route path="help" element={<PlaceholderPage title="Help" />} />
           </Route>

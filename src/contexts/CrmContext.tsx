@@ -12,6 +12,7 @@ interface CrmContextType {
   updateContact: (id: string, updates: Partial<Prospect>) => Promise<boolean>;
   deleteContact: (id: string) => Promise<boolean>;
   refetchContacts: () => Promise<void>;
+  checkDuplicate: (phone: string, email: string, excludeId?: string) => Promise<{ contact: any; matchType: 'phone' | 'email'; matchValue: string } | null>;
   orders: Order[];
   ordersLoading: boolean;
   ordersDbActive: boolean;
@@ -27,7 +28,7 @@ const CrmContext = createContext<CrmContextType | undefined>(undefined);
 export function CrmProvider({ children }: { children: ReactNode }) {
   const {
     contacts, loading: contactsLoading, dbActive: contactsDbActive,
-    addContact, updateContact, deleteContact, refetch: refetchContacts,
+    addContact, updateContact, deleteContact, refetch: refetchContacts, checkDuplicate,
   } = useContacts();
   const {
     orders, loading: ordersLoading, dbActive: ordersDbActive,
@@ -39,7 +40,7 @@ export function CrmProvider({ children }: { children: ReactNode }) {
   return (
     <CrmContext.Provider value={{
       contacts, contactsLoading, contactsDbActive,
-      addContact, updateContact, deleteContact, refetchContacts,
+      addContact, updateContact, deleteContact, refetchContacts, checkDuplicate,
       orders, ordersLoading, ordersDbActive,
       addOrder, updateOrder, deleteOrder, refetchOrders,
       dbActive,

@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { X, Pencil, Loader2, CheckCircle } from 'lucide-react';
 import { useCrm } from '@/contexts/CrmContext';
 import type { Prospect } from '@/data/mockData';
+import { DuplicateWarningModal } from './DuplicateWarningModal';
+import { safeMerge } from '@/utils/contactNormalization';
 
 interface EditContactModalProps {
   prospect: Prospect;
@@ -10,10 +12,11 @@ interface EditContactModalProps {
 }
 
 export function EditContactModal({ prospect, onClose, onSaved }: EditContactModalProps) {
-  const { updateContact } = useCrm();
+  const { updateContact, checkDuplicate } = useCrm();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+  const [duplicateMatch, setDuplicateMatch] = useState<{ contact: any; matchType: 'phone' | 'email'; matchValue: string } | null>(null);
 
   const [form, setForm] = useState({
     FullName: prospect.FullName || '',
@@ -39,6 +42,15 @@ export function EditContactModal({ prospect, onClose, onSaved }: EditContactModa
     if (!form.FullName.trim()) { setError('Full name is required.'); return; }
     setLoading(true);
     setError('');
+
+    // Check for duplicates (exclude current contact)
+    const dup = await checkDuplicate(form.PhoneNumber, form.EmailAddress, String(prospect.id));
+    if (dup) {
+      setDuplicateMatch(dup);
+      setLoading(false);
+      return;
+    }
+
     const result = await updateContact(String(prospect.id), form as Partial<Prospect>);
     setLoading(false);
     if (result) {
@@ -50,6 +62,42 @@ export function EditContactModal({ prospect, onClose, onSaved }: EditContactModa
     } else {
       setError('Failed to update contact. Please try again.');
     }
+  };
+
+  const handleMergeIntoExisting = async (existingId: string) => {
+    const fieldMap: Record<string, string> = {
+      FullName: 'full_name', PhoneNumber: 'phone_number', EmailAddress: 'email_address',
+      City: 'city', Province: 'province', Country: 'country',
+      LeadTemperature: 'lead_temperature', LeadType: 'lead_type',
+      RegistrationStatus: 'registration_status', FocusArea: 'focus_area',
+      NextAction: 'next_action', AdditionalNotes: 'additional_notes',
+      GOStatus: 'go_status', SponsorName: 'sponsor_name',
+    };
+
+    const incoming: Record<string, unknown> = {};
+    for (const [formKey, dbKey] of Object.entries(fieldMap)) {
+      incoming[dbKey] = (form as any)[formKey] || '';
+    }
+
+    const existing = duplicateMatch?.contact || {};
+    const merged = safeMerge(existing, incoming);
+
+    const reverseMap: Record<string, string> = {};
+    for (const [k, v] of Object.entries(fieldMap)) reverseMap[v] = k;
+    const prospectUpdates: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(merged)) {
+      if (reverseMap[k]) prospectUpdates[reverseMap[k]] = v;
+    }
+
+    await updateContact(existingId, prospectUpdates as any);
+    setDuplicateMatch(null);
+    onSaved();
+    onClose();
+  };
+
+  const handleOpenExisting = (_id: string) => {
+    setDuplicateMatch(null);
+    onClose();
   };
 
   if (success) {
@@ -182,6 +230,17 @@ export function EditContactModal({ prospect, onClose, onSaved }: EditContactModa
           </form>
         </div>
       </div>
+
+      {duplicateMatch && (
+        <DuplicateWarningModal
+          existingContact={duplicateMatch.contact}
+          matchType={duplicateMatch.matchType}
+          matchValue={duplicateMatch.matchValue}
+          onClose={() => setDuplicateMatch(null)}
+          onOpenExisting={handleOpenExisting}
+          onMergeIntoExisting={handleMergeIntoExisting}
+        />
+      )}
     </>
   );
 }

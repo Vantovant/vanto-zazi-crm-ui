@@ -12,6 +12,7 @@ import {
   HelpCircle,
   X,
   BarChart3,
+  GitMerge,
 } from 'lucide-react';
 
 const OWNER_ID = 'b8028d7d-6a08-45ef-a369-b438c440bea3';
@@ -24,6 +25,7 @@ const baseNavItems = [
   { path: '/deals', label: 'Deals', icon: Briefcase },
   { path: '/whatsapp', label: 'WhatsApp', icon: MessageCircle },
   { path: '/import-export', label: 'Import / Export', icon: ArrowUpDown },
+  { path: '/duplicates', label: 'Duplicates', icon: GitMerge },
 ];
 
 interface SidebarProps {
