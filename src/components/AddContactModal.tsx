@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { X, UserPlus, Loader2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useCrm } from '@/contexts/CrmContext';
 import { DuplicateWarningModal } from './DuplicateWarningModal';
 import { safeMerge } from '@/utils/contactNormalization';
@@ -10,6 +11,7 @@ interface AddContactModalProps {
 
 export function AddContactModal({ onClose }: AddContactModalProps) {
   const { addContact, checkDuplicate, updateContact } = useCrm();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [duplicateMatch, setDuplicateMatch] = useState<{ contact: any; matchType: 'phone' | 'email'; matchValue: string } | null>(null);
@@ -44,9 +46,13 @@ export function AddContactModal({ onClose }: AddContactModalProps) {
       return;
     }
 
-    const result = await addContact(form as any);
+    const result = await addContact(form as any) as any;
     setLoading(false);
-    if (result) {
+    if (result && result.error === 'duplicate') {
+      setError('A contact with this phone or email already exists. Visit the Duplicates page to review.');
+      return;
+    }
+    if (result && result.data) {
       onClose();
     } else {
       setError('Failed to add contact. Please try again.');

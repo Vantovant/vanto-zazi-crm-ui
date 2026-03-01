@@ -8,7 +8,7 @@ interface CrmContextType {
   contacts: Prospect[];
   contactsLoading: boolean;
   contactsDbActive: boolean;
-  addContact: (p: Omit<Prospect, 'id'>) => Promise<unknown>;
+  addContact: (p: Omit<Prospect, 'id'>) => Promise<{ data?: unknown; error?: string }>;
   updateContact: (id: string, updates: Partial<Prospect>) => Promise<boolean>;
   deleteContact: (id: string) => Promise<boolean>;
   refetchContacts: () => Promise<void>;
