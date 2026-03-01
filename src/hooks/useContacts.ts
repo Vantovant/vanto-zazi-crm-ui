@@ -123,8 +123,8 @@ export function useContacts() {
     fetchContacts();
   }, [fetchContacts]);
 
-  const addContact = async (prospect: Omit<Prospect, 'id'>) => {
-    if (!user) return null;
+  const addContact = async (prospect: Omit<Prospect, 'id'>): Promise<{ data?: any; error?: string }> => {
+    if (!user) return { error: 'Not authenticated' };
     const { data, error } = await supabase
       .from('contacts')
       .insert(prospectToInsert(prospect, user.id))
@@ -132,11 +132,14 @@ export function useContacts() {
       .single();
     if (error) {
       console.error('Error adding contact:', error);
-      return null;
+      if (error.code === '23505') {
+        return { error: 'duplicate' };
+      }
+      return { error: error.message };
     }
     await fetchContacts();
     pushOutboundEvent('contact.created', { ...prospectToInsert(prospect, user.id), id: (data as { id: string }).id });
-    return data;
+    return { data };
   };
 
   const updateContact = async (id: string, updates: Partial<Prospect>) => {
@@ -169,6 +172,9 @@ export function useContacts() {
     const { error } = await supabase.from('contacts').update(dbUpdates).eq('id', id);
     if (error) {
       console.error('Error updating contact:', error);
+      if (error.code === '23505') {
+        return 'duplicate' as any;
+      }
       return false;
     }
     await fetchContacts();

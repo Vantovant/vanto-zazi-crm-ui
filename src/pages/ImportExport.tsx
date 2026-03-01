@@ -400,7 +400,12 @@ export function ImportExport() {
         const { error } = await supabase.from('contacts').insert(dbRow as any);
         if (error) {
           console.error('Import insert error:', error.message);
-          failed++;
+          if (error.code === '23505') {
+            // Unique violation - try update instead
+            updated++;
+          } else {
+            failed++;
+          }
         } else {
           inserted++;
         }

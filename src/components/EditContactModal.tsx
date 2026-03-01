@@ -53,7 +53,9 @@ export function EditContactModal({ prospect, onClose, onSaved }: EditContactModa
 
     const result = await updateContact(String(prospect.id), form as Partial<Prospect>);
     setLoading(false);
-    if (result) {
+    if (result === 'duplicate' as any) {
+      setError('A contact with this phone or email already exists. Visit the Duplicates page to review.');
+    } else if (result) {
       setSuccess(true);
       setTimeout(() => {
         onSaved();
