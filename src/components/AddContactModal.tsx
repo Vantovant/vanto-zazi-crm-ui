@@ -1,15 +1,18 @@
 import { useState } from 'react';
 import { X, UserPlus, Loader2 } from 'lucide-react';
 import { useCrm } from '@/contexts/CrmContext';
+import { DuplicateWarningModal } from './DuplicateWarningModal';
+import { safeMerge } from '@/utils/contactNormalization';
 
 interface AddContactModalProps {
   onClose: () => void;
 }
 
 export function AddContactModal({ onClose }: AddContactModalProps) {
-  const { addContact } = useCrm();
+  const { addContact, checkDuplicate, updateContact } = useCrm();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [duplicateMatch, setDuplicateMatch] = useState<{ contact: any; matchType: 'phone' | 'email'; matchValue: string } | null>(null);
 
   const [form, setForm] = useState({
     FullName: '',
@@ -32,6 +35,15 @@ export function AddContactModal({ onClose }: AddContactModalProps) {
     if (!form.FullName.trim()) { setError('Full name is required.'); return; }
     setLoading(true);
     setError('');
+
+    // Check for duplicates
+    const dup = await checkDuplicate(form.PhoneNumber, form.EmailAddress);
+    if (dup) {
+      setDuplicateMatch(dup);
+      setLoading(false);
+      return;
+    }
+
     const result = await addContact(form as any);
     setLoading(false);
     if (result) {
@@ -39,6 +51,41 @@ export function AddContactModal({ onClose }: AddContactModalProps) {
     } else {
       setError('Failed to add contact. Please try again.');
     }
+  };
+
+  const handleMergeIntoExisting = async (existingId: string) => {
+    const fieldMap: Record<string, string> = {
+      FullName: 'full_name', PhoneNumber: 'phone_number', EmailAddress: 'email_address',
+      City: 'city', Province: 'province', Country: 'country',
+      LeadTemperature: 'lead_temperature', LeadType: 'lead_type',
+      FocusArea: 'focus_area', AdditionalNotes: 'additional_notes', GOStatus: 'go_status',
+    };
+
+    const incoming: Record<string, unknown> = {};
+    for (const [formKey, dbKey] of Object.entries(fieldMap)) {
+      incoming[dbKey] = (form as any)[formKey] || '';
+    }
+
+    const existing = duplicateMatch?.contact || {};
+    const merged = safeMerge(existing, incoming);
+
+    // Convert back to Prospect field names for updateContact
+    const reverseMap: Record<string, string> = {};
+    for (const [k, v] of Object.entries(fieldMap)) reverseMap[v] = k;
+    const prospectUpdates: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(merged)) {
+      if (reverseMap[k]) prospectUpdates[reverseMap[k]] = v;
+    }
+
+    await updateContact(existingId, prospectUpdates as any);
+    setDuplicateMatch(null);
+    onClose();
+  };
+
+  const handleOpenExisting = (_id: string) => {
+    setDuplicateMatch(null);
+    onClose();
+    // Navigate to contacts page - the user can find the contact there
   };
 
   return (
@@ -138,6 +185,17 @@ export function AddContactModal({ onClose }: AddContactModalProps) {
           </form>
         </div>
       </div>
+
+      {duplicateMatch && (
+        <DuplicateWarningModal
+          existingContact={duplicateMatch.contact}
+          matchType={duplicateMatch.matchType}
+          matchValue={duplicateMatch.matchValue}
+          onClose={() => setDuplicateMatch(null)}
+          onOpenExisting={handleOpenExisting}
+          onMergeIntoExisting={handleMergeIntoExisting}
+        />
+      )}
     </>
   );
 }

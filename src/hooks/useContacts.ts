@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Prospect } from '@/data/mockData';
 import { pushOutboundEvent } from '@/hooks/useOutboundWebhook';
+import { normalizePhone, normalizeEmail } from '@/utils/contactNormalization';
 
 // DB row type
 interface ContactRow {
@@ -185,5 +186,38 @@ export function useContacts() {
     return true;
   };
 
-  return { contacts, loading, dbActive, addContact, updateContact, deleteContact, refetch: fetchContacts };
+  /** Check for duplicate contact by normalized phone or email. Returns matching contact or null. */
+  const checkDuplicate = async (phone: string, email: string, excludeId?: string) => {
+    if (!user) return null;
+    const normPhone = normalizePhone(phone);
+    const normEmail = normalizeEmail(email);
+
+    if (!normPhone && !normEmail) return null;
+
+    // Build query for phone OR email match
+    let query = supabase.from('contacts').select('*');
+
+    if (normPhone && normEmail) {
+      query = query.or(`phone_normalized.eq.${normPhone},email_normalized.eq.${normEmail}`);
+    } else if (normPhone) {
+      query = query.eq('phone_normalized', normPhone);
+    } else if (normEmail) {
+      query = query.eq('email_normalized', normEmail);
+    }
+
+    const { data, error } = await query;
+    if (error || !data || data.length === 0) return null;
+
+    // Filter out current record if editing
+    const matches = excludeId ? data.filter((r: any) => r.id !== excludeId) : data;
+    if (matches.length === 0) return null;
+
+    const match = matches[0] as any;
+    const matchType = normPhone && match.phone_normalized === normPhone ? 'phone' : 'email';
+    const matchValue = matchType === 'phone' ? phone : email;
+
+    return { contact: match, matchType: matchType as 'phone' | 'email', matchValue };
+  };
+
+  return { contacts, loading, dbActive, addContact, updateContact, deleteContact, refetch: fetchContacts, checkDuplicate };
 }

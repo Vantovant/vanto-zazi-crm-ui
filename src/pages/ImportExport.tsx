@@ -26,6 +26,7 @@ import { useCrm } from '@/contexts/CrmContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { prospectColumns } from '@/data/mockData';
+import { normalizePhone, normalizeEmail, safeMerge } from '@/utils/contactNormalization';
 
 type ImportStep = 'upload' | 'ai-analyzing' | 'mapping' | 'preview' | 'complete';
 
@@ -155,7 +156,7 @@ export function ImportExport() {
   const [headerError, setHeaderError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
-  const [importResult, setImportResult] = useState<{ success: number; failed: number }>({ success: 0, failed: 0 });
+  const [importResult, setImportResult] = useState<{ success: number; failed: number; updated?: number }>({ success: 0, failed: 0, updated: 0 });
 
   // AI mapping state
   const [aiMappings, setAiMappings] = useState<AiMapping[]>([]);
@@ -265,7 +266,7 @@ export function ImportExport() {
     setColumnMapping({});
     setHeaderError(null);
     setImporting(false);
-    setImportResult({ success: 0, failed: 0 });
+    setImportResult({ success: 0, failed: 0, updated: 0 });
     setImportProgress(0);
     setAiMappings([]);
     setAiSummary('');
@@ -277,7 +278,8 @@ export function ImportExport() {
     if (!user) return;
     setImporting(true);
     setImportProgress(0);
-    let success = 0;
+    let inserted = 0;
+    let updated = 0;
     let failed = 0;
     const mappedFields = CRM_FIELDS.filter(f => columnMapping[f.key]);
 
@@ -292,37 +294,34 @@ export function ImportExport() {
       AdditionalNotes: 'additional_notes', GOStatus: 'go_status',
     };
 
-    // Helper: convert various date formats to YYYY-MM-DD
     const normalizeDate = (val: string): string => {
       if (!val) return '';
-      // Already ISO format YYYY-MM-DD
       if (/^\d{4}-\d{2}-\d{2}/.test(val)) return val.slice(0, 10);
-      // DD.MM.YYYY or DD/MM/YYYY
       const euMatch = val.match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})$/);
       if (euMatch) return `${euMatch[3]}-${euMatch[2].padStart(2, '0')}-${euMatch[1].padStart(2, '0')}`;
-      // MM/DD/YYYY
       const usMatch = val.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
       if (usMatch) return `${usMatch[3]}-${usMatch[1].padStart(2, '0')}-${usMatch[2].padStart(2, '0')}`;
-      // Try native parse as last resort
       const d = new Date(val);
       if (!Number.isNaN(d.getTime())) return d.toISOString().split('T')[0];
-      return ''; // unparseable — will use DB default
+      return '';
     };
 
-    const allRows: Record<string, unknown>[] = [];
-    for (const row of fileRows) {
+    // Detect expired member spreadsheets
+    const hasInactiveDate = fileHeaders.some(h => normalize(h).includes('makinginactive'));
+
+    for (let rowIdx = 0; rowIdx < fileRows.length; rowIdx++) {
+      const row = fileRows[rowIdx];
       const record: Record<string, string> = {};
       for (const field of mappedFields) {
         const csvHeader = columnMapping[field.key];
-        // Case-insensitive header lookup to handle AI returning slightly different casing
         const colIdx = fileHeaders.findIndex(h => h.trim().toLowerCase() === csvHeader.trim().toLowerCase());
         if (colIdx !== -1 && row[colIdx] != null) record[field.key] = String(row[colIdx]).trim();
       }
       const fullName = (record.FullName || '').trim();
-      if (!fullName) { failed++; continue; }
+      if (!fullName) { failed++; setImportProgress(rowIdx + 1); continue; }
       record.FullName = fullName;
 
-      // Parse composite "Contacts" column: "Country, email, phone"
+      // Parse composite "Contacts" column
       const contactsVal = (record.PhoneNumber || '').trim();
       if (contactsVal.includes(',') && contactsVal.includes('@')) {
         const parts = contactsVal.split(',').map(p => p.trim());
@@ -332,24 +331,20 @@ export function ImportExport() {
           else if (!record.Country || record.Country === 'South Africa') record.Country = part;
         }
       }
+
       const dbRow: Record<string, unknown> = { user_id: user.id };
       for (const [k, v] of Object.entries(record)) {
         if (fieldToCol[k]) dbRow[fieldToCol[k]] = v;
       }
 
-      // Normalize date fields to YYYY-MM-DD for PostgreSQL
-      // Always ensure date_captured is set (batch inserts need consistent columns)
       const rawDate = (dbRow.date_captured as string) || '';
-      const normalized = normalizeDate(rawDate);
-      dbRow.date_captured = normalized || new Date().toISOString().split('T')[0];
+      const normalizedDate = normalizeDate(rawDate);
+      dbRow.date_captured = normalizedDate || new Date().toISOString().split('T')[0];
 
-      // Detect expired member spreadsheets: if "Date of making inactive" header is present
-      const hasInactiveDate = fileHeaders.some(h => normalize(h).includes('makinginactive'));
       if (hasInactiveDate) {
         dbRow.lead_type = 'Expired';
         dbRow.registration_status = dbRow.registration_status || 'Activated';
       } else {
-        // Smart lead_type classification based on GO Status
         const goStatus = ((dbRow.go_status as string) || '').trim().toLowerCase();
         if (goStatus) {
           const rankedStatuses = ['promoter', 'diamond', 'builder', 'mentor', 'associate', 'vip'];
@@ -361,23 +356,62 @@ export function ImportExport() {
         }
       }
 
-      allRows.push(dbRow);
-    }
+      // UPSERT: Check for existing contact by normalized phone/email
+      const normPhone = normalizePhone(dbRow.phone_number as string);
+      const normEmail = normalizeEmail(dbRow.email_address as string);
 
-    const BATCH = 50;
-    for (let i = 0; i < allRows.length; i += BATCH) {
-      const batch = allRows.slice(i, i + BATCH);
-      const { data, error } = await supabase.from('contacts').insert(batch as any).select('id');
-      if (error) {
-        console.error('Import batch error:', error.message, 'Sample row:', JSON.stringify(batch[0]));
-        failed += batch.length;
+      let existingId: string | null = null;
+
+      if (normPhone) {
+        const { data } = await supabase.from('contacts')
+          .select('id')
+          .eq('phone_normalized', normPhone)
+          .limit(1);
+        if (data && data.length > 0) existingId = (data[0] as any).id;
       }
-      else { success += data.length; }
-      setImportProgress(Math.min(i + BATCH, allRows.length));
-      await new Promise(r => setTimeout(r, 50));
+
+      if (!existingId && normEmail) {
+        const { data } = await supabase.from('contacts')
+          .select('id')
+          .eq('email_normalized', normEmail)
+          .limit(1);
+        if (data && data.length > 0) existingId = (data[0] as any).id;
+      }
+
+      if (existingId) {
+        // UPDATE existing using safe merge
+        const { data: existingData } = await supabase.from('contacts').select('*').eq('id', existingId).single();
+        if (existingData) {
+          const merged = safeMerge(existingData as Record<string, unknown>, dbRow);
+          delete merged.user_id; // Don't update user_id
+          delete merged.id;
+          if (Object.keys(merged).length > 0) {
+            const { error } = await supabase.from('contacts').update(merged).eq('id', existingId);
+            if (error) { console.error('Import update error:', error.message); failed++; }
+            else { updated++; }
+          } else {
+            updated++; // No changes needed
+          }
+        } else {
+          failed++;
+        }
+      } else {
+        // INSERT new
+        const { error } = await supabase.from('contacts').insert(dbRow as any);
+        if (error) {
+          console.error('Import insert error:', error.message);
+          failed++;
+        } else {
+          inserted++;
+        }
+      }
+
+      setImportProgress(rowIdx + 1);
+      // Yield to UI every 10 rows
+      if (rowIdx % 10 === 0) await new Promise(r => setTimeout(r, 10));
     }
 
-    setImportResult({ success, failed });
+    setImportResult({ success: inserted, failed, updated });
     await refetchContacts();
     setImporting(false);
     setImportStep('complete');
@@ -856,14 +890,24 @@ export function ImportExport() {
                     <CheckCircle className="w-8 h-8 text-emerald-400" />
                   </div>
                   <h3 className="text-xl font-semibold text-white mb-2">Import Complete</h3>
-                  <p className="text-sm text-slate-400 mb-2">
-                    Successfully imported <span className="text-emerald-400 font-medium">{importResult.success}</span> contacts into your CRM.
-                  </p>
-                  {importResult.failed > 0 && (
-                    <p className="text-sm text-rose-400 mb-4">
-                      {importResult.failed} record{importResult.failed !== 1 ? 's' : ''} failed (missing Full Name or database error).
-                    </p>
-                  )}
+                  <div className="flex justify-center gap-6 mb-4">
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-emerald-400">{importResult.success}</p>
+                      <p className="text-xs text-slate-400">Inserted</p>
+                    </div>
+                    {(importResult.updated ?? 0) > 0 && (
+                      <div className="text-center">
+                        <p className="text-2xl font-bold text-amber-400">{importResult.updated}</p>
+                        <p className="text-xs text-slate-400">Updated</p>
+                      </div>
+                    )}
+                    {importResult.failed > 0 && (
+                      <div className="text-center">
+                        <p className="text-2xl font-bold text-rose-400">{importResult.failed}</p>
+                        <p className="text-xs text-slate-400">Failed</p>
+                      </div>
+                    )}
+                  </div>
                   {aiUsed && (
                     <p className="text-xs text-purple-400 mb-4 flex items-center justify-center gap-1">
                       <Sparkles className="w-3 h-3" />
