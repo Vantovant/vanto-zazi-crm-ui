@@ -65,14 +65,42 @@ export function SmartPasteOrdersModal({ onClose }: SmartPasteOrdersModalProps) {
         if (data) userApiKeys = data;
       } catch { /* use default */ }
 
-      const { data, error: fnError } = await supabase.functions.invoke('parse-backoffice-orders', {
-        body: {
-          pastedText,
-          contactName: selectedContactName,
-          contactId: selectedContactId,
-          userApiKeys,
-        },
-      });
+      // Use fetch directly with longer timeout to avoid supabase-js default timeout
+      const session = (await supabase.auth.getSession()).data.session;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120_000); // 2 min timeout
+
+      let data: any;
+      let fnError: any = null;
+      try {
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-backoffice-orders`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session?.access_token}`,
+              'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            },
+            body: JSON.stringify({
+              pastedText,
+              contactName: selectedContactName,
+              contactId: selectedContactId,
+              userApiKeys,
+            }),
+            signal: controller.signal,
+          }
+        );
+        clearTimeout(timeoutId);
+        data = await response.json();
+        if (!response.ok) fnError = { message: data.error || `HTTP ${response.status}` };
+      } catch (fetchErr: any) {
+        clearTimeout(timeoutId);
+        if (fetchErr.name === 'AbortError') {
+          throw new Error('Request timed out. Try pasting less data or check your connection.');
+        }
+        throw fetchErr;
+      }
 
       if (fnError) throw new Error(fnError.message);
       if (data?.error) throw new Error(data.error);
