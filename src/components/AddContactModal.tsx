@@ -67,6 +67,7 @@ export function AddContactModal({ onClose }: AddContactModalProps) {
       City: 'city', Province: 'province', Country: 'country',
       LeadTemperature: 'lead_temperature', LeadType: 'lead_type',
       FocusArea: 'focus_area', AdditionalNotes: 'additional_notes', GOStatus: 'go_status',
+      SalutationTitle: 'salutation_title',
     };
 
     const incoming: Record<string, unknown> = {};

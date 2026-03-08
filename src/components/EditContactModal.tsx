@@ -75,7 +75,7 @@ export function EditContactModal({ prospect, onClose, onSaved }: EditContactModa
       LeadTemperature: 'lead_temperature', LeadType: 'lead_type',
       RegistrationStatus: 'registration_status', FocusArea: 'focus_area',
       NextAction: 'next_action', AdditionalNotes: 'additional_notes',
-      GOStatus: 'go_status', SponsorName: 'sponsor_name',
+      GOStatus: 'go_status', SponsorName: 'sponsor_name', SalutationTitle: 'salutation_title',
     };
 
     const incoming: Record<string, unknown> = {};
