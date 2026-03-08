@@ -181,6 +181,9 @@ export function ContactDrawer({ prospect: initialProspect, onClose, onOpenTempla
                   {initials}
                 </div>
                 <h3 className="text-xl font-semibold text-white">{prospect.FullName}</h3>
+                {prospect.SalutationTitle && prospect.SalutationTitle !== 'None' && (
+                  <span className="text-xs font-medium text-teal-400 mt-0.5">{prospect.SalutationTitle}</span>
+                )}
                 <p className="text-sm text-slate-400 mt-1">{prospect.City}, {prospect.Province}</p>
 
                 <div className="flex flex-wrap justify-center gap-2 mt-4">

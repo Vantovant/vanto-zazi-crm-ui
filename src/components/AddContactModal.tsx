@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useCrm } from '@/contexts/CrmContext';
 import { DuplicateWarningModal } from './DuplicateWarningModal';
 import { safeMerge } from '@/utils/contactNormalization';
+import { SALUTATION_OPTIONS } from '@/utils/templateMerge';
 
 interface AddContactModalProps {
   onClose: () => void;
@@ -28,6 +29,7 @@ export function AddContactModal({ onClose }: AddContactModalProps) {
     FocusArea: 'Health Transformation' as const,
     AdditionalNotes: '',
     GOStatus: '',
+    SalutationTitle: 'Leader',
   });
 
   const update = (key: string, value: string) => setForm(prev => ({ ...prev, [key]: value }));
@@ -65,6 +67,7 @@ export function AddContactModal({ onClose }: AddContactModalProps) {
       City: 'city', Province: 'province', Country: 'country',
       LeadTemperature: 'lead_temperature', LeadType: 'lead_type',
       FocusArea: 'focus_area', AdditionalNotes: 'additional_notes', GOStatus: 'go_status',
+      SalutationTitle: 'salutation_title',
     };
 
     const incoming: Record<string, unknown> = {};
@@ -170,6 +173,15 @@ export function AddContactModal({ onClose }: AddContactModalProps) {
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-1.5">GO Status</label>
               <input type="text" value={form.GOStatus} onChange={e => update('GOStatus', e.target.value)} placeholder="e.g. No Status, Promoter, Associate" className="w-full px-4 py-2.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500 placeholder:text-slate-500" />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">Title / Salutation</label>
+                <select value={form.SalutationTitle} onChange={e => update('SalutationTitle', e.target.value)} className="w-full px-3 py-2.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500">
+                  {SALUTATION_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+              </div>
             </div>
 
             <div>

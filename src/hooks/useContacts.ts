@@ -33,6 +33,7 @@ interface ContactRow {
   associate_status: string;
   additional_notes: string;
   go_status: string;
+  salutation_title: string;
 }
 
 function rowToProspect(row: ContactRow): Prospect {
@@ -62,6 +63,7 @@ function rowToProspect(row: ContactRow): Prospect {
     AssociateStatus: row.associate_status,
     AdditionalNotes: row.additional_notes,
     GOStatus: row.go_status,
+    SalutationTitle: row.salutation_title,
   };
 }
 
@@ -92,6 +94,7 @@ function prospectToInsert(p: Omit<Prospect, 'id'>, userId: string) {
     associate_status: p.AssociateStatus || '',
     additional_notes: p.AdditionalNotes || '',
     go_status: p.GOStatus || '',
+    salutation_title: (p as any).SalutationTitle || 'Leader',
   };
 }
 
@@ -168,6 +171,7 @@ export function useContacts() {
     if (updates.AdditionalNotes !== undefined) dbUpdates.additional_notes = updates.AdditionalNotes;
     if (updates.DateCaptured !== undefined) dbUpdates.date_captured = updates.DateCaptured;
     if (updates.GOStatus !== undefined) dbUpdates.go_status = updates.GOStatus;
+    if ((updates as any).SalutationTitle !== undefined) dbUpdates.salutation_title = (updates as any).SalutationTitle;
 
     const { error } = await supabase.from('contacts').update(dbUpdates).eq('id', id);
     if (error) {

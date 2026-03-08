@@ -4,6 +4,7 @@ import { useCrm } from '@/contexts/CrmContext';
 import type { Prospect } from '@/data/mockData';
 import { DuplicateWarningModal } from './DuplicateWarningModal';
 import { safeMerge } from '@/utils/contactNormalization';
+import { SALUTATION_OPTIONS } from '@/utils/templateMerge';
 
 interface EditContactModalProps {
   prospect: Prospect;
@@ -33,6 +34,7 @@ export function EditContactModal({ prospect, onClose, onSaved }: EditContactModa
     AdditionalNotes: prospect.AdditionalNotes || '',
     GOStatus: prospect.GOStatus || '',
     SponsorName: prospect.SponsorName || '',
+    SalutationTitle: prospect.SalutationTitle || 'Leader',
   });
 
   const update = (key: string, value: string) => setForm(prev => ({ ...prev, [key]: value }));
@@ -73,7 +75,7 @@ export function EditContactModal({ prospect, onClose, onSaved }: EditContactModa
       LeadTemperature: 'lead_temperature', LeadType: 'lead_type',
       RegistrationStatus: 'registration_status', FocusArea: 'focus_area',
       NextAction: 'next_action', AdditionalNotes: 'additional_notes',
-      GOStatus: 'go_status', SponsorName: 'sponsor_name',
+      GOStatus: 'go_status', SponsorName: 'sponsor_name', SalutationTitle: 'salutation_title',
     };
 
     const incoming: Record<string, unknown> = {};
@@ -205,6 +207,15 @@ export function EditContactModal({ prospect, onClose, onSaved }: EditContactModa
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-1.5">Sponsor</label>
                 <input type="text" value={form.SponsorName} onChange={e => update('SponsorName', e.target.value)} placeholder="Sponsor name" className="w-full px-4 py-2.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500 placeholder:text-slate-500" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">Title / Salutation</label>
+                <select value={form.SalutationTitle} onChange={e => update('SalutationTitle', e.target.value)} className="w-full px-3 py-2.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500">
+                  {SALUTATION_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
               </div>
             </div>
 

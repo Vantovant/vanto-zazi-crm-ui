@@ -169,6 +169,7 @@ export type Database = {
           phone_number: string
           province: string
           registration_status: string
+          salutation_title: string
           sponsor_name: string
           state: string
           updated_at: string
@@ -201,6 +202,7 @@ export type Database = {
           phone_number?: string
           province?: string
           registration_status?: string
+          salutation_title?: string
           sponsor_name?: string
           state?: string
           updated_at?: string
@@ -233,6 +235,7 @@ export type Database = {
           phone_number?: string
           province?: string
           registration_status?: string
+          salutation_title?: string
           sponsor_name?: string
           state?: string
           updated_at?: string
