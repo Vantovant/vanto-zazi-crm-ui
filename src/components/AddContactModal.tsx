@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useCrm } from '@/contexts/CrmContext';
 import { DuplicateWarningModal } from './DuplicateWarningModal';
 import { safeMerge } from '@/utils/contactNormalization';
+import { SALUTATION_OPTIONS } from '@/utils/templateMerge';
 
 interface AddContactModalProps {
   onClose: () => void;
