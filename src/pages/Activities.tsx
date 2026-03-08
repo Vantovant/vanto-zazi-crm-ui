@@ -56,6 +56,7 @@ function formatTimeAgo(dateStr: string) {
 export function Activities() {
   const [showLogActivity, setShowLogActivity] = useState(false);
   const [drawerContactId, setDrawerContactId] = useState<string | null>(null);
+  const [templatePicker, setTemplatePicker] = useState<{ contact: Prospect; channel: 'whatsapp' | 'email' } | null>(null);
   const { contacts } = useCrm();
   const { activities, loading, getNeglectedContacts } = useContactActivities();
   const [aiInsight, setAiInsight] = useState('');
