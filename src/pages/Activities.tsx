@@ -227,9 +227,9 @@ export function Activities() {
                 <p className="text-sm text-slate-400">All contacts are up to date!</p>
               </div>
             ) : neglectedContacts.map((item) => (
-              <div key={item.contact_id} className="px-5 py-3 hover:bg-slate-700/30 transition-colors cursor-pointer" onClick={() => setDrawerContactId(item.contact_id)}>
+              <div key={item.contact_id} className="px-5 py-3 hover:bg-slate-700/30 transition-colors">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 cursor-pointer" onClick={() => setDrawerContactId(item.contact_id)}>
                     <p className="text-sm font-medium text-white">{item.contact?.FullName}</p>
                     {item.contact?.AssignedTo === 'Manager_Leg_1' && (
                       <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-400">L1</span>
@@ -238,7 +238,21 @@ export function Activities() {
                       <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-500/20 text-slate-400">L2</span>
                     )}
                   </div>
-                  <span className="text-xs font-medium text-amber-400">{item.daysSince}d ago</span>
+                  <div className="flex items-center gap-1.5">
+                    {item.contact && (
+                      <>
+                        <button type="button" onClick={() => item.contact && setTemplatePicker({ contact: item.contact, channel: 'whatsapp' })}
+                          className="p-1 rounded text-green-400 hover:bg-green-500/20 transition-colors" title="Send WhatsApp">
+                          <MessageCircle className="w-3.5 h-3.5" />
+                        </button>
+                        <button type="button" onClick={() => item.contact && setTemplatePicker({ contact: item.contact, channel: 'email' })}
+                          className="p-1 rounded text-violet-400 hover:bg-violet-500/20 transition-colors" title="Send Email">
+                          <Mail className="w-3.5 h-3.5" />
+                        </button>
+                      </>
+                    )}
+                    <span className="text-xs font-medium text-amber-400 ml-1">{item.daysSince}d ago</span>
+                  </div>
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5">
                   {item.contact?.LeadTemperature} · {item.contact?.LeadType}
