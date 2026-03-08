@@ -386,8 +386,19 @@ export function Activities() {
 
       {drawerContactId && (() => {
         const c = contacts.find(ct => String(ct.id) === drawerContactId);
-        return c ? <ContactDrawer prospect={c} onClose={() => setDrawerContactId(null)} /> : null;
+        return c ? <ContactDrawer prospect={c} onClose={() => setDrawerContactId(null)} onOpenTemplatePicker={(channel) => {
+          if (c) setTemplatePicker({ contact: c, channel });
+          setDrawerContactId(null);
+        }} /> : null;
       })()}
+
+      {templatePicker && (
+        <MessageTemplatePicker
+          contact={templatePicker.contact}
+          channel={templatePicker.channel}
+          onClose={() => setTemplatePicker(null)}
+        />
+      )}
     </div>
   );
 }
