@@ -4,6 +4,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { Layout } from './components/Layout';
 import { Auth } from './pages/Auth';
 import { ResetPassword } from './pages/ResetPassword';
+import { EnvStatusBanner } from './components/EnvStatusBanner';
 import { Dashboard } from './pages/Dashboard';
 import { Contacts } from './pages/Contacts';
 import { Orders } from './pages/Orders';
