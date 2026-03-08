@@ -276,15 +276,27 @@ export function Activities() {
                 <p className="text-sm text-slate-400">All contacts have been reached!</p>
               </div>
             ) : neverContactedList.map((contact) => (
-              <div key={contact.id} className="px-5 py-3 hover:bg-slate-700/30 transition-colors cursor-pointer" onClick={() => setDrawerContactId(String(contact.id))}>
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium text-white">{contact.FullName}</p>
-                  {contact.AssignedTo === 'Manager_Leg_1' && (
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-400">L1</span>
-                  )}
-                  {contact.AssignedTo === 'Manager_Leg_2' && (
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-500/20 text-slate-400">L2</span>
-                  )}
+              <div key={contact.id} className="px-5 py-3 hover:bg-slate-700/30 transition-colors">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 cursor-pointer" onClick={() => setDrawerContactId(String(contact.id))}>
+                    <p className="text-sm font-medium text-white">{contact.FullName}</p>
+                    {contact.AssignedTo === 'Manager_Leg_1' && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-400">L1</span>
+                    )}
+                    {contact.AssignedTo === 'Manager_Leg_2' && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-500/20 text-slate-400">L2</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button type="button" onClick={() => setTemplatePicker({ contact, channel: 'whatsapp' })}
+                      className="p-1 rounded text-green-400 hover:bg-green-500/20 transition-colors" title="Send WhatsApp">
+                      <MessageCircle className="w-3.5 h-3.5" />
+                    </button>
+                    <button type="button" onClick={() => setTemplatePicker({ contact, channel: 'email' })}
+                      className="p-1 rounded text-violet-400 hover:bg-violet-500/20 transition-colors" title="Send Email">
+                      <Mail className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5">
                   {contact.LeadTemperature} · {contact.NextAction || 'No action set'}
