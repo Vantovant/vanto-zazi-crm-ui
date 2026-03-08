@@ -210,6 +210,15 @@ export function EditContactModal({ prospect, onClose, onSaved }: EditContactModa
               </div>
             </div>
 
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">Title / Salutation</label>
+                <select value={form.SalutationTitle} onChange={e => update('SalutationTitle', e.target.value)} className="w-full px-3 py-2.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500">
+                  {SALUTATION_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+              </div>
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-1.5">Next Action</label>
               <input type="text" value={form.NextAction} onChange={e => update('NextAction', e.target.value)} placeholder="What's the next step?" className="w-full px-4 py-2.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500 placeholder:text-slate-500" />
