@@ -94,6 +94,7 @@ function prospectToInsert(p: Omit<Prospect, 'id'>, userId: string) {
     associate_status: p.AssociateStatus || '',
     additional_notes: p.AdditionalNotes || '',
     go_status: p.GOStatus || '',
+    salutation_title: (p as any).SalutationTitle || 'Leader',
   };
 }
 

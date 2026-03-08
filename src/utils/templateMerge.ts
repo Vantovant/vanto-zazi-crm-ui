@@ -1,5 +1,9 @@
 import type { Prospect } from '@/data/mockData';
 
+export const SALUTATION_OPTIONS = [
+  'Leader', 'Mr', 'Mrs', 'Ms', 'Dr', 'Pastor', 'Coach', 'Boss', 'Brother', 'Sister', 'None',
+] as const;
+
 export interface MergeContext {
   contact: Prospect;
   senderName?: string;
@@ -18,9 +22,16 @@ function cleanEscapes(text: string): string {
   return text.replace(/\\n/g, '\n');
 }
 
+/** Build a greeting-ready name from the contact, e.g. "Leader Dimpho" */
+export function generateGreeting(contact: Prospect): string {
+  const rawFirst = contact.FullName.split(' ')[0];
+  const title = contact.SalutationTitle || 'Leader';
+  if (title === 'None') return rawFirst;
+  return `${title} ${rawFirst}`;
+}
+
 export function mergeTemplate(body: string, ctx: MergeContext): string {
-  const rawFirst = ctx.contact.FullName.split(' ')[0];
-  const firstName = `Leader ${rawFirst}`;
+  const firstName = generateGreeting(ctx.contact);
   const map: Record<string, string> = {
     firstName,
     senderName: ctx.senderName || 'Your Team Leader',

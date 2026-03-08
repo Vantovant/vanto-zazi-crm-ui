@@ -92,6 +92,7 @@ export interface Prospect {
   AssociateStatus: string;
   AdditionalNotes: string;
   GOStatus: string;
+  SalutationTitle?: string;
 }
 
 export const prospects: Prospect[] = [
