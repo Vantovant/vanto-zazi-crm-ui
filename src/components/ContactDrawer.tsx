@@ -52,7 +52,7 @@ const regStatusColors: Record<string, string> = {
   Activated: 'bg-emerald-500/20 text-emerald-400',
 };
 
-export function ContactDrawer({ prospect: initialProspect, onClose }: ContactDrawerProps) {
+export function ContactDrawer({ prospect: initialProspect, onClose, onOpenTemplatePicker }: ContactDrawerProps) {
   const { contacts, updateContact } = useCrm();
   const { logActivity, getContactActivities } = useContactActivities();
   const [showEdit, setShowEdit] = useState(false);
