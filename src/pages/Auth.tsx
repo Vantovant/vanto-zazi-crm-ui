@@ -3,6 +3,7 @@ import logo from '@/assets/logo.jpg';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { env } from '@/lib/env';
 import { Mail, Lock, User, Loader2, ShieldX, ShieldCheck, Ticket } from 'lucide-react';
 
 export function Auth() {
@@ -94,6 +95,10 @@ function AuthForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!env.hasBackend) {
+      setError('Backend is not configured for this deployment. Please contact the administrator.');
+      return;
+    }
     setError('');
     setMessage('');
     setSubmitting(true);
