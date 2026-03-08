@@ -30,6 +30,7 @@ import { useContactActivities } from '@/hooks/useContactActivities';
 interface ContactDrawerProps {
   prospect: Prospect;
   onClose: () => void;
+  onOpenTemplatePicker?: (channel: 'whatsapp' | 'email') => void;
 }
 
 const temperatureColors: Record<string, string> = {
