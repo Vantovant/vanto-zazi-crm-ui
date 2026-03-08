@@ -63,6 +63,7 @@ function rowToProspect(row: ContactRow): Prospect {
     AssociateStatus: row.associate_status,
     AdditionalNotes: row.additional_notes,
     GOStatus: row.go_status,
+    SalutationTitle: row.salutation_title,
   };
 }
 
