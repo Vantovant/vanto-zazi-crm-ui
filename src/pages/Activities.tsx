@@ -11,13 +11,17 @@ import {
   Sparkles,
   Loader2,
   UserX,
+  Zap,
+  Mail,
 } from 'lucide-react';
 import { LogActivityModal } from '../components/LogActivityModal';
 import { ContactDrawer } from '../components/ContactDrawer';
+import { MessageTemplatePicker } from '../components/MessageTemplatePicker';
 import { useCrm } from '@/contexts/CrmContext';
 import { useContactActivities } from '@/hooks/useContactActivities';
 import { supabase } from '@/integrations/supabase/client';
 import ReactMarkdown from 'react-markdown';
+import type { Prospect } from '@/data/mockData';
 
 const activityTypeIcons: Record<string, typeof MessageCircle> = {
   whatsapp: MessageCircle,
