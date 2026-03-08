@@ -13,8 +13,14 @@ export interface MergeContext {
   expiryDate?: string;
 }
 
+/** Normalise literal escape sequences (\n, \\n) into real line breaks */
+function cleanEscapes(text: string): string {
+  return text.replace(/\\n/g, '\n');
+}
+
 export function mergeTemplate(body: string, ctx: MergeContext): string {
-  const firstName = ctx.contact.FullName.split(' ')[0];
+  const rawFirst = ctx.contact.FullName.split(' ')[0];
+  const firstName = `Leader ${rawFirst}`;
   const map: Record<string, string> = {
     firstName,
     senderName: ctx.senderName || 'Your Team Leader',
@@ -27,7 +33,8 @@ export function mergeTemplate(body: string, ctx: MergeContext): string {
     pvNeeded: ctx.pvNeeded || '[PV Amount]',
     expiryDate: ctx.expiryDate || '[Expiry Date]',
   };
-  return body.replace(/\{\{(\w+)\}\}/g, (_, key) => map[key] || `[${key}]`);
+  const merged = body.replace(/\{\{(\w+)\}\}/g, (_, key) => map[key] || `[${key}]`);
+  return cleanEscapes(merged);
 }
 
 export function mergeSubject(subject: string, ctx: MergeContext): string {
