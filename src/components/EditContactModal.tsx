@@ -4,6 +4,7 @@ import { useCrm } from '@/contexts/CrmContext';
 import type { Prospect } from '@/data/mockData';
 import { DuplicateWarningModal } from './DuplicateWarningModal';
 import { safeMerge } from '@/utils/contactNormalization';
+import { SALUTATION_OPTIONS } from '@/utils/templateMerge';
 
 interface EditContactModalProps {
   prospect: Prospect;
