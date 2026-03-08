@@ -29,6 +29,7 @@ export function AddContactModal({ onClose }: AddContactModalProps) {
     FocusArea: 'Health Transformation' as const,
     AdditionalNotes: '',
     GOStatus: '',
+    SalutationTitle: 'Leader',
   });
 
   const update = (key: string, value: string) => setForm(prev => ({ ...prev, [key]: value }));
