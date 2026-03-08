@@ -33,6 +33,7 @@ interface ContactRow {
   associate_status: string;
   additional_notes: string;
   go_status: string;
+  salutation_title: string;
 }
 
 function rowToProspect(row: ContactRow): Prospect {
