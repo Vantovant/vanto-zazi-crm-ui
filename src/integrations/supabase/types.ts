@@ -303,6 +303,51 @@ export type Database = {
         }
         Relationships: []
       }
+      message_templates: {
+        Row: {
+          active: boolean
+          body: string
+          category: string
+          channel: string
+          created_at: string
+          id: string
+          merge_fields_supported: string[]
+          send_when_condition: string
+          sort_order: number
+          subject: string | null
+          template_name: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          body?: string
+          category?: string
+          channel?: string
+          created_at?: string
+          id?: string
+          merge_fields_supported?: string[]
+          send_when_condition?: string
+          sort_order?: number
+          subject?: string | null
+          template_name?: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          body?: string
+          category?: string
+          channel?: string
+          created_at?: string
+          id?: string
+          merge_fields_supported?: string[]
+          send_when_condition?: string
+          sort_order?: number
+          subject?: string | null
+          template_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       orders: {
         Row: {
           amount: number

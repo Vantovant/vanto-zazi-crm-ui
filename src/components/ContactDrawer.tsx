@@ -30,6 +30,7 @@ import { useContactActivities } from '@/hooks/useContactActivities';
 interface ContactDrawerProps {
   prospect: Prospect;
   onClose: () => void;
+  onOpenTemplatePicker?: (channel: 'whatsapp' | 'email') => void;
 }
 
 const temperatureColors: Record<string, string> = {
@@ -51,7 +52,7 @@ const regStatusColors: Record<string, string> = {
   Activated: 'bg-emerald-500/20 text-emerald-400',
 };
 
-export function ContactDrawer({ prospect: initialProspect, onClose }: ContactDrawerProps) {
+export function ContactDrawer({ prospect: initialProspect, onClose, onOpenTemplatePicker }: ContactDrawerProps) {
   const { contacts, updateContact } = useCrm();
   const { logActivity, getContactActivities } = useContactActivities();
   const [showEdit, setShowEdit] = useState(false);
@@ -204,8 +205,8 @@ export function ContactDrawer({ prospect: initialProspect, onClose }: ContactDra
             </div>
 
             {/* Quick Actions */}
-            <div className="p-4 border-b border-slate-700/50">
-              <div className="grid grid-cols-3 gap-2">
+            <div className="px-4 border-b border-slate-700/50">
+              <div className="grid grid-cols-3 gap-2 pb-3">
                 <button type="button" onClick={() => handleWhatsApp()} className="flex flex-col items-center gap-1.5 p-3 rounded-lg bg-green-500/10 hover:bg-green-500/20 text-green-400 transition-colors">
                   <MessageCircle className="w-5 h-5" />
                   <span className="text-xs font-medium">WhatsApp</span>
@@ -237,6 +238,20 @@ export function ContactDrawer({ prospect: initialProspect, onClose }: ContactDra
                   <span className="text-xs font-medium">Email</span>
                 </button>
               </div>
+              {onOpenTemplatePicker && (
+                <div className="grid grid-cols-2 gap-2 pb-4">
+                  <button type="button" onClick={() => onOpenTemplatePicker('whatsapp')}
+                    className="flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-green-500/5 border border-green-500/20 hover:bg-green-500/15 text-green-400 transition-colors text-xs font-medium">
+                    <MessageCircle className="w-3.5 h-3.5" />
+                    WhatsApp Template
+                  </button>
+                  <button type="button" onClick={() => onOpenTemplatePicker('email')}
+                    className="flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-violet-500/5 border border-violet-500/20 hover:bg-violet-500/15 text-violet-400 transition-colors text-xs font-medium">
+                    <Mail className="w-3.5 h-3.5" />
+                    Email Template
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Contact Information */}

@@ -11,13 +11,17 @@ import {
   Sparkles,
   Loader2,
   UserX,
+  Zap,
+  Mail,
 } from 'lucide-react';
 import { LogActivityModal } from '../components/LogActivityModal';
 import { ContactDrawer } from '../components/ContactDrawer';
+import { MessageTemplatePicker } from '../components/MessageTemplatePicker';
 import { useCrm } from '@/contexts/CrmContext';
 import { useContactActivities } from '@/hooks/useContactActivities';
 import { supabase } from '@/integrations/supabase/client';
 import ReactMarkdown from 'react-markdown';
+import type { Prospect } from '@/data/mockData';
 
 const activityTypeIcons: Record<string, typeof MessageCircle> = {
   whatsapp: MessageCircle,
@@ -52,6 +56,7 @@ function formatTimeAgo(dateStr: string) {
 export function Activities() {
   const [showLogActivity, setShowLogActivity] = useState(false);
   const [drawerContactId, setDrawerContactId] = useState<string | null>(null);
+  const [templatePicker, setTemplatePicker] = useState<{ contact: Prospect; channel: 'whatsapp' | 'email' } | null>(null);
   const { contacts } = useCrm();
   const { activities, loading, getNeglectedContacts } = useContactActivities();
   const [aiInsight, setAiInsight] = useState('');
@@ -151,7 +156,22 @@ export function Activities() {
             {activities.length} activities logged · {neglectedContacts.length} contacts need attention
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => {
+              // Open template picker for highest-priority neglected contact
+              const topNeglected = neglectedContacts[0]?.contact || neverContactedList[0];
+              if (topNeglected) {
+                setTemplatePicker({ contact: topNeglected, channel: 'whatsapp' });
+              }
+            }}
+            disabled={neglectedContacts.length === 0 && neverContactedList.length === 0}
+            className="flex items-center gap-2 px-4 py-2.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            <Zap className="w-4 h-4" />
+            Suggested Outreach
+          </button>
           <button
             type="button"
             onClick={handleAIAnalysis}
@@ -207,9 +227,9 @@ export function Activities() {
                 <p className="text-sm text-slate-400">All contacts are up to date!</p>
               </div>
             ) : neglectedContacts.map((item) => (
-              <div key={item.contact_id} className="px-5 py-3 hover:bg-slate-700/30 transition-colors cursor-pointer" onClick={() => setDrawerContactId(item.contact_id)}>
+              <div key={item.contact_id} className="px-5 py-3 hover:bg-slate-700/30 transition-colors">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 cursor-pointer" onClick={() => setDrawerContactId(item.contact_id)}>
                     <p className="text-sm font-medium text-white">{item.contact?.FullName}</p>
                     {item.contact?.AssignedTo === 'Manager_Leg_1' && (
                       <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-400">L1</span>
@@ -218,7 +238,21 @@ export function Activities() {
                       <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-500/20 text-slate-400">L2</span>
                     )}
                   </div>
-                  <span className="text-xs font-medium text-amber-400">{item.daysSince}d ago</span>
+                  <div className="flex items-center gap-1.5">
+                    {item.contact && (
+                      <>
+                        <button type="button" onClick={() => item.contact && setTemplatePicker({ contact: item.contact, channel: 'whatsapp' })}
+                          className="p-1 rounded text-green-400 hover:bg-green-500/20 transition-colors" title="Send WhatsApp">
+                          <MessageCircle className="w-3.5 h-3.5" />
+                        </button>
+                        <button type="button" onClick={() => item.contact && setTemplatePicker({ contact: item.contact, channel: 'email' })}
+                          className="p-1 rounded text-violet-400 hover:bg-violet-500/20 transition-colors" title="Send Email">
+                          <Mail className="w-3.5 h-3.5" />
+                        </button>
+                      </>
+                    )}
+                    <span className="text-xs font-medium text-amber-400 ml-1">{item.daysSince}d ago</span>
+                  </div>
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5">
                   {item.contact?.LeadTemperature} · {item.contact?.LeadType}
@@ -242,15 +276,27 @@ export function Activities() {
                 <p className="text-sm text-slate-400">All contacts have been reached!</p>
               </div>
             ) : neverContactedList.map((contact) => (
-              <div key={contact.id} className="px-5 py-3 hover:bg-slate-700/30 transition-colors cursor-pointer" onClick={() => setDrawerContactId(String(contact.id))}>
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium text-white">{contact.FullName}</p>
-                  {contact.AssignedTo === 'Manager_Leg_1' && (
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-400">L1</span>
-                  )}
-                  {contact.AssignedTo === 'Manager_Leg_2' && (
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-500/20 text-slate-400">L2</span>
-                  )}
+              <div key={contact.id} className="px-5 py-3 hover:bg-slate-700/30 transition-colors">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 cursor-pointer" onClick={() => setDrawerContactId(String(contact.id))}>
+                    <p className="text-sm font-medium text-white">{contact.FullName}</p>
+                    {contact.AssignedTo === 'Manager_Leg_1' && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-400">L1</span>
+                    )}
+                    {contact.AssignedTo === 'Manager_Leg_2' && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-500/20 text-slate-400">L2</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button type="button" onClick={() => setTemplatePicker({ contact, channel: 'whatsapp' })}
+                      className="p-1 rounded text-green-400 hover:bg-green-500/20 transition-colors" title="Send WhatsApp">
+                      <MessageCircle className="w-3.5 h-3.5" />
+                    </button>
+                    <button type="button" onClick={() => setTemplatePicker({ contact, channel: 'email' })}
+                      className="p-1 rounded text-violet-400 hover:bg-violet-500/20 transition-colors" title="Send Email">
+                      <Mail className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5">
                   {contact.LeadTemperature} · {contact.NextAction || 'No action set'}
@@ -340,8 +386,19 @@ export function Activities() {
 
       {drawerContactId && (() => {
         const c = contacts.find(ct => String(ct.id) === drawerContactId);
-        return c ? <ContactDrawer prospect={c} onClose={() => setDrawerContactId(null)} /> : null;
+        return c ? <ContactDrawer prospect={c} onClose={() => setDrawerContactId(null)} onOpenTemplatePicker={(channel) => {
+          if (c) setTemplatePicker({ contact: c, channel });
+          setDrawerContactId(null);
+        }} /> : null;
       })()}
+
+      {templatePicker && (
+        <MessageTemplatePicker
+          contact={templatePicker.contact}
+          channel={templatePicker.channel}
+          onClose={() => setTemplatePicker(null)}
+        />
+      )}
     </div>
   );
 }
