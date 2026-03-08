@@ -171,6 +171,7 @@ export function useContacts() {
     if (updates.AdditionalNotes !== undefined) dbUpdates.additional_notes = updates.AdditionalNotes;
     if (updates.DateCaptured !== undefined) dbUpdates.date_captured = updates.DateCaptured;
     if (updates.GOStatus !== undefined) dbUpdates.go_status = updates.GOStatus;
+    if ((updates as any).SalutationTitle !== undefined) dbUpdates.salutation_title = (updates as any).SalutationTitle;
 
     const { error } = await supabase.from('contacts').update(dbUpdates).eq('id', id);
     if (error) {
