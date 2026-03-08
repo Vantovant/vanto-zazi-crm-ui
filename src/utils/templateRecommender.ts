@@ -65,7 +65,7 @@ export function recommendTemplate(
   }
 
   // 7. Active team member → Appreciation
-  if (contact.CommunicationStatus === 'Completed' || contact.CommunicationStatus === 'Active') {
+  if (contact.CommunicationStatus === 'Completed' || (contact.CommunicationStatus as string) === 'Active') {
     const t = find('Appreciation');
     if (t) return { template: t, reason: `${contact.FullName} is an active member. Recognition and appreciation boost retention.`, confidence: 'Medium' };
   }
