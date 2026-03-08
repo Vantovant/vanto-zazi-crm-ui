@@ -1,0 +1,1 @@
+ALTER TABLE public.contacts ADD COLUMN salutation_title text NOT NULL DEFAULT 'Leader';
