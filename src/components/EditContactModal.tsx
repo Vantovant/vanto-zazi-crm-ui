@@ -34,6 +34,7 @@ export function EditContactModal({ prospect, onClose, onSaved }: EditContactModa
     AdditionalNotes: prospect.AdditionalNotes || '',
     GOStatus: prospect.GOStatus || '',
     SponsorName: prospect.SponsorName || '',
+    SalutationTitle: prospect.SalutationTitle || 'Leader',
   });
 
   const update = (key: string, value: string) => setForm(prev => ({ ...prev, [key]: value }));
