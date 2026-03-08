@@ -95,6 +95,10 @@ function AuthForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!env.hasBackend) {
+      setError('Backend is not configured for this deployment. Please contact the administrator.');
+      return;
+    }
     setError('');
     setMessage('');
     setSubmitting(true);
