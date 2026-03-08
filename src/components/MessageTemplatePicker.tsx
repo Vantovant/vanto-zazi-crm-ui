@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import {
   X, MessageCircle, Mail, Sparkles, ChevronRight, Copy, ExternalLink,
-  Check, Clock, Loader2, Send, BookOpen, Zap, ChevronDown, ChevronUp,
+  Check, Clock, Loader2, Send, BookOpen, Zap, ChevronDown, ChevronUp, PenLine,
 } from 'lucide-react';
 import type { Prospect } from '@/data/mockData';
 import type { MessageTemplate } from '@/hooks/useMessageTemplates';
@@ -23,15 +23,19 @@ const confidenceColors = {
   Low: 'bg-slate-500/20 text-slate-400 border-slate-500/40',
 };
 
+type PickerStep = 'choose' | 'preview' | 'custom';
+
 export function MessageTemplatePicker({ contact, channel, onClose }: MessageTemplatePickerProps) {
   const { templates, loading: templatesLoading } = useMessageTemplates();
   const { logActivity, daysSinceLastActivity, getContactActivities } = useContactActivities();
   const { updateContact } = useCrm();
 
-  const [step, setStep] = useState<'choose' | 'preview'>('choose');
+  const [step, setStep] = useState<PickerStep>('choose');
   const [selectedTemplate, setSelectedTemplate] = useState<MessageTemplate | null>(null);
   const [editedBody, setEditedBody] = useState('');
   const [editedSubject, setEditedSubject] = useState('');
+  const [customRawBody, setCustomRawBody] = useState('');
+  const [customRawSubject, setCustomRawSubject] = useState('');
   const [nextAction, setNextAction] = useState('');
   const [copied, setCopied] = useState(false);
   const [logSuccess, setLogSuccess] = useState(false);
@@ -61,6 +65,27 @@ export function MessageTemplatePicker({ contact, channel, onClose }: MessageTemp
     setStep('preview');
   }, [mergeCtx, channel]);
 
+  /* ---------- Custom message helpers ---------- */
+  const personalizeCustom = useCallback((raw: string) => {
+    return mergeTemplate(raw, mergeCtx);
+  }, [mergeCtx]);
+
+  const handleEnterCustomMode = useCallback(() => {
+    setSelectedTemplate(null);
+    setCustomRawBody('');
+    setCustomRawSubject('');
+    setEditedBody('');
+    setEditedSubject('');
+    setStep('custom');
+  }, []);
+
+  const handleCustomPreview = useCallback(() => {
+    setEditedBody(personalizeCustom(customRawBody));
+    if (channel === 'email') setEditedSubject(personalizeCustom(customRawSubject));
+    setStep('preview');
+  }, [customRawBody, customRawSubject, channel, personalizeCustom]);
+
+  /* ---------- Send helpers ---------- */
   const handleCopy = useCallback(() => {
     const text = channel === 'email' ? `Subject: ${editedSubject}\n\n${editedBody}` : editedBody;
     navigator.clipboard.writeText(text);
@@ -83,16 +108,19 @@ export function MessageTemplatePicker({ contact, channel, onClose }: MessageTemp
   }, [contact, editedBody, editedSubject]);
 
   const handleSendAndLog = useCallback(async () => {
-    if (!selectedTemplate) return;
     setLogging(true);
+    const isCustom = !selectedTemplate;
+    const summaryText = isCustom
+      ? `Custom ${channel === 'whatsapp' ? 'WhatsApp' : 'Email'} message sent`
+      : `Sent template: ${selectedTemplate!.template_name}`;
     await logActivity({
       contact_id: String(contact.id),
       activity_type: channel === 'whatsapp' ? 'whatsapp' : 'email',
-      summary: `Sent template: ${selectedTemplate.template_name}`,
+      summary: summaryText,
       notes: editedBody.substring(0, 500),
       next_action: nextAction,
     });
-    const actionText = `${channel === 'whatsapp' ? 'WhatsApp' : 'Email'}: ${selectedTemplate.template_name} (${new Date().toLocaleDateString()})`;
+    const actionText = `${channel === 'whatsapp' ? 'WhatsApp' : 'Email'}: ${isCustom ? 'Custom message' : selectedTemplate!.template_name} (${new Date().toLocaleDateString()})`;
     await updateContact(String(contact.id), {
       ActionTaken: actionText,
       ...(nextAction ? { NextAction: nextAction } : {}),
@@ -105,6 +133,8 @@ export function MessageTemplatePicker({ contact, channel, onClose }: MessageTemp
     setLogSuccess(true);
     setTimeout(() => onClose(), 1500);
   }, [selectedTemplate, contact, channel, editedBody, nextAction, logActivity, updateContact, handleOpenWhatsApp, handleOpenEmail, onClose]);
+
+  /* ---------- Render ---------- */
 
   if (templatesLoading) {
     return (
@@ -133,7 +163,7 @@ export function MessageTemplatePicker({ contact, channel, onClose }: MessageTemp
               </div>
               <div>
                 <h2 className="text-lg font-semibold text-white">
-                  {step === 'choose' ? 'Choose Message Template' : 'Preview & Send'}
+                  {step === 'choose' ? 'Choose Message Template' : step === 'custom' ? 'Write Your Own Message' : 'Preview & Send'}
                 </h2>
                 <p className="text-xs text-slate-400">{channel === 'whatsapp' ? 'WhatsApp' : 'Email'} · {contact.FullName}</p>
               </div>
@@ -148,44 +178,24 @@ export function MessageTemplatePicker({ contact, channel, onClose }: MessageTemp
               <Check className="w-12 h-12 text-emerald-400 mx-auto mb-3" />
               <p className="text-white font-medium">Activity logged successfully!</p>
             </div>
+
           ) : step === 'choose' ? (
             <div className="flex-1 overflow-y-auto">
               {/* Contact Summary */}
               <div className="px-6 py-4 bg-slate-800/30 border-b border-slate-700/50">
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                  <div>
-                    <span className="text-slate-500">Temperature</span>
-                    <p className="text-white font-medium mt-0.5">{contact.LeadTemperature}</p>
-                  </div>
-                  <div>
-                    <span className="text-slate-500">Lead Type</span>
-                    <p className="text-white font-medium mt-0.5">{contact.LeadType}</p>
-                  </div>
-                  <div>
-                    <span className="text-slate-500">Registration</span>
-                    <p className="text-white font-medium mt-0.5">{contact.RegistrationStatus}</p>
-                  </div>
-                  <div>
-                    <span className="text-slate-500">Last Activity</span>
-                    <p className="text-white font-medium mt-0.5">{days !== null ? `${days}d ago` : 'Never'}</p>
-                  </div>
+                  <div><span className="text-slate-500">Temperature</span><p className="text-white font-medium mt-0.5">{contact.LeadTemperature}</p></div>
+                  <div><span className="text-slate-500">Lead Type</span><p className="text-white font-medium mt-0.5">{contact.LeadType}</p></div>
+                  <div><span className="text-slate-500">Registration</span><p className="text-white font-medium mt-0.5">{contact.RegistrationStatus}</p></div>
+                  <div><span className="text-slate-500">Last Activity</span><p className="text-white font-medium mt-0.5">{days !== null ? `${days}d ago` : 'Never'}</p></div>
                   {contact.GOStatus && (
-                    <div>
-                      <span className="text-slate-500">GO Status</span>
-                      <p className="text-amber-400 font-medium mt-0.5">{contact.GOStatus}</p>
-                    </div>
+                    <div><span className="text-slate-500">GO Status</span><p className="text-amber-400 font-medium mt-0.5">{contact.GOStatus}</p></div>
                   )}
                   {contact.ActionTaken && (
-                    <div className="col-span-2">
-                      <span className="text-slate-500">Last Action</span>
-                      <p className="text-white font-medium mt-0.5 truncate">{contact.ActionTaken}</p>
-                    </div>
+                    <div className="col-span-2"><span className="text-slate-500">Last Action</span><p className="text-white font-medium mt-0.5 truncate">{contact.ActionTaken}</p></div>
                   )}
                   {contact.NextAction && (
-                    <div>
-                      <span className="text-slate-500">Next Action</span>
-                      <p className="text-teal-400 font-medium mt-0.5 truncate">{contact.NextAction}</p>
-                    </div>
+                    <div><span className="text-slate-500">Next Action</span><p className="text-teal-400 font-medium mt-0.5 truncate">{contact.NextAction}</p></div>
                   )}
                 </div>
               </div>
@@ -207,40 +217,42 @@ export function MessageTemplatePicker({ contact, channel, onClose }: MessageTemp
                         <p className="text-sm font-medium text-white">{recommendation.template.template_name}</p>
                         <p className="text-xs text-slate-500">{recommendation.template.category}</p>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleSelectTemplate(recommendation.template)}
-                        className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium bg-violet-600 hover:bg-violet-500 text-white rounded-lg transition-colors"
-                      >
-                        <Zap className="w-3 h-3" />
-                        Use This
+                      <button type="button" onClick={() => handleSelectTemplate(recommendation.template)}
+                        className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium bg-violet-600 hover:bg-violet-500 text-white rounded-lg transition-colors">
+                        <Zap className="w-3 h-3" /> Use This
                       </button>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setBrowsing(true)}
-                    className="mt-3 flex items-center gap-2 text-xs text-slate-400 hover:text-slate-200 transition-colors"
-                  >
-                    <BookOpen className="w-3.5 h-3.5" />
-                    Or browse library manually
-                  </button>
+
+                  {/* Action row: Browse library + Custom message */}
+                  <div className="mt-3 flex flex-wrap items-center gap-4">
+                    <button type="button" onClick={() => setBrowsing(true)}
+                      className="flex items-center gap-2 text-xs text-slate-400 hover:text-slate-200 transition-colors">
+                      <BookOpen className="w-3.5 h-3.5" /> Browse library manually
+                    </button>
+                    <button type="button" onClick={handleEnterCustomMode}
+                      className="flex items-center gap-2 text-xs text-teal-400 hover:text-teal-300 transition-colors">
+                      <PenLine className="w-3.5 h-3.5" /> Use my own message
+                    </button>
+                  </div>
                 </div>
               )}
 
               {/* Manual Browse */}
               {(browsing || !recommendation) && (
                 <div className="px-6 py-4">
-                  {recommendation && (
-                    <button
-                      type="button"
-                      onClick={() => setBrowsing(false)}
-                      className="mb-3 flex items-center gap-2 text-xs text-violet-400 hover:text-violet-300 transition-colors"
-                    >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      Back to AI recommendation
+                  <div className="flex flex-wrap items-center gap-4 mb-3">
+                    {recommendation && (
+                      <button type="button" onClick={() => setBrowsing(false)}
+                        className="flex items-center gap-2 text-xs text-violet-400 hover:text-violet-300 transition-colors">
+                        <Sparkles className="w-3.5 h-3.5" /> Back to AI recommendation
+                      </button>
+                    )}
+                    <button type="button" onClick={handleEnterCustomMode}
+                      className="flex items-center gap-2 text-xs text-teal-400 hover:text-teal-300 transition-colors">
+                      <PenLine className="w-3.5 h-3.5" /> Use my own message
                     </button>
-                  )}
+                  </div>
                   <h3 className="text-sm font-semibold text-slate-300 mb-3">Browse Templates</h3>
                   <div className="space-y-1">
                     {categories.map(cat => {
@@ -248,11 +260,8 @@ export function MessageTemplatePicker({ contact, channel, onClose }: MessageTemp
                       const isExpanded = expandedCategory === cat;
                       return (
                         <div key={cat}>
-                          <button
-                            type="button"
-                            onClick={() => setExpandedCategory(isExpanded ? null : cat)}
-                            className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm text-slate-300 hover:bg-slate-800 transition-colors"
-                          >
+                          <button type="button" onClick={() => setExpandedCategory(isExpanded ? null : cat)}
+                            className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm text-slate-300 hover:bg-slate-800 transition-colors">
                             <span className="font-medium">{cat}</span>
                             <div className="flex items-center gap-2">
                               <span className="text-xs text-slate-500">{catTemplates.length}</span>
@@ -262,12 +271,8 @@ export function MessageTemplatePicker({ contact, channel, onClose }: MessageTemp
                           {isExpanded && (
                             <div className="ml-3 mb-2 space-y-1">
                               {catTemplates.map(t => (
-                                <button
-                                  key={t.id}
-                                  type="button"
-                                  onClick={() => handleSelectTemplate(t)}
-                                  className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm text-slate-400 hover:bg-slate-700/50 hover:text-white transition-colors group"
-                                >
+                                <button key={t.id} type="button" onClick={() => handleSelectTemplate(t)}
+                                  className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm text-slate-400 hover:bg-slate-700/50 hover:text-white transition-colors group">
                                   <div className="text-left">
                                     <p className="font-medium">{t.template_name}</p>
                                     <p className="text-xs text-slate-500 mt-0.5">{t.send_when_condition}</p>
@@ -284,54 +289,80 @@ export function MessageTemplatePicker({ contact, channel, onClose }: MessageTemp
                 </div>
               )}
             </div>
-          ) : (
-            /* Preview Step */
+
+          ) : step === 'custom' ? (
+            /* Custom Message Input */
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
-              <button
-                type="button"
-                onClick={() => setStep('choose')}
-                className="text-xs text-slate-400 hover:text-slate-200 transition-colors mb-2"
-              >
+              <button type="button" onClick={() => { setStep('choose'); setBrowsing(false); }}
+                className="text-xs text-slate-400 hover:text-slate-200 transition-colors mb-2">
                 ← Back to templates
               </button>
 
-              <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-3">
-                <p className="text-xs text-slate-500">Template</p>
-                <p className="text-sm font-medium text-white">{selectedTemplate?.template_name}</p>
-                <p className="text-xs text-slate-500 mt-1">{selectedTemplate?.category}</p>
+              <div className="bg-teal-500/10 border border-teal-500/20 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <PenLine className="w-4 h-4 text-teal-400" />
+                  <h3 className="text-sm font-semibold text-teal-300">Write Your Own Message</h3>
+                </div>
+                <p className="text-xs text-slate-400">
+                  Use {'{{firstName}}'} for the contact's name. It will be personalised automatically.
+                </p>
               </div>
 
               {channel === 'email' && (
                 <div>
                   <label className="block text-xs font-medium text-slate-400 mb-1.5">Subject</label>
-                  <input
-                    type="text"
-                    value={editedSubject}
-                    onChange={e => setEditedSubject(e.target.value)}
-                    className="w-full px-3 py-2.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500/40"
-                  />
+                  <input type="text" value={customRawSubject} onChange={e => setCustomRawSubject(e.target.value)}
+                    placeholder="e.g. Quick check-in, Leader {{firstName}}"
+                    className="w-full px-3 py-2.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500/40 placeholder:text-slate-500" />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1.5">Your Message</label>
+                <textarea value={customRawBody} onChange={e => setCustomRawBody(e.target.value)} rows={8}
+                  placeholder={`e.g. Hi {{firstName}}, I wanted to check in and see how you are doing.`}
+                  className="w-full px-3 py-2.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500/40 resize-y placeholder:text-slate-500" />
+              </div>
+
+              <button type="button" onClick={handleCustomPreview} disabled={!customRawBody.trim()}
+                className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-40 text-white rounded-lg transition-colors">
+                <Sparkles className="w-4 h-4" /> Personalise & Preview
+              </button>
+            </div>
+
+          ) : (
+            /* Preview Step */
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              <button type="button" onClick={() => selectedTemplate ? setStep('choose') : setStep('custom')}
+                className="text-xs text-slate-400 hover:text-slate-200 transition-colors mb-2">
+                ← {selectedTemplate ? 'Back to templates' : 'Back to editor'}
+              </button>
+
+              <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-3">
+                <p className="text-xs text-slate-500">Source</p>
+                <p className="text-sm font-medium text-white">{selectedTemplate ? selectedTemplate.template_name : 'Custom Message'}</p>
+                {selectedTemplate && <p className="text-xs text-slate-500 mt-1">{selectedTemplate.category}</p>}
+              </div>
+
+              {channel === 'email' && (
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1.5">Subject</label>
+                  <input type="text" value={editedSubject} onChange={e => setEditedSubject(e.target.value)}
+                    className="w-full px-3 py-2.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500/40" />
                 </div>
               )}
 
               <div>
                 <label className="block text-xs font-medium text-slate-400 mb-1.5">Message</label>
-                <textarea
-                  value={editedBody}
-                  onChange={e => setEditedBody(e.target.value)}
-                  rows={8}
-                  className="w-full px-3 py-2.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500/40 resize-y"
-                />
+                <textarea value={editedBody} onChange={e => setEditedBody(e.target.value)} rows={8}
+                  className="w-full px-3 py-2.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500/40 resize-y" />
               </div>
 
               <div>
                 <label className="block text-xs font-medium text-slate-400 mb-1.5">Next Action (optional)</label>
-                <input
-                  type="text"
-                  value={nextAction}
-                  onChange={e => setNextAction(e.target.value)}
+                <input type="text" value={nextAction} onChange={e => setNextAction(e.target.value)}
                   placeholder="What's the next step after this message?"
-                  className="w-full px-3 py-2.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500/40 placeholder:text-slate-500"
-                />
+                  className="w-full px-3 py-2.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500/40 placeholder:text-slate-500" />
               </div>
 
               <div className="flex flex-wrap gap-2 pt-2">
