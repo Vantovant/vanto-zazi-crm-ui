@@ -3,6 +3,7 @@ import logo from '@/assets/logo.jpg';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { env } from '@/lib/env';
 import { Mail, Lock, User, Loader2, ShieldX, ShieldCheck, Ticket } from 'lucide-react';
 
 export function Auth() {
