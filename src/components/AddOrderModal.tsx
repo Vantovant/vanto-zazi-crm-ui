@@ -97,6 +97,18 @@ export function AddOrderModal({ onClose }: AddOrderModalProps) {
     e.preventDefault();
     if (!selectedContactName.trim()) { setError('Please select a contact.'); return; }
     if (lines.length === 0) { setError('Add at least one product.'); return; }
+
+    // Validate offline stock
+    if (purchaseType === 'Offline') {
+      for (const line of lines) {
+        const invItem = inventory.find(i => i.product_name === line.product.name);
+        if (!invItem || invItem.stock_quantity < line.quantity) {
+          setError(`Insufficient stock for ${line.product.name}. Available: ${invItem?.stock_quantity ?? 0}`);
+          return;
+        }
+      }
+    }
+
     setLoading(true);
     setError('');
 
@@ -112,11 +124,17 @@ export function AddOrderModal({ onClose }: AddOrderModalProps) {
         status: status as 'Pending' | 'Paid' | 'Delivered' | 'Activated',
         orderDate,
         badges: [],
-        purchaseType: '',
+        purchaseType,
         pvAmount: line.product.pv * line.quantity,
         source: 'manual',
       });
-      if (result) successCount++;
+      if (result) {
+        successCount++;
+        // Deduct from inventory for offline orders
+        if (purchaseType === 'Offline') {
+          await deductStock(line.product.name, line.quantity);
+        }
+      }
     }
 
     setLoading(false);
