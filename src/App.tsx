@@ -14,6 +14,7 @@ import { ImportExport } from './pages/ImportExport';
 import { Deals } from './pages/Deals';
 import { TeamDashboard } from './pages/TeamDashboard';
 import { Duplicates } from './pages/Duplicates';
+import { Inventory } from './pages/Inventory';
 
 function App() {
   return (
