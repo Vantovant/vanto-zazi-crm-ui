@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { X, ShoppingCart, Loader2, Search, Check, Plus, Trash2 } from 'lucide-react';
 import { useCrm } from '@/contexts/CrmContext';
 import { productCatalog, type Product } from '@/data/productCatalog';
+import { useInventory } from '@/hooks/useInventory';
 
 interface OrderLine {
   product: Product;
