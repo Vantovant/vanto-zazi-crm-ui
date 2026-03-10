@@ -18,7 +18,7 @@ export function useInventory() {
   const fetchInventory = useCallback(async () => {
     if (!user) return;
     setLoading(true);
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('inventory')
       .select('*')
       .order('product_name', { ascending: true });
@@ -26,7 +26,7 @@ export function useInventory() {
     if (error) {
       console.error('Error fetching inventory:', error);
     } else {
-      setInventory((data as any[]).map(row => ({
+      setInventory((data || []).map((row: any) => ({
         id: row.id,
         product_name: row.product_name,
         stock_quantity: row.stock_quantity,
@@ -43,16 +43,15 @@ export function useInventory() {
 
   const addOrUpdateStock = async (productName: string, quantity: number) => {
     if (!user) return false;
-    // Check if product already exists
     const existing = inventory.find(i => i.product_name === productName);
     if (existing) {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('inventory')
         .update({ stock_quantity: existing.stock_quantity + quantity })
         .eq('id', existing.id);
       if (error) { console.error('Error updating inventory:', error); return false; }
     } else {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('inventory')
         .insert({ user_id: user.id, product_name: productName, stock_quantity: quantity });
       if (error) { console.error('Error adding inventory:', error); return false; }
@@ -62,7 +61,7 @@ export function useInventory() {
   };
 
   const setStock = async (id: string, quantity: number) => {
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('inventory')
       .update({ stock_quantity: quantity })
       .eq('id', id);
@@ -72,7 +71,7 @@ export function useInventory() {
   };
 
   const deleteItem = async (id: string) => {
-    const { error } = await supabase.from('inventory').delete().eq('id', id);
+    const { error } = await (supabase as any).from('inventory').delete().eq('id', id);
     if (error) { console.error('Error deleting inventory item:', error); return false; }
     await fetchInventory();
     return true;
@@ -81,7 +80,7 @@ export function useInventory() {
   const deductStock = async (productName: string, quantity: number) => {
     const item = inventory.find(i => i.product_name === productName);
     if (!item || item.stock_quantity < quantity) return false;
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('inventory')
       .update({ stock_quantity: item.stock_quantity - quantity })
       .eq('id', item.id);
