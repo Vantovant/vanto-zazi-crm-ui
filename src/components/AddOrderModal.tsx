@@ -16,8 +16,12 @@ interface AddOrderModalProps {
 
 export function AddOrderModal({ onClose }: AddOrderModalProps) {
   const { addOrder, contacts } = useCrm();
+  const { inventory, deductStock } = useInventory();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Purchase type
+  const [purchaseType, setPurchaseType] = useState<'Online' | 'Offline'>('Online');
 
   // Contact search
   const [contactSearch, setContactSearch] = useState('');
