@@ -79,6 +79,12 @@ export function AddOrderModal({ onClose }: AddOrderModalProps) {
 
   const updateQty = (idx: number, qty: number) => {
     if (qty < 1) return;
+    // For offline, cap at available inventory
+    if (purchaseType === 'Offline') {
+      const productName = lines[idx].product.name;
+      const invItem = inventory.find(i => i.product_name === productName);
+      if (invItem && qty > invItem.stock_quantity) return;
+    }
     setLines(prev => prev.map((l, i) => i === idx ? { ...l, quantity: qty } : l));
   };
 
