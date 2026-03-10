@@ -6,6 +6,7 @@ import {
   Users,
   Activity,
   ShoppingCart,
+  Package,
   Briefcase,
   MessageCircle,
   ArrowUpDown,
