@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { X, ShoppingCart, Loader2, Search, Check, Plus, Trash2 } from 'lucide-react';
 import { useCrm } from '@/contexts/CrmContext';
 import { productCatalog, type Product } from '@/data/productCatalog';
+import { useInventory } from '@/hooks/useInventory';
 
 interface OrderLine {
   product: Product;
@@ -15,8 +16,12 @@ interface AddOrderModalProps {
 
 export function AddOrderModal({ onClose }: AddOrderModalProps) {
   const { addOrder, contacts } = useCrm();
+  const { inventory, deductStock } = useInventory();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Purchase type
+  const [purchaseType, setPurchaseType] = useState<'Online' | 'Offline'>('Online');
 
   // Contact search
   const [contactSearch, setContactSearch] = useState('');
@@ -74,6 +79,12 @@ export function AddOrderModal({ onClose }: AddOrderModalProps) {
 
   const updateQty = (idx: number, qty: number) => {
     if (qty < 1) return;
+    // For offline, cap at available inventory
+    if (purchaseType === 'Offline') {
+      const productName = lines[idx].product.name;
+      const invItem = inventory.find(i => i.product_name === productName);
+      if (invItem && qty > invItem.stock_quantity) return;
+    }
     setLines(prev => prev.map((l, i) => i === idx ? { ...l, quantity: qty } : l));
   };
 
@@ -92,6 +103,18 @@ export function AddOrderModal({ onClose }: AddOrderModalProps) {
     e.preventDefault();
     if (!selectedContactName.trim()) { setError('Please select a contact.'); return; }
     if (lines.length === 0) { setError('Add at least one product.'); return; }
+
+    // Validate offline stock
+    if (purchaseType === 'Offline') {
+      for (const line of lines) {
+        const invItem = inventory.find(i => i.product_name === line.product.name);
+        if (!invItem || invItem.stock_quantity < line.quantity) {
+          setError(`Insufficient stock for ${line.product.name}. Available: ${invItem?.stock_quantity ?? 0}`);
+          return;
+        }
+      }
+    }
+
     setLoading(true);
     setError('');
 
@@ -107,11 +130,17 @@ export function AddOrderModal({ onClose }: AddOrderModalProps) {
         status: status as 'Pending' | 'Paid' | 'Delivered' | 'Activated',
         orderDate,
         badges: [],
-        purchaseType: '',
+        purchaseType,
         pvAmount: line.product.pv * line.quantity,
         source: 'manual',
       });
-      if (result) successCount++;
+      if (result) {
+        successCount++;
+        // Deduct from inventory for offline orders
+        if (purchaseType === 'Offline') {
+          await deductStock(line.product.name, line.quantity);
+        }
+      }
     }
 
     setLoading(false);
@@ -184,47 +213,101 @@ export function AddOrderModal({ onClose }: AddOrderModalProps) {
               </div>
             </div>
 
+            {/* Purchase Type Toggle */}
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-1.5">Purchase Type</label>
+              <div className="flex gap-2">
+                {(['Online', 'Offline'] as const).map(type => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => { setPurchaseType(type); setLines([]); }}
+                    className={`flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border transition-colors ${
+                      purchaseType === type
+                        ? 'bg-teal-600/20 border-teal-500/50 text-teal-400'
+                        : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Product Search & Add */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1.5">Add Products *</label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                <input
-                  type="text"
-                  value={productSearch}
-                  onChange={e => { setProductSearch(e.target.value); setShowProductDropdown(true); }}
-                  onFocus={() => setShowProductDropdown(true)}
-                  placeholder="Search products (GRW, ALT, BTY...)"
-                  className="w-full pl-10 pr-4 py-2.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500 placeholder:text-slate-500"
-                />
-                {showProductDropdown && filteredProducts.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-30 max-h-56 overflow-y-auto">
-                    {(['Daily', 'Premium', 'Elite'] as const).map(range => {
-                      const items = filteredProducts.filter(p => p.range === range);
-                      if (items.length === 0) return null;
+              <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                Add Products * {purchaseType === 'Offline' && <span className="text-xs text-slate-500">(from inventory)</span>}
+              </label>
+              {purchaseType === 'Offline' ? (
+                /* Offline: dropdown from inventory */
+                <div className="relative">
+                  <select
+                    onChange={e => {
+                      const name = e.target.value;
+                      if (!name) return;
+                      const catalogProduct = productCatalog.find(p => p.name === name);
+                      if (catalogProduct) addLine(catalogProduct);
+                      e.target.value = '';
+                    }}
+                    className="w-full px-3 py-2.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500"
+                  >
+                    <option value="">Select from inventory...</option>
+                    {inventory.filter(i => i.stock_quantity > 0).map(item => {
+                      const inCart = lines.find(l => l.product.name === item.product_name);
+                      const available = item.stock_quantity - (inCart?.quantity || 0);
                       return (
-                        <div key={range}>
-                          <div className="px-4 py-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-800/80 sticky top-0">{range} Range</div>
-                          {items.map(p => (
-                            <button
-                              key={p.name}
-                              type="button"
-                              onClick={() => addLine(p)}
-                              className="w-full text-left px-4 py-2 text-sm hover:bg-slate-700 transition-colors flex items-center justify-between gap-2"
-                            >
-                              <div className="flex items-center gap-2">
-                                <span className="text-slate-200 font-medium">{p.name}</span>
-                                <span className={`text-xs px-1.5 py-0.5 rounded ${rangeColor[p.range]}`}>{p.pv} PV</span>
-                              </div>
-                              <span className="text-xs text-slate-400">R{p.priceIncVat.toLocaleString()}</span>
-                            </button>
-                          ))}
-                        </div>
+                        <option key={item.id} value={item.product_name} disabled={available <= 0}>
+                          {item.product_name} — {available} available
+                        </option>
                       );
                     })}
-                  </div>
-                )}
-              </div>
+                  </select>
+                  {inventory.filter(i => i.stock_quantity > 0).length === 0 && (
+                    <p className="text-xs text-amber-400 mt-1">No inventory items available. Add stock first.</p>
+                  )}
+                </div>
+              ) : (
+                /* Online: standard product search */
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <input
+                    type="text"
+                    value={productSearch}
+                    onChange={e => { setProductSearch(e.target.value); setShowProductDropdown(true); }}
+                    onFocus={() => setShowProductDropdown(true)}
+                    placeholder="Search products (GRW, ALT, BTY...)"
+                    className="w-full pl-10 pr-4 py-2.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500 placeholder:text-slate-500"
+                  />
+                  {showProductDropdown && filteredProducts.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-30 max-h-56 overflow-y-auto">
+                      {(['Daily', 'Premium', 'Elite'] as const).map(range => {
+                        const items = filteredProducts.filter(p => p.range === range);
+                        if (items.length === 0) return null;
+                        return (
+                          <div key={range}>
+                            <div className="px-4 py-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-800/80 sticky top-0">{range} Range</div>
+                            {items.map(p => (
+                              <button
+                                key={p.name}
+                                type="button"
+                                onClick={() => addLine(p)}
+                                className="w-full text-left px-4 py-2 text-sm hover:bg-slate-700 transition-colors flex items-center justify-between gap-2"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className="text-slate-200 font-medium">{p.name}</span>
+                                  <span className={`text-xs px-1.5 py-0.5 rounded ${rangeColor[p.range]}`}>{p.pv} PV</span>
+                                </div>
+                                <span className="text-xs text-slate-400">R{p.priceIncVat.toLocaleString()}</span>
+                              </button>
+                            ))}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Line Items */}

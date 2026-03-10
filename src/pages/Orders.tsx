@@ -355,7 +355,11 @@ export function Orders() {
                   <td className="px-5 py-4">
                     {order.purchaseType ? (
                       <span className={`text-xs font-medium px-2 py-0.5 rounded ${
-                        order.purchaseType === 'Upgrade'
+                        order.purchaseType === 'Offline'
+                          ? 'bg-orange-500/20 text-orange-400'
+                          : order.purchaseType === 'Online'
+                          ? 'bg-sky-500/20 text-sky-400'
+                          : order.purchaseType === 'Upgrade'
                           ? 'bg-violet-500/20 text-violet-400'
                           : 'bg-teal-500/20 text-teal-400'
                       }`}>
