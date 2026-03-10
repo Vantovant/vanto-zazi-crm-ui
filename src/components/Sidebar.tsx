@@ -23,6 +23,7 @@ const baseNavItems = [
   { path: '/contacts', label: 'Contacts', icon: Users },
   { path: '/activities', label: 'Activities', icon: Activity },
   { path: '/orders', label: 'Orders', icon: ShoppingCart },
+  { path: '/inventory', label: 'Inventory', icon: Package },
   { path: '/deals', label: 'Deals', icon: Briefcase },
   { path: '/whatsapp', label: 'WhatsApp', icon: MessageCircle },
   { path: '/import-export', label: 'Import / Export', icon: ArrowUpDown },
