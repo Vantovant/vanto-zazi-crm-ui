@@ -176,7 +176,7 @@ export function EditContactModal({ prospect, onClose, onSaved }: EditContactModa
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-1.5">Lead Type</label>
                 <select value={form.LeadType} onChange={e => update('LeadType', e.target.value)} className="w-full px-3 py-2.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500">
-                  {FILTER_OPTIONS.LeadType.map(o => <option key={o} value={o}>{o}</option>)}
+                  {filterOptions.LeadType.map((o: string) => <option key={o} value={o}>{o}</option>)}
                 </select>
               </div>
               <div>
