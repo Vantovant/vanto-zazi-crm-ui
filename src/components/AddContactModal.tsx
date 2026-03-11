@@ -5,6 +5,7 @@ import { useCrm } from '@/contexts/CrmContext';
 import { DuplicateWarningModal } from './DuplicateWarningModal';
 import { safeMerge } from '@/utils/contactNormalization';
 import { SALUTATION_OPTIONS } from '@/utils/templateMerge';
+import { filterOptions } from '@/data/mockData';
 
 interface AddContactModalProps {
   onClose: () => void;
