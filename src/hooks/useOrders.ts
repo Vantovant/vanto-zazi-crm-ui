@@ -19,6 +19,7 @@ interface OrderRow {
   purchase_type: string;
   pv_amount: number;
   source: string;
+  sales_channel: string;
 }
 
 function rowToOrder(row: OrderRow): Order {
