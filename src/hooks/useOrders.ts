@@ -37,6 +37,7 @@ function rowToOrder(row: OrderRow): Order {
     purchaseType: row.purchase_type || '',
     pvAmount: Number(row.pv_amount) || 0,
     source: row.source || 'manual',
+    salesChannel: row.sales_channel || 'Online',
   };
 }
 
