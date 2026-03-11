@@ -469,8 +469,14 @@ export function Orders() {
                   )}
                   {selectedOrder.purchaseType && (
                     <div className="flex justify-between text-sm">
-                      <span className="text-slate-500">Type</span>
+                      <span className="text-slate-500">Purchase Type</span>
                       <span className="text-slate-300">{selectedOrder.purchaseType}</span>
+                    </div>
+                  )}
+                  {selectedOrder.salesChannel && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-500">Sales Channel</span>
+                      <span className="text-slate-300">{selectedOrder.salesChannel}</span>
                     </div>
                   )}
                   {(selectedOrder.pvAmount ?? 0) > 0 && (
