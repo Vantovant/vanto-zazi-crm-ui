@@ -44,6 +44,7 @@ const leadTypeColors: Record<string, string> = {
   Registered_Nopurchase: 'bg-amber-500/20 text-amber-400 border-amber-500/40',
   Purchase_Nostatus: 'bg-teal-500/20 text-teal-400 border-teal-500/40',
   Purchase_Status: 'bg-violet-500/20 text-violet-400 border-violet-500/40',
+  Expired: 'bg-rose-500/20 text-rose-400 border-rose-500/40',
 };
 
 const regStatusColors: Record<string, string> = {
