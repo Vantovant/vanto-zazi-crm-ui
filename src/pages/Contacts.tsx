@@ -41,6 +41,7 @@ const leadTypeColors: Record<string, string> = {
   Registered_Nopurchase: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
   Purchase_Nostatus: 'bg-teal-500/20 text-teal-400 border-teal-500/30',
   Purchase_Status: 'bg-violet-500/20 text-violet-400 border-violet-500/30',
+  Expired: 'bg-rose-500/20 text-rose-400 border-rose-500/30',
 };
 
 export function Contacts() {

@@ -5,6 +5,7 @@ import { useCrm } from '@/contexts/CrmContext';
 import { DuplicateWarningModal } from './DuplicateWarningModal';
 import { safeMerge } from '@/utils/contactNormalization';
 import { SALUTATION_OPTIONS } from '@/utils/templateMerge';
+import { filterOptions } from '@/data/mockData';
 
 interface AddContactModalProps {
   onClose: () => void;
@@ -154,10 +155,7 @@ export function AddContactModal({ onClose }: AddContactModalProps) {
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-1.5">Lead Type</label>
                 <select value={form.LeadType} onChange={e => update('LeadType', e.target.value)} className="w-full px-3 py-2.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500">
-                  <option value="Prospect">Prospect</option>
-                  <option value="Registered_Nopurchase">Registered_Nopurchase</option>
-                  <option value="Purchase_Nostatus">Purchase_Nostatus</option>
-                  <option value="Purchase_Status">Purchase_Status</option>
+                  {filterOptions.LeadType.map((o: string) => <option key={o} value={o}>{o}</option>)}
                 </select>
               </div>
               <div>
