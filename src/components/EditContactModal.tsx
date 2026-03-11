@@ -5,7 +5,7 @@ import type { Prospect } from '@/data/mockData';
 import { DuplicateWarningModal } from './DuplicateWarningModal';
 import { safeMerge } from '@/utils/contactNormalization';
 import { SALUTATION_OPTIONS } from '@/utils/templateMerge';
-import { FILTER_OPTIONS } from '@/data/mockData';
+import { filterOptions } from '@/data/mockData';
 
 interface EditContactModalProps {
   prospect: Prospect;
