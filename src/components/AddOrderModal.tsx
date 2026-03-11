@@ -3,11 +3,13 @@ import { X, ShoppingCart, Loader2, Search, Check, Plus, Trash2 } from 'lucide-re
 import { useCrm } from '@/contexts/CrmContext';
 import { productCatalog, type Product } from '@/data/productCatalog';
 import { useInventory } from '@/hooks/useInventory';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 
 interface OrderLine {
   product: Product;
   quantity: number;
-  sellingPrice: number; // defaults to stock price, user can override
+  sellingPrice: number;
 }
 
 interface AddOrderModalProps {
@@ -16,12 +18,13 @@ interface AddOrderModalProps {
 
 export function AddOrderModal({ onClose }: AddOrderModalProps) {
   const { addOrder, contacts } = useCrm();
-  const { inventory, deductStock } = useInventory();
+  const { inventory, refetch: refetchInventory } = useInventory();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Purchase type
-  const [purchaseType, setPurchaseType] = useState<'Online' | 'Offline'>('Online');
+  // Sales channel (Online vs Offline) — separate from purchase_type
+  const [salesChannel, setSalesChannel] = useState<'Online' | 'Offline'>('Online');
 
   // Contact search
   const [contactSearch, setContactSearch] = useState('');
@@ -79,8 +82,7 @@ export function AddOrderModal({ onClose }: AddOrderModalProps) {
 
   const updateQty = (idx: number, qty: number) => {
     if (qty < 1) return;
-    // For offline, cap at available inventory
-    if (purchaseType === 'Offline') {
+    if (salesChannel === 'Offline') {
       const productName = lines[idx].product.name;
       const invItem = inventory.find(i => i.product_name === productName);
       if (invItem && qty > invItem.stock_quantity) return;
@@ -103,9 +105,10 @@ export function AddOrderModal({ onClose }: AddOrderModalProps) {
     e.preventDefault();
     if (!selectedContactName.trim()) { setError('Please select a contact.'); return; }
     if (lines.length === 0) { setError('Add at least one product.'); return; }
+    if (!user) { setError('Not authenticated.'); return; }
 
     // Validate offline stock
-    if (purchaseType === 'Offline') {
+    if (salesChannel === 'Offline') {
       for (const line of lines) {
         const invItem = inventory.find(i => i.product_name === line.product.name);
         if (!invItem || invItem.stock_quantity < line.quantity) {
@@ -120,31 +123,54 @@ export function AddOrderModal({ onClose }: AddOrderModalProps) {
 
     let successCount = 0;
     for (const line of lines) {
-      const result = await addOrder({
-        orderId: `ORD-${Date.now().toString(36).toUpperCase()}-${successCount}`,
-        contactName: selectedContactName,
-        contact_id: selectedContactId || undefined,
-        product: line.product.name,
-        quantity: line.quantity,
-        amount: line.sellingPrice * line.quantity,
-        status: status as 'Pending' | 'Paid' | 'Delivered' | 'Activated',
-        orderDate,
-        badges: [],
-        purchaseType,
-        pvAmount: line.product.pv * line.quantity,
-        source: 'manual',
-      });
-      if (result) {
-        successCount++;
-        // Deduct from inventory for offline orders
-        if (purchaseType === 'Offline') {
-          await deductStock(line.product.name, line.quantity);
+      if (salesChannel === 'Offline') {
+        // Use atomic RPC
+        const { error: rpcError } = await (supabase as any).rpc('create_offline_order_and_deduct_stock', {
+          p_user_id: user.id,
+          p_contact_id: selectedContactId || null,
+          p_contact_name: selectedContactName,
+          p_product: line.product.name,
+          p_quantity: line.quantity,
+          p_amount: line.sellingPrice * line.quantity,
+          p_pv_amount: line.product.pv * line.quantity,
+          p_purchase_type: '',
+          p_status: status,
+          p_source: 'manual',
+          p_order_date: orderDate,
+          p_order_id: `ORD-${Date.now().toString(36).toUpperCase()}-${successCount}`,
+          p_badges: [],
+          p_sales_channel: 'Offline',
+        });
+        if (rpcError) {
+          console.error('Offline order RPC error:', rpcError);
+          setError(rpcError.message || 'Failed to create offline order.');
+          setLoading(false);
+          return;
         }
+        successCount++;
+      } else {
+        // Online: normal flow
+        const result = await addOrder({
+          orderId: `ORD-${Date.now().toString(36).toUpperCase()}-${successCount}`,
+          contactName: selectedContactName,
+          contact_id: selectedContactId || undefined,
+          product: line.product.name,
+          quantity: line.quantity,
+          amount: line.sellingPrice * line.quantity,
+          status: status as 'Pending' | 'Paid' | 'Delivered' | 'Activated',
+          orderDate,
+          badges: [],
+          purchaseType: '',
+          pvAmount: line.product.pv * line.quantity,
+          source: 'manual',
+        });
+        if (result) successCount++;
       }
     }
 
     setLoading(false);
     if (successCount > 0) {
+      if (salesChannel === 'Offline') await refetchInventory();
       onClose();
     } else {
       setError('Failed to add orders. Please try again.');
@@ -213,17 +239,17 @@ export function AddOrderModal({ onClose }: AddOrderModalProps) {
               </div>
             </div>
 
-            {/* Purchase Type Toggle */}
+            {/* Sales Channel Toggle */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1.5">Purchase Type</label>
+              <label className="block text-sm font-medium text-slate-300 mb-1.5">Sales Channel</label>
               <div className="flex gap-2">
                 {(['Online', 'Offline'] as const).map(type => (
                   <button
                     key={type}
                     type="button"
-                    onClick={() => { setPurchaseType(type); setLines([]); }}
+                    onClick={() => { setSalesChannel(type); setLines([]); }}
                     className={`flex-1 px-4 py-2.5 text-sm font-medium rounded-lg border transition-colors ${
-                      purchaseType === type
+                      salesChannel === type
                         ? 'bg-teal-600/20 border-teal-500/50 text-teal-400'
                         : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'
                     }`}
@@ -237,10 +263,9 @@ export function AddOrderModal({ onClose }: AddOrderModalProps) {
             {/* Product Search & Add */}
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-1.5">
-                Add Products * {purchaseType === 'Offline' && <span className="text-xs text-slate-500">(from inventory)</span>}
+                Add Products * {salesChannel === 'Offline' && <span className="text-xs text-slate-500">(from inventory)</span>}
               </label>
-              {purchaseType === 'Offline' ? (
-                /* Offline: dropdown from inventory */
+              {salesChannel === 'Offline' ? (
                 <div className="relative">
                   <select
                     onChange={e => {
@@ -268,7 +293,6 @@ export function AddOrderModal({ onClose }: AddOrderModalProps) {
                   )}
                 </div>
               ) : (
-                /* Online: standard product search */
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                   <input
@@ -390,7 +414,6 @@ export function AddOrderModal({ onClose }: AddOrderModalProps) {
         </div>
       </div>
 
-      {/* Close dropdowns on outside click */}
       {(showContactDropdown || showProductDropdown) && (
         <div className="fixed inset-0 z-40" onClick={() => { setShowContactDropdown(false); setShowProductDropdown(false); }} />
       )}

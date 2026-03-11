@@ -21,10 +21,11 @@ export function useInventory() {
     const { data, error } = await (supabase as any)
       .from('inventory')
       .select('*')
+      .eq('user_id', user.id)
       .order('product_name', { ascending: true });
 
     if (error) {
-      console.error('Error fetching inventory:', error);
+      console.error('Error fetching inventory:', error.message, error);
     } else {
       setInventory((data || []).map((row: any) => ({
         id: row.id,
@@ -41,20 +42,25 @@ export function useInventory() {
     fetchInventory();
   }, [fetchInventory]);
 
-  const addOrUpdateStock = async (productName: string, quantity: number) => {
+  const addOrUpdateStock = async (productName: string, quantity: number): Promise<boolean> => {
     if (!user) return false;
     const existing = inventory.find(i => i.product_name === productName);
+    let error: any;
     if (existing) {
-      const { error } = await (supabase as any)
+      const res = await (supabase as any)
         .from('inventory')
         .update({ stock_quantity: existing.stock_quantity + quantity })
         .eq('id', existing.id);
-      if (error) { console.error('Error updating inventory:', error); return false; }
+      error = res.error;
     } else {
-      const { error } = await (supabase as any)
+      const res = await (supabase as any)
         .from('inventory')
         .insert({ user_id: user.id, product_name: productName, stock_quantity: quantity });
-      if (error) { console.error('Error adding inventory:', error); return false; }
+      error = res.error;
+    }
+    if (error) {
+      console.error('Inventory save error:', error.message, error.details, error.hint);
+      return false;
     }
     await fetchInventory();
     return true;
@@ -77,19 +83,7 @@ export function useInventory() {
     return true;
   };
 
-  const deductStock = async (productName: string, quantity: number) => {
-    const item = inventory.find(i => i.product_name === productName);
-    if (!item || item.stock_quantity < quantity) return false;
-    const { error } = await (supabase as any)
-      .from('inventory')
-      .update({ stock_quantity: item.stock_quantity - quantity })
-      .eq('id', item.id);
-    if (error) { console.error('Error deducting stock:', error); return false; }
-    await fetchInventory();
-    return true;
-  };
-
   const totalProducts = inventory.reduce((s, i) => s + i.stock_quantity, 0);
 
-  return { inventory, loading, totalProducts, addOrUpdateStock, setStock, deleteItem, deductStock, refetch: fetchInventory };
+  return { inventory, loading, totalProducts, addOrUpdateStock, setStock, deleteItem, refetch: fetchInventory };
 }
