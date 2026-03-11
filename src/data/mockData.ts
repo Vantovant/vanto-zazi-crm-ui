@@ -473,6 +473,7 @@ export interface Order {
   purchaseType?: string;
   pvAmount?: number;
   source?: string;
+  salesChannel?: string;
 }
 
 export const orders: Order[] = [

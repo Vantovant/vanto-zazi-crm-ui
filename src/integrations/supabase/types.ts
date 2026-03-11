@@ -243,6 +243,33 @@ export type Database = {
         }
         Relationships: []
       }
+      inventory: {
+        Row: {
+          created_at: string
+          id: string
+          product_name: string
+          stock_quantity: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          product_name: string
+          stock_quantity?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          product_name?: string
+          stock_quantity?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       invites: {
         Row: {
           created_at: string
@@ -365,6 +392,7 @@ export type Database = {
           purchase_type: string
           pv_amount: number
           quantity: number
+          sales_channel: string
           source: string
           status: string
           updated_at: string
@@ -383,6 +411,7 @@ export type Database = {
           purchase_type?: string
           pv_amount?: number
           quantity?: number
+          sales_channel?: string
           source?: string
           status?: string
           updated_at?: string
@@ -401,6 +430,7 @@ export type Database = {
           purchase_type?: string
           pv_amount?: number
           quantity?: number
+          sales_channel?: string
           source?: string
           status?: string
           updated_at?: string
@@ -562,6 +592,25 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_offline_order_and_deduct_stock: {
+        Args: {
+          p_amount: number
+          p_badges: string[]
+          p_contact_id: string
+          p_contact_name: string
+          p_order_date: string
+          p_order_id: string
+          p_product: string
+          p_purchase_type: string
+          p_pv_amount: number
+          p_quantity: number
+          p_sales_channel: string
+          p_source: string
+          p_status: string
+          p_user_id: string
+        }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

@@ -353,21 +353,27 @@ export function Orders() {
                     <span className="text-sm text-slate-400">{order.quantity}</span>
                   </td>
                   <td className="px-5 py-4">
-                    {order.purchaseType ? (
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded ${
-                        order.purchaseType === 'Offline'
-                          ? 'bg-orange-500/20 text-orange-400'
-                          : order.purchaseType === 'Online'
-                          ? 'bg-sky-500/20 text-sky-400'
-                          : order.purchaseType === 'Upgrade'
-                          ? 'bg-violet-500/20 text-violet-400'
-                          : 'bg-teal-500/20 text-teal-400'
-                      }`}>
-                        {order.purchaseType}
-                      </span>
-                    ) : (
-                      <span className="text-slate-600">—</span>
-                    )}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {order.salesChannel && order.salesChannel !== 'Online' && (
+                        <span className="text-xs font-medium px-2 py-0.5 rounded bg-orange-500/20 text-orange-400">
+                          {order.salesChannel}
+                        </span>
+                      )}
+                      {order.purchaseType && order.purchaseType !== '' && (
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded ${
+                          order.purchaseType === 'Upgrade'
+                            ? 'bg-violet-500/20 text-violet-400'
+                            : order.purchaseType === 'Activity'
+                            ? 'bg-teal-500/20 text-teal-400'
+                            : 'bg-sky-500/20 text-sky-400'
+                        }`}>
+                          {order.purchaseType}
+                        </span>
+                      )}
+                      {(!order.salesChannel || order.salesChannel === 'Online') && !order.purchaseType && (
+                        <span className="text-xs font-medium px-2 py-0.5 rounded bg-sky-500/20 text-sky-400">Online</span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-5 py-4">
                     <span className="text-sm text-slate-400">{order.pvAmount ? `${order.pvAmount} PV` : '—'}</span>
@@ -463,8 +469,14 @@ export function Orders() {
                   )}
                   {selectedOrder.purchaseType && (
                     <div className="flex justify-between text-sm">
-                      <span className="text-slate-500">Type</span>
+                      <span className="text-slate-500">Purchase Type</span>
                       <span className="text-slate-300">{selectedOrder.purchaseType}</span>
+                    </div>
+                  )}
+                  {selectedOrder.salesChannel && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-500">Sales Channel</span>
+                      <span className="text-slate-300">{selectedOrder.salesChannel}</span>
                     </div>
                   )}
                   {(selectedOrder.pvAmount ?? 0) > 0 && (
