@@ -202,10 +202,16 @@ async function pollContext() {
     }
   }
 
-  // STRICT CHANNEL ISOLATION: If ctx is from a different channel than current, ignore it
+  // ABSOLUTE CHANNEL ISOLATION: If ctx is from a different channel than current, NEVER render it
   if (currentChannel && ctx.channel && ctx.channel !== currentChannel) {
-    // Store it as last-known for its channel but don't render
+    // Store it for its own channel only — absolutely block rendering
     rememberLastKnownContext(ctx);
+    console.log('[Zazi SP] BLOCKED cross-channel render:', ctx.channel, 'while active channel is', currentChannel);
+    return;
+  }
+
+  // DOUBLE-CHECK: Even if channels match, verify the context channel matches currentChannel
+  if (ctx.channel && currentChannel && ctx.channel !== currentChannel) {
     return;
   }
 
