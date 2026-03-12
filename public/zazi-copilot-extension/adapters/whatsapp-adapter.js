@@ -242,6 +242,7 @@
       }
 
       consecutiveNoChatReads = 0;
+      noChatSince = null;
 
       // Detect and skip group chats
       if (isGroupChat()) {
