@@ -694,6 +694,7 @@ $('submitEditBtn')?.addEventListener('click', async () => {
 
 // ===== INLINE CREATE CONTACT =====
 $('createContactBtn')?.addEventListener('click', () => {
+  isEditing = true; // BLOCK background refreshes during create too
   $('noContactMatch').classList.add('hidden');
   $('inlineCreateForm').classList.remove('hidden');
   $('createError').classList.add('hidden');
