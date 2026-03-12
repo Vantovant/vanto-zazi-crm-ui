@@ -165,6 +165,25 @@
     return last5.map(m => `${m.direction}:${m.text.substring(0, 30)}`).join('|');
   }
 
+  function getConversationKey(contactInfo) {
+    const key = (contactInfo?.phone || contactInfo?.name || '').trim().toLowerCase();
+    return key;
+  }
+
+  async function requestContextClear(reason, extra = {}) {
+    try {
+      await chrome.runtime.sendMessage({
+        type: 'CONTEXT_CLEAR_REQUEST',
+        channel: 'whatsapp',
+        reason,
+        ...extra,
+      });
+      console.log('[Zazi WA] Context clear requested:', reason, extra);
+    } catch (err) {
+      console.warn('[Zazi WA] Failed to request context clear:', err);
+    }
+  }
+
   function insertIntoCompose(text) {
     const compose = $(SEL.composeBox);
     if (!compose) { console.warn('[Zazi WA] Compose box not found'); return false; }
