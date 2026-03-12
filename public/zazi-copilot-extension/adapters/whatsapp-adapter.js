@@ -326,4 +326,8 @@
   } else {
     window.addEventListener('load', init);
   }
+
+  window.addEventListener('beforeunload', () => {
+    requestContextClear('tab_unloaded');
+  });
 })();
