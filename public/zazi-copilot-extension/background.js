@@ -265,25 +265,36 @@ async function handleMessage(msg, sender) {
         });
       }
 
-      // ---- Store latest state for side panel ----
+      // ---- Store latest state for side panel (current + last-known-good) ----
+      const conversationKey = getConversationKey({ channel, contactIdentifier, contactInfo, contact });
+      const contextPayload = {
+        channel,
+        conversationKey,
+        contact,
+        candidateMatches,
+        contactIdentifier,
+        contactInfo,
+        replyStatus,
+        recommendation,
+        suggestion,
+        lastInboundTime: lastInboundTime?.toISOString(),
+        lastOutboundTime: lastOutboundTime?.toISOString(),
+        lastInboundPreview,
+        lastOutboundPreview,
+        followUpAttempts,
+        messages: (messages || []).slice(-10),
+        timestamp: Date.now(),
+      };
+
       await chrome.storage.local.set({
-        current_context: {
-          channel,
-          contact,
-          candidateMatches,
-          contactIdentifier,
-          contactInfo,
-          replyStatus,
-          recommendation,
-          suggestion,
-          lastInboundTime: lastInboundTime?.toISOString(),
-          lastOutboundTime: lastOutboundTime?.toISOString(),
-          lastInboundPreview,
-          lastOutboundPreview,
-          followUpAttempts,
-          messages: (messages || []).slice(-10),
-          timestamp: Date.now(),
-        }
+        current_context: contextPayload,
+        last_known_good_context: contextPayload,
+      });
+
+      console.log('[Zazi BG] Valid chat state stored', {
+        conversationKey,
+        contactId: contact?.id || null,
+        hasCandidates: candidateMatches.length > 0,
       });
 
       return { contact, candidateMatches, replyStatus, recommendation, suggestion };
