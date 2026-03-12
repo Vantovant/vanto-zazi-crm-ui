@@ -5,6 +5,9 @@
 const $ = (id) => document.getElementById(id);
 
 let currentContext = null;
+let lastKnownGoodConversation = null;
+const MAX_CONTEXT_AGE_MS = 120000;
+const REFRESH_GRACE_MS = 45000;
 
 // ===== INIT =====
 async function init() {
@@ -42,12 +45,14 @@ $('loginBtn').addEventListener('click', async () => {
 
 $('logoutBtn').addEventListener('click', async () => {
   await chrome.runtime.sendMessage({ type: 'AUTH_LOGOUT' });
+  await chrome.storage.local.remove(['current_context', 'last_known_good_context']);
   $('loginSection').classList.remove('hidden');
   $('connectedSection').classList.add('hidden');
   $('logoutBtn').classList.add('hidden');
   $('statusBadge').textContent = 'Not Connected';
   $('statusBadge').className = 'status-badge disconnected';
   currentContext = null;
+  lastKnownGoodConversation = null;
 });
 
 function showConnected(email) {
@@ -65,24 +70,89 @@ function startContextPolling() {
   setInterval(pollContext, 2000);
 }
 
-async function pollContext() {
-  const data = await chrome.storage.local.get('current_context');
-  const ctx = data.current_context;
+function isExplicitClear(ctx) {
+  return Boolean(ctx?.cleared || ctx?.clearReason);
+}
 
-  if (!ctx || !ctx.timestamp) {
-    $('noContext').classList.remove('hidden');
-    $('groupChatNotice').classList.add('hidden');
-    $('activeContext').classList.add('hidden');
-    $('timelineSection').classList.add('hidden');
+function isContextPayloadValid(ctx) {
+  if (!ctx || isExplicitClear(ctx)) return false;
+  if (ctx.isGroup) return true;
+  return Boolean(
+    ctx.contact?.id ||
+    ctx.contactIdentifier ||
+    ctx.contactInfo?.name ||
+    (Array.isArray(ctx.messages) && ctx.messages.length > 0)
+  );
+}
+
+function isFreshEnough(ctx) {
+  if (!ctx?.timestamp) return false;
+  return Date.now() - ctx.timestamp <= MAX_CONTEXT_AGE_MS;
+}
+
+function showDefaultEmptyState() {
+  $('noContext').classList.remove('hidden');
+  $('groupChatNotice').classList.add('hidden');
+  $('activeContext').classList.add('hidden');
+  $('timelineSection').classList.add('hidden');
+}
+
+async function pollContext() {
+  const data = await chrome.storage.local.get(['current_context', 'last_known_good_context']);
+  const ctx = data.current_context;
+  const persistedLastKnownGood = data.last_known_good_context;
+
+  if (isContextPayloadValid(persistedLastKnownGood)) {
+    lastKnownGoodConversation = persistedLastKnownGood;
+  }
+
+  if (isExplicitClear(ctx)) {
+    console.log('[Zazi SP] Context cleared intentionally:', ctx.clearReason || 'unknown');
+    currentContext = null;
+    showDefaultEmptyState();
     return;
   }
 
-  // Stale check — allow up to 60s (adapter polls every 5s)
-  if (Date.now() - ctx.timestamp > 60000) return;
+  if (!isContextPayloadValid(ctx)) {
+    if (lastKnownGoodConversation && Date.now() - (lastKnownGoodConversation.timestamp || 0) <= REFRESH_GRACE_MS) {
+      console.log('[Zazi SP] Parse miss ignored — keeping last-known-good conversation');
+      if (!currentContext || currentContext.timestamp !== lastKnownGoodConversation.timestamp) {
+        currentContext = lastKnownGoodConversation;
+        renderContext(lastKnownGoodConversation);
+      }
+      return;
+    }
+
+    if (lastKnownGoodConversation && isFreshEnough(lastKnownGoodConversation)) {
+      if (!currentContext || currentContext.timestamp !== lastKnownGoodConversation.timestamp) {
+        currentContext = lastKnownGoodConversation;
+        renderContext(lastKnownGoodConversation);
+      }
+      return;
+    }
+
+    showDefaultEmptyState();
+    return;
+  }
+
+  if (!isFreshEnough(ctx) && lastKnownGoodConversation && isFreshEnough(lastKnownGoodConversation)) {
+    console.log('[Zazi SP] Stale refresh ignored — showing last-known-good conversation');
+    if (!currentContext || currentContext.timestamp !== lastKnownGoodConversation.timestamp) {
+      currentContext = lastKnownGoodConversation;
+      renderContext(lastKnownGoodConversation);
+    }
+    return;
+  }
 
   // Avoid redundant re-renders
   if (currentContext && currentContext.timestamp === ctx.timestamp) return;
+
   currentContext = ctx;
+  lastKnownGoodConversation = ctx;
+  console.log('[Zazi SP] Valid chat state stored in side panel cache', {
+    conversationKey: ctx.conversationKey,
+    contact: ctx.contact?.full_name || ctx.contactInfo?.name || ctx.contactIdentifier,
+  });
 
   // Handle group chat
   if (ctx.isGroup) {

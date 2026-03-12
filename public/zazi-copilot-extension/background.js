@@ -8,6 +8,26 @@ importScripts('lib/config.js', 'lib/supabase-client.js', 'lib/followup-engine.js
 // Open side panel when extension icon clicked
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 
+const CONTEXT_KEYS = ['current_context', 'last_known_good_context'];
+const MIN_CLEAR_MISSES = 3;
+
+function getConversationKey({ channel, contactIdentifier, contactInfo, contact }) {
+  const fallback = (contactIdentifier || contactInfo?.name || '').toString().trim().toLowerCase();
+  return `${channel}:${contact?.id || fallback || 'unknown'}`;
+}
+
+function isStrongContextPayload({ channel, contactIdentifier, contactInfo, messages }) {
+  if (!channel) return false;
+  if (contactIdentifier?.toString().trim()) return true;
+  if (contactInfo?.name?.toString().trim()) return true;
+  return Array.isArray(messages) && messages.length > 0;
+}
+
+async function getStoredContexts() {
+  return chrome.storage.local.get(CONTEXT_KEYS);
+}
+
+
 // Listen for messages from content scripts and side panel
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   // Handle OPEN_SIDE_PANEL specially — needs sender.tab context
@@ -92,9 +112,53 @@ async function handleMessage(msg, sender) {
       return { success: !result.error, result };
     }
 
+    case 'CONTEXT_CLEAR_REQUEST': {
+      const reason = msg.reason || 'unknown';
+      const allowedReasons = new Set(['confirmed_no_active_chat', 'chat_switched', 'tab_unloaded', 'explicit_reset']);
+      const misses = Number(msg.consecutiveMisses || 0);
+      const { current_context } = await getStoredContexts();
+
+      if (!allowedReasons.has(reason)) {
+        console.log('[Zazi BG] Blocked context clear request (invalid reason):', reason);
+        return { success: false, blocked: true };
+      }
+
+      if (reason === 'confirmed_no_active_chat' && misses < MIN_CLEAR_MISSES) {
+        console.log('[Zazi BG] Blocked context clear request (insufficient misses):', misses);
+        return { success: false, blocked: true };
+      }
+
+      if (current_context?.isGroup) {
+        console.log('[Zazi BG] Clearing group state intentionally:', reason);
+      } else {
+        console.log('[Zazi BG] State cleared intentionally:', reason);
+      }
+
+      await chrome.storage.local.set({
+        current_context: {
+          cleared: true,
+          clearReason: reason,
+          channel: msg.channel || current_context?.channel || null,
+          timestamp: Date.now(),
+        }
+      });
+
+      return { success: true, cleared: true };
+    }
+
     case 'CHAT_CONTEXT_UPDATE': {
       const { channel, contactIdentifier, messages, contactInfo } = msg;
+      const sourceTabId = sender?.tab?.id ?? null;
       await SupabaseClient.init();
+
+      if (!isStrongContextPayload({ channel, contactIdentifier, contactInfo, messages })) {
+        const { current_context } = await getStoredContexts();
+        if (current_context?.conversationKey) {
+          console.log('[Zazi BG] Null/empty overwrite blocked — keeping last-known-good conversation');
+          return { success: true, ignored: true, reason: 'weak_payload_blocked' };
+        }
+      }
+
 
       // ---- Contact matching: phone first, then name fallback ----
       let contact = null;
@@ -202,25 +266,37 @@ async function handleMessage(msg, sender) {
         });
       }
 
-      // ---- Store latest state for side panel ----
+      // ---- Store latest state for side panel (current + last-known-good) ----
+      const conversationKey = getConversationKey({ channel, contactIdentifier, contactInfo, contact });
+      const contextPayload = {
+        channel,
+        conversationKey,
+        sourceTabId,
+        contact,
+        candidateMatches,
+        contactIdentifier,
+        contactInfo,
+        replyStatus,
+        recommendation,
+        suggestion,
+        lastInboundTime: lastInboundTime?.toISOString(),
+        lastOutboundTime: lastOutboundTime?.toISOString(),
+        lastInboundPreview,
+        lastOutboundPreview,
+        followUpAttempts,
+        messages: (messages || []).slice(-10),
+        timestamp: Date.now(),
+      };
+
       await chrome.storage.local.set({
-        current_context: {
-          channel,
-          contact,
-          candidateMatches,
-          contactIdentifier,
-          contactInfo,
-          replyStatus,
-          recommendation,
-          suggestion,
-          lastInboundTime: lastInboundTime?.toISOString(),
-          lastOutboundTime: lastOutboundTime?.toISOString(),
-          lastInboundPreview,
-          lastOutboundPreview,
-          followUpAttempts,
-          messages: (messages || []).slice(-10),
-          timestamp: Date.now(),
-        }
+        current_context: contextPayload,
+        last_known_good_context: contextPayload,
+      });
+
+      console.log('[Zazi BG] Valid chat state stored', {
+        conversationKey,
+        contactId: contact?.id || null,
+        hasCandidates: candidateMatches.length > 0,
       });
 
       return { contact, candidateMatches, replyStatus, recommendation, suggestion };
@@ -239,5 +315,25 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     if (SupabaseClient.isAuthenticated()) {
       await SupabaseClient.refreshSession();
     }
+  }
+});
+
+chrome.tabs.onRemoved.addListener(async (tabId) => {
+  try {
+    const { current_context } = await getStoredContexts();
+    if (!current_context?.sourceTabId || current_context.sourceTabId !== tabId) return;
+
+    await chrome.storage.local.set({
+      current_context: {
+        cleared: true,
+        clearReason: 'tab_unloaded',
+        channel: current_context.channel || null,
+        timestamp: Date.now(),
+      }
+    });
+
+    console.log('[Zazi BG] State cleared intentionally: tab_unloaded');
+  } catch (err) {
+    console.warn('[Zazi BG] Failed to clear context on tab close:', err);
   }
 });
