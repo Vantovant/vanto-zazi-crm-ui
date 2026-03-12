@@ -313,27 +313,59 @@ export function Activities() {
           </div>
         </div>
 
-        {/* Activity Stats */}
+        {/* Activity Goals & Progress */}
         <div className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-700">
-            <h3 className="font-semibold text-white">Activity Summary</h3>
+          <div className="px-5 py-4 border-b border-slate-700 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Target className="w-4 h-4 text-teal-400" />
+              <h3 className="font-semibold text-white">Activity Goals</h3>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex bg-slate-900 rounded-lg p-0.5 text-xs">
+                <button type="button" onClick={() => setGoalsPeriod('today')}
+                  className={`px-2.5 py-1 rounded-md font-medium transition-colors ${goalsPeriod === 'today' ? 'bg-teal-600 text-white' : 'text-slate-400 hover:text-white'}`}>
+                  Today
+                </button>
+                <button type="button" onClick={() => setGoalsPeriod('week')}
+                  className={`px-2.5 py-1 rounded-md font-medium transition-colors ${goalsPeriod === 'week' ? 'bg-teal-600 text-white' : 'text-slate-400 hover:text-white'}`}>
+                  This Week
+                </button>
+              </div>
+              <button type="button" onClick={() => setShowGoalsModal(true)} className="p-1 rounded text-slate-400 hover:text-teal-400 hover:bg-slate-700 transition-colors" title="Set Goals">
+                <Settings className="w-4 h-4" />
+              </button>
+            </div>
           </div>
-          <div className="p-5 space-y-3">
-            {['whatsapp', 'call', 'meeting', 'note', 'registration'].map((type) => {
-              const count = activities.filter(a => a.activity_type === type).length;
-              const Icon = activityTypeIcons[type] || FileText;
-              return (
-                <div key={type} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className={`p-1.5 rounded-lg ${activityTypeColors[type]}`}>
-                      <Icon className="w-3.5 h-3.5" />
+          <div className="p-5 space-y-4">
+            {(() => {
+              const periodActivities = goalsPeriod === 'today' ? getActivitiesToday() : getActivitiesThisWeek();
+              const multiplier = goalsPeriod === 'week' ? 7 : 1;
+              const metrics = [
+                { type: 'whatsapp', label: 'WhatsApp', goal: goals.daily_whatsapp_goal * multiplier, icon: MessageCircle, color: 'bg-green-500', trackColor: 'bg-green-500/20', textColor: 'text-green-400' },
+                { type: 'email', label: 'Email', goal: goals.daily_email_goal * multiplier, icon: Mail, color: 'bg-violet-500', trackColor: 'bg-violet-500/20', textColor: 'text-violet-400' },
+                { type: 'call', label: 'Calls', goal: goals.daily_call_goal * multiplier, icon: Phone, color: 'bg-cyan-500', trackColor: 'bg-cyan-500/20', textColor: 'text-cyan-400' },
+              ];
+              return metrics.map(({ type, label, goal, icon: Icon, color, trackColor, textColor }) => {
+                const count = periodActivities.filter(a => a.activity_type === type).length;
+                const pct = Math.min(100, Math.round((count / goal) * 100));
+                return (
+                  <div key={type}>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <Icon className={`w-4 h-4 ${textColor}`} />
+                        <span className="text-sm text-slate-300">{label}</span>
+                      </div>
+                      <span className={`text-sm font-semibold ${count >= goal ? 'text-emerald-400' : 'text-white'}`}>
+                        {count} / {goal}
+                      </span>
                     </div>
-                    <span className="text-sm text-slate-300 capitalize">{type}</span>
+                    <div className={`w-full h-2 rounded-full ${trackColor}`}>
+                      <div className={`h-2 rounded-full ${color} transition-all duration-500`} style={{ width: `${pct}%` }} />
+                    </div>
                   </div>
-                  <span className="text-sm font-medium text-white">{count}</span>
-                </div>
-              );
-            })}
+                );
+              });
+            })()}
           </div>
         </div>
       </div>
