@@ -26,6 +26,8 @@
   let lastContactName = '';
   let lastMessageHash = '';
   let hasContext = false;
+  let consecutiveNoChatReads = 0;
+  const MAX_NO_CHAT_MISSES_BEFORE_CLEAR = 3;
 
   // ===== MINIMAL FLOATING LAUNCHER (opens Chrome side panel) =====
   function ensureLauncher() {
