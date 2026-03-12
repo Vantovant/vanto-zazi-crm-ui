@@ -204,29 +204,41 @@ async function handleMessage(msg, sender) {
     case 'CHAT_CONTEXT_UPDATE': {
       const { channel, contactIdentifier, messages, contactInfo } = msg;
       const sourceTabId = sender?.tab?.id ?? null;
-      await SupabaseClient.init();
 
-      if (!isStrongContextPayload({ channel, contactIdentifier, contactInfo, messages })) {
-        const { current_context } = await getStoredContexts();
-        if (current_context?.conversationKey) {
-          console.log('[Zazi BG] Null/empty overwrite blocked — keeping last-known-good conversation');
-          return { success: true, ignored: true, reason: 'weak_payload_blocked' };
-        }
+      if (!['whatsapp', 'gmail'].includes(channel)) {
+        return { success: false, error: 'Unsupported channel' };
       }
 
+      await SupabaseClient.init();
+
+      const stored = await getStoredContexts();
+      const currentChannel = stored.current_channel || stored.current_context?.channel || null;
+      const currentContext = stored.current_context || null;
+      const channelLastKnownKey = getLastKnownContextKey(channel);
+      const existingChannelContext = stored[channelLastKnownKey] || null;
+
+      if (!isStrongContextPayload({ channel, contactIdentifier, contactInfo, messages })) {
+        if (existingChannelContext?.conversationKey || (currentChannel === channel && currentContext?.conversationKey)) {
+          console.log('[Zazi BG] Null/empty update blocked', {
+            channel,
+            reason: 'weak_payload_blocked',
+          });
+          return { success: true, ignored: true, reason: 'weak_payload_blocked' };
+        }
+
+        return { success: true, ignored: true, reason: 'weak_payload_no_state' };
+      }
 
       // ---- Contact matching: phone first, then name fallback ----
       let contact = null;
       let candidateMatches = [];
 
       if (channel === 'whatsapp' && contactIdentifier) {
-        // Try phone match first
         const phoneDigits = contactIdentifier.replace(/[^0-9]/g, '');
         if (phoneDigits.length >= 7) {
           contact = await SupabaseClient.findContactByPhone(phoneDigits);
         }
 
-        // Fallback: name match
         if (!contact && contactInfo?.name) {
           const nameResults = await SupabaseClient.findContactByName(contactInfo.name);
           if (nameResults.length === 1) {
@@ -321,7 +333,7 @@ async function handleMessage(msg, sender) {
         });
       }
 
-      // ---- Store latest state for side panel (current + last-known-good) ----
+      // ---- Build channel context payload ----
       const conversationKey = getConversationKey({ channel, contactIdentifier, contactInfo, contact });
       const contextPayload = {
         channel,
@@ -343,16 +355,41 @@ async function handleMessage(msg, sender) {
         timestamp: Date.now(),
       };
 
-      await chrome.storage.local.set({
-        current_context: contextPayload,
-        last_known_good_context: contextPayload,
-      });
+      const tabIsActiveForChannel = await isSenderTabActiveForChannel(sourceTabId, channel);
+      const shouldPromoteToCurrent =
+        tabIsActiveForChannel ||
+        currentChannel === channel ||
+        !currentContext?.conversationKey ||
+        currentContext?.cleared;
 
-      console.log('[Zazi BG] Valid chat state stored', {
-        conversationKey,
-        contactId: contact?.id || null,
-        hasCandidates: candidateMatches.length > 0,
-      });
+      const previousChannelContext = existingChannelContext;
+      const updateType = previousChannelContext?.conversationKey === conversationKey ? 'refreshed' : 'detected';
+
+      const storageUpdate = {
+        [channelLastKnownKey]: contextPayload,
+      };
+
+      if (shouldPromoteToCurrent) {
+        storageUpdate.current_channel = channel;
+        storageUpdate.current_context = contextPayload;
+      }
+
+      await chrome.storage.local.set(storageUpdate);
+
+      if (shouldPromoteToCurrent) {
+        console.log(`[Zazi BG] Valid chat ${updateType}`, {
+          channel,
+          conversationKey,
+          contactId: contact?.id || null,
+          sourceTabId,
+        });
+      } else {
+        console.log('[Zazi BG] Stored valid channel context without switching active channel', {
+          channel,
+          currentChannel,
+          conversationKey,
+        });
+      }
 
       return { contact, candidateMatches, replyStatus, recommendation, suggestion };
     }
