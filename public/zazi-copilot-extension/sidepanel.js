@@ -116,12 +116,18 @@ async function pollContext() {
   if (!isContextPayloadValid(ctx)) {
     if (lastKnownGoodConversation && Date.now() - (lastKnownGoodConversation.timestamp || 0) <= REFRESH_GRACE_MS) {
       console.log('[Zazi SP] Parse miss ignored — keeping last-known-good conversation');
-      renderContext(lastKnownGoodConversation);
+      if (!currentContext || currentContext.timestamp !== lastKnownGoodConversation.timestamp) {
+        currentContext = lastKnownGoodConversation;
+        renderContext(lastKnownGoodConversation);
+      }
       return;
     }
 
     if (lastKnownGoodConversation && isFreshEnough(lastKnownGoodConversation)) {
-      renderContext(lastKnownGoodConversation);
+      if (!currentContext || currentContext.timestamp !== lastKnownGoodConversation.timestamp) {
+        currentContext = lastKnownGoodConversation;
+        renderContext(lastKnownGoodConversation);
+      }
       return;
     }
 
@@ -131,7 +137,10 @@ async function pollContext() {
 
   if (!isFreshEnough(ctx) && lastKnownGoodConversation && isFreshEnough(lastKnownGoodConversation)) {
     console.log('[Zazi SP] Stale refresh ignored — showing last-known-good conversation');
-    renderContext(lastKnownGoodConversation);
+    if (!currentContext || currentContext.timestamp !== lastKnownGoodConversation.timestamp) {
+      currentContext = lastKnownGoodConversation;
+      renderContext(lastKnownGoodConversation);
+    }
     return;
   }
 
