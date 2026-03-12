@@ -101,6 +101,20 @@ export function useContactActivities() {
     return neglected.sort((a, b) => b.daysSince - a.daysSince);
   }, [activities]);
 
+  // Filter activities for today
+  const getActivitiesToday = useCallback(() => {
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    return activities.filter(a => new Date(a.created_at) >= startOfDay);
+  }, [activities]);
+
+  // Filter activities for the last 7 days
+  const getActivitiesThisWeek = useCallback(() => {
+    const now = new Date();
+    const weekAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+    return activities.filter(a => new Date(a.created_at) >= weekAgo);
+  }, [activities]);
+
   return {
     activities,
     loading,
@@ -108,6 +122,8 @@ export function useContactActivities() {
     daysSinceLastActivity,
     getContactActivities,
     getNeglectedContacts,
+    getActivitiesToday,
+    getActivitiesThisWeek,
     refetch: fetchActivities,
   };
 }
