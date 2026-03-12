@@ -22,6 +22,8 @@ const CHANNEL_HOSTS = {
   gmail: 'mail.google.com',
 };
 
+const LEAD_TYPES = ['Prospect', 'Registered_Nopurchase', 'Purchase_Nostatus', 'Purchase_Status', 'Expired', 'Customer', 'Distributor'];
+
 function getLastKnownContextKey(channel) {
   return channel === 'gmail' ? 'last_known_good_gmail_context' : 'last_known_good_whatsapp_context';
 }
@@ -56,7 +58,6 @@ async function isSenderTabActiveForChannel(tabId, channel) {
 }
 
 // ===== PERSISTENT CONTACT MAPPINGS =====
-// Maps conversationKey → contact_id for reuse across sessions
 async function getContactMappings() {
   const data = await chrome.storage.local.get('contact_mappings');
   return data.contact_mappings || {};
@@ -105,6 +106,14 @@ async function handleMessage(msg, sender) {
         email: SupabaseClient._userEmail,
       };
 
+    case 'GET_REMEMBERED_EMAIL': {
+      const data = await chrome.storage.local.get('remembered_email');
+      return { email: data.remembered_email || '' };
+    }
+
+    case 'GET_LEAD_TYPES':
+      return { leadTypes: LEAD_TYPES };
+
     case 'LOOKUP_CONTACT_PHONE':
       await SupabaseClient.init();
       return { contact: await SupabaseClient.findContactByPhone(msg.phone) };
@@ -144,6 +153,12 @@ async function handleMessage(msg, sender) {
       await SupabaseClient.init();
       const result = await SupabaseClient.logActivity(msg.params);
       return { success: !result.error, result };
+    }
+
+    case 'CREATE_CONTACT': {
+      await SupabaseClient.init();
+      const createResult = await SupabaseClient.createContact(msg.params);
+      return createResult;
     }
 
     case 'SYNC_FOLLOWUP_STATE': {
@@ -188,7 +203,6 @@ async function handleMessage(msg, sender) {
           currentChannel,
           reason,
         });
-        // Clear just that channel's last-known-good, not the active context
         if (effectiveChannel) {
           await chrome.storage.local.set({
             [getLastKnownContextKey(effectiveChannel)]: null,
@@ -202,16 +216,11 @@ async function handleMessage(msg, sender) {
         lastKnownForChannel?.timestamp &&
         Date.now() - lastKnownForChannel.timestamp <= CLEAR_GRACE_MS
       ) {
-        console.log('[Zazi BG] Parse miss ignored — clear blocked by sticky grace window', {
-          channel: effectiveChannel,
-          lastKnownAgeMs: Date.now() - lastKnownForChannel.timestamp,
-        });
+        console.log('[Zazi BG] Parse miss ignored — clear blocked by sticky grace window');
         return { success: true, ignored: true, reason: 'clear_grace_window' };
       }
 
-      console.log('[Zazi BG] State cleared intentionally:', reason, {
-        channel: effectiveChannel || null,
-      });
+      console.log('[Zazi BG] State cleared intentionally:', reason, { channel: effectiveChannel });
 
       await chrome.storage.local.set({
         current_channel: null,
@@ -244,82 +253,124 @@ async function handleMessage(msg, sender) {
 
       if (!isStrongContextPayload({ channel, contactIdentifier, contactInfo, messages })) {
         if (existingChannelContext?.conversationKey || (currentChannel === channel && currentContext?.conversationKey)) {
-          console.log('[Zazi BG] Null/empty update blocked', {
-            channel,
-            reason: 'weak_payload_blocked',
-          });
+          console.log('[Zazi BG] Null/empty update blocked', { channel, reason: 'weak_payload_blocked' });
           return { success: true, ignored: true, reason: 'weak_payload_blocked' };
         }
         return { success: true, ignored: true, reason: 'weak_payload_no_state' };
       }
 
-      // ---- Contact matching: phone/email first, then persistent mapping, then name fallback ----
+      // ---- Contact matching: phone/email → persistent mapping → name fallback ----
       let contact = null;
       let candidateMatches = [];
       const contactMappings = await getContactMappings();
 
-      if (channel === 'whatsapp' && contactIdentifier) {
-        const phoneDigits = contactIdentifier.replace(/[^0-9]/g, '');
-        if (phoneDigits.length >= 7) {
-          contact = await SupabaseClient.findContactByPhone(phoneDigits);
+      console.log('[Zazi BG] CRM search started', {
+        channel,
+        contactIdentifier,
+        contactName: contactInfo?.name,
+      });
+
+      if (channel === 'whatsapp') {
+        // Try phone first
+        if (contactIdentifier) {
+          const phoneDigits = contactIdentifier.replace(/[^0-9]/g, '');
+          if (phoneDigits.length >= 7) {
+            contact = await SupabaseClient.findContactByPhone(phoneDigits);
+            if (contact) console.log('[Zazi BG] CRM matched by phone:', contact.full_name);
+          }
         }
 
+        // Try name-as-phone (when WhatsApp shows unsaved number as name)
         if (!contact && contactInfo?.name) {
-          // Check persistent mapping first
-          const mapKey = `whatsapp:${(contactInfo.phone || contactInfo.name || '').trim().toLowerCase()}`;
-          const mappedContactId = contactMappings[mapKey];
-          if (mappedContactId) {
-            const mapped = await SupabaseClient._query('contacts', `id=eq.${mappedContactId}&limit=1`);
-            if (Array.isArray(mapped) && mapped.length > 0) {
-              contact = mapped[0];
-              console.log('[Zazi BG] Contact resolved via persistent mapping:', mapKey);
+          const nameDigits = contactInfo.name.replace(/[^0-9]/g, '');
+          if (nameDigits.length >= 7) {
+            contact = await SupabaseClient.findContactByPhone(nameDigits);
+            if (contact) console.log('[Zazi BG] CRM matched by name-as-phone:', contact.full_name);
+          }
+        }
+
+        // Try persistent mapping
+        if (!contact) {
+          const mapKeys = [
+            `whatsapp:${(contactIdentifier || '').trim().toLowerCase()}`,
+            `whatsapp:${(contactInfo?.name || '').trim().toLowerCase()}`,
+            `whatsapp:${(contactInfo?.phone || '').trim().toLowerCase()}`,
+          ].filter(k => k !== 'whatsapp:');
+
+          for (const mapKey of mapKeys) {
+            const mappedId = contactMappings[mapKey];
+            if (mappedId) {
+              const mapped = await SupabaseClient._query('contacts', `id=eq.${mappedId}&limit=1`);
+              if (Array.isArray(mapped) && mapped.length > 0) {
+                contact = mapped[0];
+                console.log('[Zazi BG] CRM matched via persistent mapping:', mapKey, '→', contact.full_name);
+                break;
+              }
             }
           }
+        }
 
-          if (!contact) {
-            const nameResults = await SupabaseClient.findContactByName(contactInfo.name);
-            if (nameResults.length === 1) {
-              contact = nameResults[0];
-            } else if (nameResults.length > 1) {
-              candidateMatches = nameResults;
-            }
+        // Name fallback
+        if (!contact && contactInfo?.name) {
+          const nameResults = await SupabaseClient.findContactByName(contactInfo.name);
+          if (nameResults.length === 1) {
+            contact = nameResults[0];
+            console.log('[Zazi BG] CRM matched by name:', contact.full_name);
+          } else if (nameResults.length > 1) {
+            candidateMatches = nameResults;
+            console.log('[Zazi BG] CRM name search returned multiple matches:', nameResults.length);
           }
         }
       } else if (channel === 'gmail' && contactIdentifier) {
         contact = await SupabaseClient.findContactByEmail(contactIdentifier);
+        if (contact) console.log('[Zazi BG] CRM matched by email:', contact.full_name);
 
         if (!contact) {
-          // Check persistent mapping
           const mapKey = `gmail:${contactIdentifier.trim().toLowerCase()}`;
-          const mappedContactId = contactMappings[mapKey];
-          if (mappedContactId) {
-            const mapped = await SupabaseClient._query('contacts', `id=eq.${mappedContactId}&limit=1`);
+          const mappedId = contactMappings[mapKey];
+          if (mappedId) {
+            const mapped = await SupabaseClient._query('contacts', `id=eq.${mappedId}&limit=1`);
             if (Array.isArray(mapped) && mapped.length > 0) {
               contact = mapped[0];
-              console.log('[Zazi BG] Contact resolved via persistent mapping:', mapKey);
+              console.log('[Zazi BG] CRM matched via persistent mapping:', mapKey);
             }
           }
+        }
 
-          if (!contact && contactInfo?.name) {
-            const nameResults = await SupabaseClient.findContactByName(contactInfo.name);
-            if (nameResults.length === 1) {
-              contact = nameResults[0];
-            } else if (nameResults.length > 1) {
-              candidateMatches = nameResults;
-            }
+        if (!contact && contactInfo?.name) {
+          const nameResults = await SupabaseClient.findContactByName(contactInfo.name);
+          if (nameResults.length === 1) {
+            contact = nameResults[0];
+            console.log('[Zazi BG] CRM matched by name (Gmail):', contact.full_name);
+          } else if (nameResults.length > 1) {
+            candidateMatches = nameResults;
           }
         }
       }
 
-      // Save persistent mapping if we found a contact
+      if (!contact && candidateMatches.length === 0) {
+        console.log('[Zazi BG] CRM search: no match found', {
+          channel,
+          identifier: contactIdentifier,
+          name: contactInfo?.name,
+        });
+      }
+
+      // Save persistent mapping if contact found
       if (contact) {
-        const mapKey = `${channel}:${(contactIdentifier || contactInfo?.name || '').trim().toLowerCase()}`;
-        if (mapKey && contactMappings[mapKey] !== contact.id) {
-          await saveContactMapping(mapKey, contact.id);
+        const mapKeys = [
+          `${channel}:${(contactIdentifier || '').trim().toLowerCase()}`,
+          `${channel}:${(contactInfo?.name || '').trim().toLowerCase()}`,
+        ].filter(k => k !== `${channel}:`);
+
+        for (const mapKey of mapKeys) {
+          if (contactMappings[mapKey] !== contact.id) {
+            await saveContactMapping(mapKey, contact.id);
+          }
         }
       }
 
-      // ---- Compute reply status from visible messages ----
+      // ---- Compute reply status ----
       let lastInboundTime = null;
       let lastOutboundTime = null;
       let followUpAttempts = 0;
@@ -379,7 +430,7 @@ async function handleMessage(msg, sender) {
         lastProduct,
       });
 
-      // ---- Sync follow-up state to DB if we have a contact ----
+      // ---- Sync follow-up state ----
       if (contact) {
         await SupabaseClient.upsertFollowUpState({
           contact_id: contact.id,
@@ -393,7 +444,7 @@ async function handleMessage(msg, sender) {
         });
       }
 
-      // ---- Build channel context payload ----
+      // ---- Build context payload ----
       const conversationKey = getConversationKey({ channel, contactIdentifier, contactInfo, contact });
       const contextPayload = {
         channel,
@@ -441,13 +492,7 @@ async function handleMessage(msg, sender) {
           channel,
           conversationKey,
           contactId: contact?.id || null,
-          sourceTabId,
-        });
-      } else {
-        console.log('[Zazi BG] Stored valid channel context without switching active channel', {
-          channel,
-          currentChannel,
-          conversationKey,
+          contactName: contact?.full_name || contactInfo?.name || null,
         });
       }
 

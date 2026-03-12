@@ -1,6 +1,5 @@
 /**
  * Zazi Follow-Up Copilot — WhatsApp Web Content Script (Adapter)
- * Minimal launcher button only. Full UI lives in Chrome side panel.
  * Detects active chat, sends context to background, which updates side panel state.
  */
 
@@ -8,7 +7,7 @@
   if (window.__zaziWACopilotLoaded) return;
   window.__zaziWACopilotLoaded = true;
 
-  console.log('[Zazi WA] Copilot adapter loaded (launcher-only mode)');
+  console.log('[Zazi WA] Copilot adapter loaded');
 
   // ===== SELECTORS =====
   const SEL = {
@@ -33,7 +32,7 @@
   const MIN_NO_CHAT_DURATION_MS = 12000;
   const REFRESH_LOG_INTERVAL_MS = 10000;
 
-  // ===== MINIMAL FLOATING LAUNCHER (opens Chrome side panel) =====
+  // ===== MINIMAL FLOATING LAUNCHER =====
   function ensureLauncher() {
     if (document.getElementById('zazi-copilot-launcher')) return;
 
@@ -83,35 +82,28 @@
     document.body.appendChild(tooltip);
 
     launcher.addEventListener('click', () => {
-      console.log('[Zazi WA] Launcher clicked — requesting side panel open');
       chrome.runtime.sendMessage({ type: 'OPEN_SIDE_PANEL' });
     });
   }
 
   function updateLauncherBadge(active) {
     const launcher = document.getElementById('zazi-copilot-launcher');
-    if (launcher) {
-      launcher.classList.toggle('has-context', active);
-    }
+    if (launcher) launcher.classList.toggle('has-context', active);
   }
 
   // ===== GROUP DETECTION =====
   function isGroupChat() {
-    // Check for group icon in header
     if ($(SEL.groupMeta)) return true;
-    // Check for "participants" or "members" text in header subtitle
     if ($(SEL.participantCount)) return true;
-    // Check header subtitle for comma-separated participant list
     const subtitleEl = document.querySelector('#main header span[title]:nth-child(2)');
     if (subtitleEl) {
       const text = subtitleEl.getAttribute('title') || '';
-      // Group subtitles typically show participant names separated by commas
       if (text.includes(',') && !text.includes('+')) return true;
     }
     return false;
   }
 
-  // ===== DOM HELPERS =====
+  // ===== IMPROVED IDENTITY EXTRACTION =====
   function getActiveContact() {
     const headerEl = $(SEL.contactInfo);
     if (!headerEl) return null;
@@ -119,14 +111,53 @@
     if (!name) return null;
 
     let phone = '';
+
+    // Strategy 1: Header phone element with "+" in title
     const phoneEl = $(SEL.phoneFromHeader);
-    if (phoneEl) phone = phoneEl.getAttribute('title') || phoneEl.textContent || '';
-    if (!phone) {
-      const sub = document.querySelector('#main header span[title*="+"]');
-      if (sub) phone = sub.textContent || '';
+    if (phoneEl) {
+      phone = phoneEl.getAttribute('title') || phoneEl.textContent || '';
     }
 
-    return { name, phone: phone.replace(/[^0-9+]/g, '') };
+    // Strategy 2: Check all spans in header for phone-like patterns
+    if (!phone) {
+      const headerSpans = $$('#main header span[title]');
+      for (const span of headerSpans) {
+        const t = span.getAttribute('title') || '';
+        if (/\+?\d[\d\s\-()]{6,}/.test(t) && t !== name) {
+          phone = t;
+          break;
+        }
+      }
+    }
+
+    // Strategy 3: If the contact name itself looks like a phone number
+    if (!phone && /^\+?\d[\d\s\-()]{6,}$/.test(name)) {
+      phone = name;
+    }
+
+    // Strategy 4: Check drawer/info panel for phone
+    if (!phone) {
+      const drawerPhone = document.querySelector('[data-testid="phone-number"] span, .copyable-text[data-tab] span[title*="+"]');
+      if (drawerPhone) {
+        phone = drawerPhone.textContent || drawerPhone.getAttribute('title') || '';
+      }
+    }
+
+    // Strategy 5: Extract from data-id attributes on messages (contains phone in some formats)
+    if (!phone) {
+      const msgEl = document.querySelector('#main [data-id*="@"]');
+      if (msgEl) {
+        const dataId = msgEl.getAttribute('data-id') || '';
+        const phoneMatch = dataId.match(/(\d{10,15})@/);
+        if (phoneMatch) {
+          phone = phoneMatch[1];
+        }
+      }
+    }
+
+    const cleanPhone = phone.replace(/[^0-9+]/g, '');
+    console.log('[Zazi WA] Identity extracted:', { name, phone: cleanPhone || '(none)' });
+    return { name, phone: cleanPhone };
   }
 
   function readVisibleMessages() {
@@ -163,15 +194,13 @@
     return messages;
   }
 
-  /** Simple hash of last 5 messages to detect new messages in same chat */
   function computeMessageHash(messages) {
     const last5 = messages.slice(-5);
     return last5.map(m => `${m.direction}:${m.text.substring(0, 30)}`).join('|');
   }
 
   function getConversationKey(contactInfo) {
-    const key = (contactInfo?.phone || contactInfo?.name || '').trim().toLowerCase();
-    return key;
+    return (contactInfo?.phone || contactInfo?.name || '').trim().toLowerCase();
   }
 
   async function requestContextClear(reason, extra = {}) {
@@ -202,30 +231,17 @@
     try {
       const contactInfo = getActiveContact();
       if (!contactInfo || !contactInfo.name) {
-        if (document.visibilityState === 'hidden') {
-          console.log('[Zazi WA] Parse miss ignored (tab hidden)');
-          return;
-        }
+        if (document.visibilityState === 'hidden') return;
 
         consecutiveNoChatReads += 1;
         if (!noChatSince) noChatSince = Date.now();
         const noChatDurationMs = Date.now() - noChatSince;
 
-        console.log('[Zazi WA] Parse miss (no active chat)', {
-          consecutiveNoChatReads,
-          threshold: MAX_NO_CHAT_MISSES_BEFORE_CLEAR,
-          noChatDurationMs,
-          minDurationMs: MIN_NO_CHAT_DURATION_MS,
-        });
-
         const stillInDebounceWindow =
           consecutiveNoChatReads < MAX_NO_CHAT_MISSES_BEFORE_CLEAR ||
           noChatDurationMs < MIN_NO_CHAT_DURATION_MS;
 
-        if (stillInDebounceWindow) {
-          console.log('[Zazi WA] Parse miss ignored — keeping last-known-good state');
-          return;
-        }
+        if (stillInDebounceWindow) return;
 
         if (lastContactName) {
           console.log('[Zazi WA] Clearing context after confirmed sustained no-chat state');
@@ -246,11 +262,9 @@
 
       // Detect and skip group chats
       if (isGroupChat()) {
-        console.log('[Zazi WA] Group chat detected, skipping:', contactInfo.name);
         if (lastContactName !== contactInfo.name) {
           lastContactName = contactInfo.name;
           lastMessageHash = '';
-          // Store group indicator so side panel can show appropriate message
           await chrome.storage.local.set({
             current_context: {
               channel: 'whatsapp',
@@ -267,16 +281,12 @@
       const messages = readVisibleMessages();
       const msgHash = computeMessageHash(messages);
 
-      // Skip if same contact AND same messages (no new activity)
       const isSameContact = contactInfo.name === lastContactName;
       const isSameMessages = msgHash === lastMessageHash;
       if (isSameContact && isSameMessages) {
         const now = Date.now();
         if (now - lastRefreshLogAt >= REFRESH_LOG_INTERVAL_MS) {
-          console.log('[Zazi WA] Valid chat refreshed (sticky keepalive)', {
-            contact: contactInfo.name,
-            conversationKey: `whatsapp:${getConversationKey(contactInfo)}`,
-          });
+          console.log('[Zazi WA] Valid chat refreshed (sticky keepalive)', { contact: contactInfo.name });
           lastRefreshLogAt = now;
         }
         return;
@@ -288,11 +298,10 @@
 
       console.log('[Zazi WA] Valid chat detected:', {
         contact: contactInfo.name,
-        conversationKey: `whatsapp:${getConversationKey(contactInfo)}`,
+        phone: contactInfo.phone || '(none)',
         mode: isSameContact ? 'new_messages' : 'chat_switch',
       });
 
-      // Send context to background — background processes CRM match + intelligence
       const response = await chrome.runtime.sendMessage({
         type: 'CHAT_CONTEXT_UPDATE',
         channel: 'whatsapp',
@@ -300,10 +309,6 @@
         contactInfo,
         messages,
       });
-
-      if (response?.ignored) {
-        console.log('[Zazi WA] Null/empty overwrite attempt blocked by background');
-      }
 
       if (response && !response.error && !response.ignored) {
         hasContext = true;
@@ -314,7 +319,7 @@
     }
   }
 
-  // ===== MUTATION OBSERVER for chat switches =====
+  // ===== MUTATION OBSERVER =====
   function startObserver() {
     const target = document.getElementById('app') || document.body;
     const observer = new MutationObserver(() => {
@@ -334,7 +339,6 @@
     } else if (msg.action === 'get_chat_context') {
       sendResponse({ contactInfo: getActiveContact(), messages: readVisibleMessages() });
     } else if (msg.action === 'force_refresh') {
-      // Force re-process even if same chat (e.g. after creating contact)
       lastContactName = '';
       lastMessageHash = '';
       consecutiveNoChatReads = 0;
@@ -350,15 +354,12 @@
   function init() {
     ensureLauncher();
     startObserver();
-    setInterval(processActiveChat, 5000); // Poll every 5s for new messages
+    setInterval(processActiveChat, 5000);
     setTimeout(processActiveChat, 2000);
   }
 
-  if (document.readyState === 'complete') {
-    init();
-  } else {
-    window.addEventListener('load', init);
-  }
+  if (document.readyState === 'complete') init();
+  else window.addEventListener('load', init);
 
   window.addEventListener('beforeunload', () => {
     requestContextClear('tab_unloaded');

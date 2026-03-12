@@ -19,6 +19,17 @@ const CONTEXT_STORAGE_KEYS = [
   'last_known_good_gmail_context',
 ];
 
+// Lead type intelligence map
+const LEAD_TYPE_INTEL = {
+  'Prospect': { icon: '🎯', label: 'Prospect', color: '#6b7280', hint: 'Prospecting / conversion path' },
+  'Registered_Nopurchase': { icon: '📋', label: 'Registered (No Purchase)', color: '#f59e0b', hint: 'Activation / first-purchase follow-up' },
+  'Purchase_Nostatus': { icon: '🛒', label: 'Purchase (No Status)', color: '#3b82f6', hint: 'Status follow-up needed' },
+  'Purchase_Status': { icon: '✅', label: 'Active (Status)', color: '#22c55e', hint: 'Support / reorder / progression' },
+  'Expired': { icon: '⏰', label: 'Expired', color: '#ef4444', hint: 'Reactivation path' },
+  'Customer': { icon: '🤝', label: 'Customer', color: '#10b981', hint: 'Support / reorder' },
+  'Distributor': { icon: '🌟', label: 'Distributor', color: '#8b5cf6', hint: 'Team support / progression' },
+};
+
 function getLastKnownContextKey(channel) {
   return channel === 'gmail' ? 'last_known_good_gmail_context' : 'last_known_good_whatsapp_context';
 }
@@ -39,22 +50,28 @@ function hydrateLastKnownContexts(data) {
 
 function pickFallbackContext(preferredChannel) {
   const now = Date.now();
-
   const preferred = preferredChannel ? lastKnownByChannel[preferredChannel] : null;
   if (isContextPayloadValid(preferred) && now - (preferred.timestamp || 0) <= REFRESH_GRACE_MS) {
     return preferred;
   }
-
   const candidates = Object.values(lastKnownByChannel)
     .filter((ctx) => isContextPayloadValid(ctx) && now - (ctx.timestamp || 0) <= MAX_CONTEXT_AGE_MS)
     .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-
   return candidates[0] || null;
 }
 
 // ===== INIT =====
 async function init() {
   console.log('[Zazi SP] Side panel initializing');
+
+  // Prefill remembered email
+  try {
+    const remembered = await chrome.runtime.sendMessage({ type: 'GET_REMEMBERED_EMAIL' });
+    if (remembered?.email) {
+      $('email').value = remembered.email;
+    }
+  } catch (e) { /* ignore */ }
+
   const res = await chrome.runtime.sendMessage({ type: 'AUTH_STATUS' });
   if (res.authenticated) {
     showConnected(res.email);
@@ -150,12 +167,8 @@ async function pollContext() {
   currentChannel = data.current_channel || currentChannel;
 
   if (isExplicitClear(ctx)) {
-    console.log('[Zazi SP] Context cleared intentionally:', ctx.clearReason || 'unknown');
     const fallback = pickFallbackContext(currentChannel || ctx.channel);
     if (fallback && Date.now() - (fallback.timestamp || 0) <= REFRESH_GRACE_MS) {
-      console.log('[Zazi SP] Clear event fallback — keeping last-known-good context', {
-        channel: fallback.channel,
-      });
       if (!currentContext || currentContext.timestamp !== fallback.timestamp) {
         currentContext = fallback;
         currentChannel = fallback.channel || currentChannel;
@@ -163,7 +176,6 @@ async function pollContext() {
       }
       return;
     }
-
     currentContext = null;
     showDefaultEmptyState();
     return;
@@ -172,10 +184,6 @@ async function pollContext() {
   if (!isContextPayloadValid(ctx)) {
     const fallback = pickFallbackContext(currentChannel);
     if (fallback) {
-      console.log('[Zazi SP] Parse miss ignored — rendering sticky last-known-good context', {
-        channel: fallback.channel,
-        conversationKey: fallback.conversationKey,
-      });
       if (!currentContext || currentContext.timestamp !== fallback.timestamp) {
         currentContext = fallback;
         currentChannel = fallback.channel || currentChannel;
@@ -183,7 +191,6 @@ async function pollContext() {
       }
       return;
     }
-
     showDefaultEmptyState();
     return;
   }
@@ -191,7 +198,6 @@ async function pollContext() {
   if (!isFreshEnough(ctx)) {
     const fallback = pickFallbackContext(ctx.channel || currentChannel);
     if (fallback && fallback.timestamp !== ctx.timestamp) {
-      console.log('[Zazi SP] Stale refresh ignored — showing last-known-good conversation');
       if (!currentContext || currentContext.timestamp !== fallback.timestamp) {
         currentContext = fallback;
         currentChannel = fallback.channel || currentChannel;
@@ -206,12 +212,6 @@ async function pollContext() {
   currentContext = ctx;
   currentChannel = ctx.channel || currentChannel;
   rememberLastKnownContext(ctx);
-
-  console.log('[Zazi SP] Valid chat state stored in side panel cache', {
-    channel: ctx.channel,
-    conversationKey: ctx.conversationKey,
-    contact: ctx.contact?.full_name || ctx.contactInfo?.name || ctx.contactIdentifier,
-  });
 
   if (ctx.isGroup) {
     $('noContext').classList.add('hidden');
@@ -238,15 +238,28 @@ function renderContext(ctx) {
   const contact = ctx.contact;
   $('contactName').textContent = contact?.full_name || ctx.contactInfo?.name || ctx.contactIdentifier || 'Unknown';
 
+  // Hide inline create form when re-rendering
+  $('inlineCreateForm').classList.add('hidden');
+
   if (contact) {
     $('noContactMatch').classList.add('hidden');
     $('candidateMatches').classList.add('hidden');
-    $('contactType').textContent = contact.lead_type || '';
+
+    // Lead type with intelligence
+    const lt = contact.lead_type || 'Prospect';
+    const intel = LEAD_TYPE_INTEL[lt] || LEAD_TYPE_INTEL['Prospect'];
+    $('contactType').textContent = `${intel.icon} ${intel.label}`;
+    $('contactType').style.background = `${intel.color}20`;
+    $('contactType').style.color = intel.color;
     $('contactTemp').textContent = contact.lead_temperature || '';
     $('contactStatus').textContent = contact.communication_status || '';
+
+    // Lead type intelligence bar
+    renderLeadTypeIntel(contact);
   } else if (ctx.candidateMatches && ctx.candidateMatches.length > 0) {
     $('noContactMatch').classList.add('hidden');
     $('candidateMatches').classList.remove('hidden');
+    $('leadTypeIntel').classList.add('hidden');
     $('contactType').textContent = '';
     $('contactTemp').textContent = '';
     $('contactStatus').textContent = '';
@@ -254,6 +267,7 @@ function renderContext(ctx) {
   } else {
     $('noContactMatch').classList.remove('hidden');
     $('candidateMatches').classList.add('hidden');
+    $('leadTypeIntel').classList.add('hidden');
     $('contactType').textContent = '';
     $('contactTemp').textContent = '';
     $('contactStatus').textContent = '';
@@ -281,7 +295,6 @@ function renderContext(ctx) {
   $('recAction').textContent = rec.badge || '—';
   $('recReason').textContent = rec.reason || '';
 
-  // Set tone/objective selects to match recommendation
   if (rec.suggestedTone) $('toneSelect').value = rec.suggestedTone;
   if (rec.suggestedObjective) $('objectiveSelect').value = rec.suggestedObjective;
 
@@ -292,15 +305,50 @@ function renderContext(ctx) {
     $('suggestionText').textContent = text || '—';
   }
 
-  // Messages
   renderMessages(ctx.messages || []);
 
-  // Load timeline if contact exists
   if (contact?.id) {
     loadTimeline(contact.id);
   } else {
     $('timelineSection').classList.add('hidden');
   }
+}
+
+function renderLeadTypeIntel(contact) {
+  const el = $('leadTypeIntel');
+  if (!contact) { el.classList.add('hidden'); return; }
+
+  const lt = contact.lead_type || 'Prospect';
+  const intel = LEAD_TYPE_INTEL[lt] || LEAD_TYPE_INTEL['Prospect'];
+  const regStatus = contact.registration_status || 'Not Registered';
+  const goStatus = contact.go_status || '';
+
+  let details = [`${intel.icon} ${intel.hint}`];
+
+  if (lt === 'Expired') {
+    details.push('⚠️ Account expired — reactivation needed');
+  } else if (lt === 'Registered_Nopurchase') {
+    details.push('📦 Registered but no purchase yet — help them activate');
+  } else if (lt === 'Purchase_Nostatus') {
+    details.push('🔄 Has purchased but no active status — follow up on status');
+  } else if (lt === 'Purchase_Status') {
+    details.push('💪 Active with status — support, reorder, or progression');
+  }
+
+  if (regStatus === 'Not Registered') {
+    details.push('📝 Not registered yet');
+  } else if (regStatus === 'Registered') {
+    details.push('✅ Registered');
+  } else if (regStatus === 'Activated') {
+    details.push('🚀 Activated');
+  }
+
+  if (goStatus) {
+    details.push(`🏷️ GO Status: ${goStatus}`);
+  }
+
+  el.innerHTML = details.map(d => `<div class="intel-line">${d}</div>`).join('');
+  el.classList.remove('hidden');
 }
 
 function renderCandidates(candidates) {
@@ -317,7 +365,6 @@ function renderCandidates(candidates) {
 
 async function selectCandidate(contact) {
   if (!currentContext) return;
-  // Update context with selected contact and re-process
   currentContext.contact = contact;
   currentContext.candidateMatches = [];
   currentContext.timestamp = Date.now();
@@ -329,7 +376,7 @@ async function selectCandidate(contact) {
     [channelKey]: currentContext,
   });
 
-  // Save persistent mapping so this contact is reused next time
+  // Save persistent mapping
   const mapKey = `${currentContext.channel}:${(currentContext.contactIdentifier || currentContext.contactInfo?.name || '').trim().toLowerCase()}`;
   if (mapKey && contact.id) {
     await chrome.runtime.sendMessage({
@@ -341,7 +388,7 @@ async function selectCandidate(contact) {
 
   rememberLastKnownContext(currentContext);
   renderContext(currentContext);
-  // Force adapter to re-send so background syncs follow-up state
+
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (tab) {
     chrome.tabs.sendMessage(tab.id, { action: 'force_refresh' }).catch(() => {});
@@ -371,7 +418,6 @@ async function loadTimeline(contactId) {
 
   $('timelineSection').classList.remove('hidden');
 
-  // Activities
   const tl = $('timelineList');
   tl.innerHTML = '';
   const activities = res.activities || [];
@@ -391,7 +437,6 @@ async function loadTimeline(contactId) {
     tl.innerHTML = '<p style="color:#64748b;text-align:center;padding:8px;">No activities</p>';
   }
 
-  // Orders
   const ol = $('ordersList');
   ol.innerHTML = '';
   const orders = res.orders || [];
@@ -414,7 +459,7 @@ async function loadTimeline(contactId) {
 
 // ===== ACTIONS =====
 
-// Regenerate suggestion with selected tone/objective
+// Regenerate suggestion
 $('regenerateBtn').addEventListener('click', async () => {
   if (!currentContext) return;
   const contactName = currentContext.contact?.full_name || currentContext.contactInfo?.name || 'there';
@@ -456,11 +501,11 @@ $('insertBtn').addEventListener('click', async () => {
   }
 });
 
-// Log Activity — creates real CRM activity entry
+// Log Activity
 $('logActivityBtn').addEventListener('click', async () => {
   if (!currentContext) return;
   if (!currentContext.contact?.id) {
-    flashButton('logActivityBtn', '⚠️ No contact', '📝 Log', 2000);
+    flashButton('logActivityBtn', '⚠️ No contact linked', '📝 Log', 2000);
     return;
   }
   const rec = currentContext.recommendation || {};
@@ -471,24 +516,23 @@ $('logActivityBtn').addEventListener('click', async () => {
       contact_id: currentContext.contact.id,
       activity_type: activityType,
       summary: `${currentContext.channel} follow-up: ${rec.badge || rec.action || 'check-in'}`,
-      notes: `Reply status: ${currentContext.replyStatus || 'unknown'}. Suggestion: ${$('suggestionText').textContent?.substring(0, 300) || ''}`,
+      notes: `Reply status: ${currentContext.replyStatus || 'unknown'}. Lead type: ${currentContext.contact.lead_type || 'unknown'}. Suggestion: ${$('suggestionText').textContent?.substring(0, 300) || ''}`,
       next_action: rec.reason || '',
     },
   });
   if (res.success) {
     flashButton('logActivityBtn', '✅ Logged!', '📝 Log');
-    // Refresh timeline
     if (currentContext.contact?.id) loadTimeline(currentContext.contact.id);
   } else {
     flashButton('logActivityBtn', '❌ Error', '📝 Log', 2000);
   }
 });
 
-// Save as draft activity — requires matched contact
+// Save as draft
 $('logDraftBtn').addEventListener('click', async () => {
   if (!currentContext) return;
   if (!currentContext.contact?.id) {
-    flashButton('logDraftBtn', '⚠️ No contact', '💾 Draft', 2000);
+    flashButton('logDraftBtn', '⚠️ No contact linked', '💾 Draft', 2000);
     return;
   }
   const text = $('suggestionText').textContent;
@@ -509,10 +553,106 @@ $('logDraftBtn').addEventListener('click', async () => {
   }
 });
 
-// Create contact from extension
+// ===== INLINE CREATE CONTACT =====
 $('createContactBtn')?.addEventListener('click', () => {
-  const crmUrl = 'https://vanto-zazi-bloom.lovable.app/contacts';
-  chrome.tabs.create({ url: crmUrl });
+  // Show inline form, prefill from context
+  $('noContactMatch').classList.add('hidden');
+  $('inlineCreateForm').classList.remove('hidden');
+  $('createError').classList.add('hidden');
+
+  // Prefill
+  const ctx = currentContext;
+  if (ctx) {
+    $('createName').value = ctx.contactInfo?.name || ctx.contactIdentifier || '';
+    $('createPhone').value = ctx.contactInfo?.phone || (ctx.channel === 'whatsapp' ? ctx.contactIdentifier || '' : '');
+    $('createEmail').value = ctx.contactInfo?.email || (ctx.channel === 'gmail' ? ctx.contactIdentifier || '' : '');
+    $('createLeadType').value = 'Prospect';
+  }
+});
+
+$('cancelCreateBtn')?.addEventListener('click', () => {
+  $('inlineCreateForm').classList.add('hidden');
+  $('noContactMatch').classList.remove('hidden');
+});
+
+$('submitCreateBtn')?.addEventListener('click', async () => {
+  const name = $('createName').value.trim();
+  const phone = $('createPhone').value.trim();
+  const email = $('createEmail').value.trim();
+  const leadType = $('createLeadType').value;
+
+  if (!name) {
+    $('createError').textContent = 'Name is required';
+    $('createError').classList.remove('hidden');
+    return;
+  }
+
+  $('submitCreateBtn').disabled = true;
+  $('submitCreateBtn').textContent = 'Creating...';
+  $('createError').classList.add('hidden');
+
+  try {
+    const res = await chrome.runtime.sendMessage({
+      type: 'CREATE_CONTACT',
+      params: {
+        full_name: name,
+        phone_number: phone,
+        email_address: email,
+        lead_type: leadType,
+      },
+    });
+
+    if (res.success && res.contact) {
+      console.log('[Zazi SP] Contact created:', res.contact.id, res.contact.full_name);
+
+      // Link to current conversation
+      if (currentContext) {
+        currentContext.contact = res.contact;
+        currentContext.candidateMatches = [];
+        currentContext.timestamp = Date.now();
+
+        const channelKey = getLastKnownContextKey(currentContext.channel || 'whatsapp');
+        await chrome.storage.local.set({
+          current_channel: currentContext.channel || currentChannel,
+          current_context: currentContext,
+          [channelKey]: currentContext,
+        });
+
+        // Save persistent mapping
+        const mapKeys = [
+          `${currentContext.channel}:${(currentContext.contactIdentifier || '').trim().toLowerCase()}`,
+          `${currentContext.channel}:${(currentContext.contactInfo?.name || '').trim().toLowerCase()}`,
+        ].filter(k => k !== `${currentContext.channel}:`);
+
+        for (const mk of mapKeys) {
+          await chrome.runtime.sendMessage({
+            type: 'SAVE_CONTACT_MAPPING',
+            conversationKey: mk,
+            contactId: res.contact.id,
+          });
+        }
+
+        rememberLastKnownContext(currentContext);
+        $('inlineCreateForm').classList.add('hidden');
+        renderContext(currentContext);
+
+        // Force adapter to re-send
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (tab) {
+          chrome.tabs.sendMessage(tab.id, { action: 'force_refresh' }).catch(() => {});
+        }
+      }
+    } else {
+      $('createError').textContent = res.error || 'Failed to create contact';
+      $('createError').classList.remove('hidden');
+    }
+  } catch (err) {
+    $('createError').textContent = 'Error: ' + err.message;
+    $('createError').classList.remove('hidden');
+  }
+
+  $('submitCreateBtn').disabled = false;
+  $('submitCreateBtn').textContent = 'Create & Link';
 });
 
 // ===== HELPERS =====

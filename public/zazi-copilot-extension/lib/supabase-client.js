@@ -40,6 +40,7 @@ const SupabaseClient = {
         refresh_token: this._refreshToken,
         user_email: this._userEmail,
         user_id: this._userId,
+        remembered_email: email, // Remember for prefill
       });
       return { success: true, user: data.user };
     }
@@ -52,6 +53,7 @@ const SupabaseClient = {
     this._userEmail = null;
     this._userId = null;
     await chrome.storage.local.remove(['access_token', 'refresh_token', 'user_email', 'user_id']);
+    // Keep remembered_email for prefill
   },
 
   async refreshSession() {
@@ -127,22 +129,68 @@ const SupabaseClient = {
 
   async findContactByPhone(phone) {
     const digits = phone.replace(/[^0-9]/g, '');
-    if (!digits) return null;
-    const data = await this._query('contacts', `phone_normalized=eq.${digits}&limit=1`);
-    return Array.isArray(data) && data.length > 0 ? data[0] : null;
+    if (!digits || digits.length < 7) return null;
+
+    // Try exact normalized match first
+    console.log('[Supabase] Phone lookup (exact):', digits);
+    let data = await this._query('contacts', `phone_normalized=eq.${digits}&limit=1`);
+    if (Array.isArray(data) && data.length > 0) {
+      console.log('[Supabase] Phone matched (exact):', data[0].full_name);
+      return data[0];
+    }
+
+    // Try suffix match — last 9 digits (handles country code differences)
+    const suffix = digits.slice(-9);
+    if (suffix.length >= 7) {
+      console.log('[Supabase] Phone lookup (suffix):', suffix);
+      data = await this._query('contacts', `phone_normalized=like.*${suffix}&limit=3`);
+      if (Array.isArray(data) && data.length === 1) {
+        console.log('[Supabase] Phone matched (suffix):', data[0].full_name);
+        return data[0];
+      }
+      if (Array.isArray(data) && data.length > 1) {
+        console.log('[Supabase] Phone suffix matched multiple:', data.length);
+        // Return first — caller can handle ambiguity
+        return data[0];
+      }
+    }
+
+    // Try raw phone_number field as well (unnormalized)
+    data = await this._query('contacts', `phone_number=like.*${suffix}&limit=3`);
+    if (Array.isArray(data) && data.length === 1) {
+      console.log('[Supabase] Phone matched (raw field suffix):', data[0].full_name);
+      return data[0];
+    }
+
+    console.log('[Supabase] Phone lookup: no match for', digits);
+    return null;
   },
 
   async findContactByEmail(email) {
     const norm = email.trim().toLowerCase();
     if (!norm) return null;
+    console.log('[Supabase] Email lookup:', norm);
     const data = await this._query('contacts', `email_normalized=eq.${encodeURIComponent(norm)}&limit=1`);
-    return Array.isArray(data) && data.length > 0 ? data[0] : null;
+    if (Array.isArray(data) && data.length > 0) {
+      console.log('[Supabase] Email matched:', data[0].full_name);
+      return data[0];
+    }
+    // Also try raw email_address
+    const data2 = await this._query('contacts', `email_address=ilike.${encodeURIComponent(norm)}&limit=1`);
+    if (Array.isArray(data2) && data2.length > 0) {
+      console.log('[Supabase] Email matched (raw field):', data2[0].full_name);
+      return data2[0];
+    }
+    console.log('[Supabase] Email lookup: no match for', norm);
+    return null;
   },
 
   async findContactByName(name) {
     const norm = name.trim();
     if (!norm) return null;
+    console.log('[Supabase] Name lookup:', norm);
     const data = await this._query('contacts', `full_name=ilike.${encodeURIComponent('%' + norm + '%')}&limit=5`);
+    console.log('[Supabase] Name lookup results:', Array.isArray(data) ? data.length : 0);
     return Array.isArray(data) ? data : [];
   },
 
@@ -169,6 +217,35 @@ const SupabaseClient = {
       notes: params.notes || '',
       next_action: params.next_action || '',
     });
+  },
+
+  async createContact(params) {
+    console.log('[Supabase] Creating contact:', params.full_name);
+    const row = {
+      user_id: this._userId,
+      full_name: params.full_name || '',
+      phone_number: params.phone_number || '',
+      email_address: params.email_address || '',
+      lead_type: params.lead_type || 'Prospect',
+      lead_temperature: params.lead_temperature || 'Warm',
+      communication_status: 'New',
+      registration_status: 'Not Registered',
+      interest_level: 'Medium',
+      focus_area: 'Health Transformation',
+      lead_path: 'Not sure yet',
+      country: 'South Africa',
+    };
+    const result = await this._insert('contacts', row);
+    if (Array.isArray(result) && result.length > 0) {
+      console.log('[Supabase] Contact created:', result[0].id, result[0].full_name);
+      return { success: true, contact: result[0] };
+    }
+    if (result?.id) {
+      console.log('[Supabase] Contact created:', result.id);
+      return { success: true, contact: result };
+    }
+    console.error('[Supabase] Contact creation failed:', result);
+    return { success: false, error: result?.message || result?.error || 'Creation failed' };
   },
 
   async upsertFollowUpState(state) {

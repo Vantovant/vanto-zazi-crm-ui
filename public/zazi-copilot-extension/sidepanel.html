@@ -61,9 +61,33 @@
               <span id="contactTemp" class="meta-tag"></span>
               <span id="contactStatus" class="meta-tag"></span>
             </div>
+            <!-- Lead Type Intelligence -->
+            <div id="leadTypeIntel" class="lead-type-intel hidden"></div>
+
             <div id="noContactMatch" class="warning-box hidden">
               <p>⚠️ No CRM match found</p>
               <button id="createContactBtn" class="btn-small">+ Create Contact</button>
+            </div>
+            <!-- Inline Create Contact Form -->
+            <div id="inlineCreateForm" class="inline-create-form hidden">
+              <h4>Create New Contact</h4>
+              <input type="text" id="createName" placeholder="Full name" class="form-input">
+              <input type="text" id="createPhone" placeholder="Phone number" class="form-input">
+              <input type="email" id="createEmail" placeholder="Email address" class="form-input">
+              <select id="createLeadType" class="select-small form-select">
+                <option value="Prospect">Prospect</option>
+                <option value="Registered_Nopurchase">Registered (No Purchase)</option>
+                <option value="Purchase_Nostatus">Purchase (No Status)</option>
+                <option value="Purchase_Status">Purchase (Status)</option>
+                <option value="Expired">Expired</option>
+                <option value="Customer">Customer</option>
+                <option value="Distributor">Distributor</option>
+              </select>
+              <div class="inline-create-actions">
+                <button id="submitCreateBtn" class="btn-primary btn-compact">Create & Link</button>
+                <button id="cancelCreateBtn" class="btn-small">Cancel</button>
+              </div>
+              <p id="createError" class="error hidden"></p>
             </div>
             <!-- Multiple candidate matches -->
             <div id="candidateMatches" class="candidate-box hidden">
