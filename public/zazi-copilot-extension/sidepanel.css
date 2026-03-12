@@ -112,6 +112,31 @@ input:focus { border-color: #6366f1; }
 }
 .warning-box p { font-size: 12px; color: #f59e0b; flex: 1; }
 
+/* Candidate matches */
+.candidate-box {
+  margin-top: 8px; padding: 8px; background: #3b82f610; border: 1px solid #3b82f630; border-radius: 8px;
+}
+.candidate-box p { font-size: 12px; color: #60a5fa; margin-bottom: 6px; }
+.btn-candidate {
+  display: block; width: 100%; text-align: left; padding: 6px 10px; margin-bottom: 4px;
+  border: 1px solid #3a3a5a; border-radius: 6px; background: #2a2a4a; color: #e2e8f0;
+  font-size: 12px; cursor: pointer;
+}
+.btn-candidate:hover { background: #3a3a6a; border-color: #6366f1; }
+
+/* Message summary */
+.message-summary-card {
+  background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 10px; padding: 10px 12px; margin-bottom: 12px;
+}
+.summary-row { display: flex; gap: 8px; margin-bottom: 4px; align-items: baseline; }
+.summary-row:last-child { margin-bottom: 0; }
+.summary-label { font-size: 11px; color: #64748b; white-space: nowrap; min-width: 100px; }
+.summary-text { font-size: 12px; color: #cbd5e1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Primary action button */
+.btn-action-primary { background: #4338ca; border-color: #4338ca; color: white; font-weight: 600; }
+.btn-action-primary:hover { background: #4f46e5; }
+
 /* Recommendation card */
 .recommendation-card {
   background: linear-gradient(135deg, #1e1b4b, #1a1a2e); border: 1px solid #4338ca30;
