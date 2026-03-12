@@ -2,6 +2,27 @@ import { useState, useMemo } from 'react';
 import { X, ClipboardPaste, Loader2, Search, Check, ChevronDown, Sparkles } from 'lucide-react';
 import { useCrm } from '@/contexts/CrmContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+
+/** Compute a stable dedupe key for an order */
+function computeDedupeKey(o: {
+  contactName: string; product: string; quantity: number;
+  amount: number; pvAmount: number; purchaseType: string;
+  orderDate: string; source: string;
+}): string {
+  const parts = [
+    (o.contactName || '').trim().toLowerCase(),
+    (o.product || '').trim().toLowerCase(),
+    String(o.quantity || 0),
+    String(o.amount || 0),
+    String(o.pvAmount || 0),
+    (o.purchaseType || '').trim().toLowerCase(),
+    (o.orderDate || ''),
+    (o.source || 'manual').trim().toLowerCase(),
+  ].join('|');
+  // Simple hash to match md5 conceptually – we use the raw string for DB lookup
+  return parts;
+}
 
 interface ParsedOrder {
   product: string;
