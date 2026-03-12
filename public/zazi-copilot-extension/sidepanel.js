@@ -601,6 +601,7 @@ $('logDraftBtn').addEventListener('click', async () => {
 // ===== INLINE EDIT CONTACT =====
 $('editContactBtn')?.addEventListener('click', () => {
   if (!currentContext?.contact) return;
+  isEditing = true; // BLOCK background refreshes
   const c = currentContext.contact;
   $('editName').value = c.full_name || '';
   $('editPhone').value = c.phone_number || '';
