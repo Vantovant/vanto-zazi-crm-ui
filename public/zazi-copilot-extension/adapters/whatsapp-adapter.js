@@ -338,6 +338,8 @@
       lastContactName = '';
       lastMessageHash = '';
       consecutiveNoChatReads = 0;
+      noChatSince = null;
+      lastRefreshLogAt = 0;
       processActiveChat();
       sendResponse({ success: true });
     }
