@@ -8,8 +8,22 @@ importScripts('lib/config.js', 'lib/supabase-client.js', 'lib/followup-engine.js
 // Open side panel when extension icon clicked
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 
-const CONTEXT_KEYS = ['current_context', 'last_known_good_context'];
+const CONTEXT_KEYS = [
+  'current_channel',
+  'current_context',
+  'last_known_good_whatsapp_context',
+  'last_known_good_gmail_context',
+];
 const MIN_CLEAR_MISSES = 3;
+const CLEAR_GRACE_MS = 15000;
+const CHANNEL_HOSTS = {
+  whatsapp: 'web.whatsapp.com',
+  gmail: 'mail.google.com',
+};
+
+function getLastKnownContextKey(channel) {
+  return channel === 'gmail' ? 'last_known_good_gmail_context' : 'last_known_good_whatsapp_context';
+}
 
 function getConversationKey({ channel, contactIdentifier, contactInfo, contact }) {
   const fallback = (contactIdentifier || contactInfo?.name || '').toString().trim().toLowerCase();
@@ -25,6 +39,22 @@ function isStrongContextPayload({ channel, contactIdentifier, contactInfo, messa
 
 async function getStoredContexts() {
   return chrome.storage.local.get(CONTEXT_KEYS);
+}
+
+async function isSenderTabActiveForChannel(tabId, channel) {
+  if (!tabId || !channel) return false;
+
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    if (!tab?.active) return false;
+
+    const expectedHost = CHANNEL_HOSTS[channel];
+    if (!expectedHost) return true;
+
+    return (tab.url || '').includes(expectedHost);
+  } catch {
+    return false;
+  }
 }
 
 
@@ -116,7 +146,12 @@ async function handleMessage(msg, sender) {
       const reason = msg.reason || 'unknown';
       const allowedReasons = new Set(['confirmed_no_active_chat', 'chat_switched', 'tab_unloaded', 'explicit_reset']);
       const misses = Number(msg.consecutiveMisses || 0);
-      const { current_context } = await getStoredContexts();
+      const stored = await getStoredContexts();
+      const currentContext = stored.current_context;
+      const currentChannel = stored.current_channel || currentContext?.channel || null;
+      const requestedChannel = msg.channel || null;
+      const effectiveChannel = requestedChannel || currentChannel;
+      const lastKnownForChannel = effectiveChannel ? stored[getLastKnownContextKey(effectiveChannel)] : null;
 
       if (!allowedReasons.has(reason)) {
         console.log('[Zazi BG] Blocked context clear request (invalid reason):', reason);
@@ -128,17 +163,37 @@ async function handleMessage(msg, sender) {
         return { success: false, blocked: true };
       }
 
-      if (current_context?.isGroup) {
-        console.log('[Zazi BG] Clearing group state intentionally:', reason);
-      } else {
-        console.log('[Zazi BG] State cleared intentionally:', reason);
+      if (effectiveChannel && currentChannel && effectiveChannel !== currentChannel) {
+        console.log('[Zazi BG] Blocked context clear request from non-active channel', {
+          requestedChannel: effectiveChannel,
+          currentChannel,
+          reason,
+        });
+        return { success: true, ignored: true, reason: 'non_active_channel_clear_blocked' };
       }
 
+      if (
+        reason === 'confirmed_no_active_chat' &&
+        lastKnownForChannel?.timestamp &&
+        Date.now() - lastKnownForChannel.timestamp <= CLEAR_GRACE_MS
+      ) {
+        console.log('[Zazi BG] Parse miss ignored — clear blocked by sticky grace window', {
+          channel: effectiveChannel,
+          lastKnownAgeMs: Date.now() - lastKnownForChannel.timestamp,
+        });
+        return { success: true, ignored: true, reason: 'clear_grace_window' };
+      }
+
+      console.log('[Zazi BG] State cleared intentionally:', reason, {
+        channel: effectiveChannel || null,
+      });
+
       await chrome.storage.local.set({
+        current_channel: null,
         current_context: {
           cleared: true,
           clearReason: reason,
-          channel: msg.channel || current_context?.channel || null,
+          channel: effectiveChannel || null,
           timestamp: Date.now(),
         }
       });
@@ -149,29 +204,41 @@ async function handleMessage(msg, sender) {
     case 'CHAT_CONTEXT_UPDATE': {
       const { channel, contactIdentifier, messages, contactInfo } = msg;
       const sourceTabId = sender?.tab?.id ?? null;
-      await SupabaseClient.init();
 
-      if (!isStrongContextPayload({ channel, contactIdentifier, contactInfo, messages })) {
-        const { current_context } = await getStoredContexts();
-        if (current_context?.conversationKey) {
-          console.log('[Zazi BG] Null/empty overwrite blocked — keeping last-known-good conversation');
-          return { success: true, ignored: true, reason: 'weak_payload_blocked' };
-        }
+      if (!['whatsapp', 'gmail'].includes(channel)) {
+        return { success: false, error: 'Unsupported channel' };
       }
 
+      await SupabaseClient.init();
+
+      const stored = await getStoredContexts();
+      const currentChannel = stored.current_channel || stored.current_context?.channel || null;
+      const currentContext = stored.current_context || null;
+      const channelLastKnownKey = getLastKnownContextKey(channel);
+      const existingChannelContext = stored[channelLastKnownKey] || null;
+
+      if (!isStrongContextPayload({ channel, contactIdentifier, contactInfo, messages })) {
+        if (existingChannelContext?.conversationKey || (currentChannel === channel && currentContext?.conversationKey)) {
+          console.log('[Zazi BG] Null/empty update blocked', {
+            channel,
+            reason: 'weak_payload_blocked',
+          });
+          return { success: true, ignored: true, reason: 'weak_payload_blocked' };
+        }
+
+        return { success: true, ignored: true, reason: 'weak_payload_no_state' };
+      }
 
       // ---- Contact matching: phone first, then name fallback ----
       let contact = null;
       let candidateMatches = [];
 
       if (channel === 'whatsapp' && contactIdentifier) {
-        // Try phone match first
         const phoneDigits = contactIdentifier.replace(/[^0-9]/g, '');
         if (phoneDigits.length >= 7) {
           contact = await SupabaseClient.findContactByPhone(phoneDigits);
         }
 
-        // Fallback: name match
         if (!contact && contactInfo?.name) {
           const nameResults = await SupabaseClient.findContactByName(contactInfo.name);
           if (nameResults.length === 1) {
@@ -266,7 +333,7 @@ async function handleMessage(msg, sender) {
         });
       }
 
-      // ---- Store latest state for side panel (current + last-known-good) ----
+      // ---- Build channel context payload ----
       const conversationKey = getConversationKey({ channel, contactIdentifier, contactInfo, contact });
       const contextPayload = {
         channel,
@@ -288,16 +355,41 @@ async function handleMessage(msg, sender) {
         timestamp: Date.now(),
       };
 
-      await chrome.storage.local.set({
-        current_context: contextPayload,
-        last_known_good_context: contextPayload,
-      });
+      const tabIsActiveForChannel = await isSenderTabActiveForChannel(sourceTabId, channel);
+      const shouldPromoteToCurrent =
+        tabIsActiveForChannel ||
+        currentChannel === channel ||
+        !currentContext?.conversationKey ||
+        currentContext?.cleared;
 
-      console.log('[Zazi BG] Valid chat state stored', {
-        conversationKey,
-        contactId: contact?.id || null,
-        hasCandidates: candidateMatches.length > 0,
-      });
+      const previousChannelContext = existingChannelContext;
+      const updateType = previousChannelContext?.conversationKey === conversationKey ? 'refreshed' : 'detected';
+
+      const storageUpdate = {
+        [channelLastKnownKey]: contextPayload,
+      };
+
+      if (shouldPromoteToCurrent) {
+        storageUpdate.current_channel = channel;
+        storageUpdate.current_context = contextPayload;
+      }
+
+      await chrome.storage.local.set(storageUpdate);
+
+      if (shouldPromoteToCurrent) {
+        console.log(`[Zazi BG] Valid chat ${updateType}`, {
+          channel,
+          conversationKey,
+          contactId: contact?.id || null,
+          sourceTabId,
+        });
+      } else {
+        console.log('[Zazi BG] Stored valid channel context without switching active channel', {
+          channel,
+          currentChannel,
+          conversationKey,
+        });
+      }
 
       return { contact, candidateMatches, replyStatus, recommendation, suggestion };
     }
@@ -320,14 +412,15 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 
 chrome.tabs.onRemoved.addListener(async (tabId) => {
   try {
-    const { current_context } = await getStoredContexts();
+    const { current_context, current_channel } = await getStoredContexts();
     if (!current_context?.sourceTabId || current_context.sourceTabId !== tabId) return;
 
     await chrome.storage.local.set({
+      current_channel: null,
       current_context: {
         cleared: true,
         clearReason: 'tab_unloaded',
-        channel: current_context.channel || null,
+        channel: current_context.channel || current_channel || null,
         timestamp: Date.now(),
       }
     });

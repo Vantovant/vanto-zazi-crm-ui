@@ -27,7 +27,11 @@
   let lastMessageHash = '';
   let hasContext = false;
   let consecutiveNoChatReads = 0;
+  let noChatSince = null;
+  let lastRefreshLogAt = 0;
   const MAX_NO_CHAT_MISSES_BEFORE_CLEAR = 3;
+  const MIN_NO_CHAT_DURATION_MS = 12000;
+  const REFRESH_LOG_INTERVAL_MS = 10000;
 
   // ===== MINIMAL FLOATING LAUNCHER (opens Chrome side panel) =====
   function ensureLauncher() {
@@ -198,21 +202,36 @@
     try {
       const contactInfo = getActiveContact();
       if (!contactInfo || !contactInfo.name) {
+        if (document.visibilityState === 'hidden') {
+          console.log('[Zazi WA] Parse miss ignored (tab hidden)');
+          return;
+        }
+
         consecutiveNoChatReads += 1;
+        if (!noChatSince) noChatSince = Date.now();
+        const noChatDurationMs = Date.now() - noChatSince;
+
         console.log('[Zazi WA] Parse miss (no active chat)', {
           consecutiveNoChatReads,
           threshold: MAX_NO_CHAT_MISSES_BEFORE_CLEAR,
+          noChatDurationMs,
+          minDurationMs: MIN_NO_CHAT_DURATION_MS,
         });
 
-        if (consecutiveNoChatReads < MAX_NO_CHAT_MISSES_BEFORE_CLEAR) {
+        const stillInDebounceWindow =
+          consecutiveNoChatReads < MAX_NO_CHAT_MISSES_BEFORE_CLEAR ||
+          noChatDurationMs < MIN_NO_CHAT_DURATION_MS;
+
+        if (stillInDebounceWindow) {
           console.log('[Zazi WA] Parse miss ignored — keeping last-known-good state');
           return;
         }
 
         if (lastContactName) {
-          console.log('[Zazi WA] Clearing context after confirmed no-chat reads');
+          console.log('[Zazi WA] Clearing context after confirmed sustained no-chat state');
           await requestContextClear('confirmed_no_active_chat', {
             consecutiveMisses: consecutiveNoChatReads,
+            noChatDurationMs,
           });
           lastContactName = '';
           lastMessageHash = '';
@@ -223,6 +242,7 @@
       }
 
       consecutiveNoChatReads = 0;
+      noChatSince = null;
 
       // Detect and skip group chats
       if (isGroupChat()) {
@@ -250,10 +270,21 @@
       // Skip if same contact AND same messages (no new activity)
       const isSameContact = contactInfo.name === lastContactName;
       const isSameMessages = msgHash === lastMessageHash;
-      if (isSameContact && isSameMessages) return;
+      if (isSameContact && isSameMessages) {
+        const now = Date.now();
+        if (now - lastRefreshLogAt >= REFRESH_LOG_INTERVAL_MS) {
+          console.log('[Zazi WA] Valid chat refreshed (sticky keepalive)', {
+            contact: contactInfo.name,
+            conversationKey: `whatsapp:${getConversationKey(contactInfo)}`,
+          });
+          lastRefreshLogAt = now;
+        }
+        return;
+      }
 
       lastContactName = contactInfo.name;
       lastMessageHash = msgHash;
+      lastRefreshLogAt = Date.now();
 
       console.log('[Zazi WA] Valid chat detected:', {
         contact: contactInfo.name,
@@ -307,6 +338,8 @@
       lastContactName = '';
       lastMessageHash = '';
       consecutiveNoChatReads = 0;
+      noChatSince = null;
+      lastRefreshLogAt = 0;
       processActiveChat();
       sendResponse({ success: true });
     }

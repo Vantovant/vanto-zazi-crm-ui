@@ -5,9 +5,52 @@
 const $ = (id) => document.getElementById(id);
 
 let currentContext = null;
-let lastKnownGoodConversation = null;
+let currentChannel = null;
+const lastKnownByChannel = {
+  whatsapp: null,
+  gmail: null,
+};
 const MAX_CONTEXT_AGE_MS = 120000;
 const REFRESH_GRACE_MS = 45000;
+const CONTEXT_STORAGE_KEYS = [
+  'current_channel',
+  'current_context',
+  'last_known_good_whatsapp_context',
+  'last_known_good_gmail_context',
+];
+
+function getLastKnownContextKey(channel) {
+  return channel === 'gmail' ? 'last_known_good_gmail_context' : 'last_known_good_whatsapp_context';
+}
+
+function rememberLastKnownContext(ctx) {
+  if (!ctx?.channel || !isContextPayloadValid(ctx)) return;
+  lastKnownByChannel[ctx.channel] = ctx;
+}
+
+function hydrateLastKnownContexts(data) {
+  if (isContextPayloadValid(data.last_known_good_whatsapp_context)) {
+    lastKnownByChannel.whatsapp = data.last_known_good_whatsapp_context;
+  }
+  if (isContextPayloadValid(data.last_known_good_gmail_context)) {
+    lastKnownByChannel.gmail = data.last_known_good_gmail_context;
+  }
+}
+
+function pickFallbackContext(preferredChannel) {
+  const now = Date.now();
+
+  const preferred = preferredChannel ? lastKnownByChannel[preferredChannel] : null;
+  if (isContextPayloadValid(preferred) && now - (preferred.timestamp || 0) <= REFRESH_GRACE_MS) {
+    return preferred;
+  }
+
+  const candidates = Object.values(lastKnownByChannel)
+    .filter((ctx) => isContextPayloadValid(ctx) && now - (ctx.timestamp || 0) <= MAX_CONTEXT_AGE_MS)
+    .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+  return candidates[0] || null;
+}
 
 // ===== INIT =====
 async function init() {
@@ -45,14 +88,16 @@ $('loginBtn').addEventListener('click', async () => {
 
 $('logoutBtn').addEventListener('click', async () => {
   await chrome.runtime.sendMessage({ type: 'AUTH_LOGOUT' });
-  await chrome.storage.local.remove(['current_context', 'last_known_good_context']);
+  await chrome.storage.local.remove(CONTEXT_STORAGE_KEYS);
   $('loginSection').classList.remove('hidden');
   $('connectedSection').classList.add('hidden');
   $('logoutBtn').classList.add('hidden');
   $('statusBadge').textContent = 'Not Connected';
   $('statusBadge').className = 'status-badge disconnected';
   currentContext = null;
-  lastKnownGoodConversation = null;
+  currentChannel = null;
+  lastKnownByChannel.whatsapp = null;
+  lastKnownByChannel.gmail = null;
 });
 
 function showConnected(email) {
@@ -98,35 +143,43 @@ function showDefaultEmptyState() {
 }
 
 async function pollContext() {
-  const data = await chrome.storage.local.get(['current_context', 'last_known_good_context']);
+  const data = await chrome.storage.local.get(CONTEXT_STORAGE_KEYS);
   const ctx = data.current_context;
-  const persistedLastKnownGood = data.last_known_good_context;
 
-  if (isContextPayloadValid(persistedLastKnownGood)) {
-    lastKnownGoodConversation = persistedLastKnownGood;
-  }
+  hydrateLastKnownContexts(data);
+  currentChannel = data.current_channel || currentChannel;
 
   if (isExplicitClear(ctx)) {
     console.log('[Zazi SP] Context cleared intentionally:', ctx.clearReason || 'unknown');
+    const fallback = pickFallbackContext(currentChannel || ctx.channel);
+    if (fallback && Date.now() - (fallback.timestamp || 0) <= REFRESH_GRACE_MS) {
+      console.log('[Zazi SP] Clear event fallback — keeping last-known-good context', {
+        channel: fallback.channel,
+      });
+      if (!currentContext || currentContext.timestamp !== fallback.timestamp) {
+        currentContext = fallback;
+        currentChannel = fallback.channel || currentChannel;
+        renderContext(fallback);
+      }
+      return;
+    }
+
     currentContext = null;
     showDefaultEmptyState();
     return;
   }
 
   if (!isContextPayloadValid(ctx)) {
-    if (lastKnownGoodConversation && Date.now() - (lastKnownGoodConversation.timestamp || 0) <= REFRESH_GRACE_MS) {
-      console.log('[Zazi SP] Parse miss ignored — keeping last-known-good conversation');
-      if (!currentContext || currentContext.timestamp !== lastKnownGoodConversation.timestamp) {
-        currentContext = lastKnownGoodConversation;
-        renderContext(lastKnownGoodConversation);
-      }
-      return;
-    }
-
-    if (lastKnownGoodConversation && isFreshEnough(lastKnownGoodConversation)) {
-      if (!currentContext || currentContext.timestamp !== lastKnownGoodConversation.timestamp) {
-        currentContext = lastKnownGoodConversation;
-        renderContext(lastKnownGoodConversation);
+    const fallback = pickFallbackContext(currentChannel);
+    if (fallback) {
+      console.log('[Zazi SP] Parse miss ignored — rendering sticky last-known-good context', {
+        channel: fallback.channel,
+        conversationKey: fallback.conversationKey,
+      });
+      if (!currentContext || currentContext.timestamp !== fallback.timestamp) {
+        currentContext = fallback;
+        currentChannel = fallback.channel || currentChannel;
+        renderContext(fallback);
       }
       return;
     }
@@ -135,26 +188,31 @@ async function pollContext() {
     return;
   }
 
-  if (!isFreshEnough(ctx) && lastKnownGoodConversation && isFreshEnough(lastKnownGoodConversation)) {
-    console.log('[Zazi SP] Stale refresh ignored — showing last-known-good conversation');
-    if (!currentContext || currentContext.timestamp !== lastKnownGoodConversation.timestamp) {
-      currentContext = lastKnownGoodConversation;
-      renderContext(lastKnownGoodConversation);
+  if (!isFreshEnough(ctx)) {
+    const fallback = pickFallbackContext(ctx.channel || currentChannel);
+    if (fallback && fallback.timestamp !== ctx.timestamp) {
+      console.log('[Zazi SP] Stale refresh ignored — showing last-known-good conversation');
+      if (!currentContext || currentContext.timestamp !== fallback.timestamp) {
+        currentContext = fallback;
+        currentChannel = fallback.channel || currentChannel;
+        renderContext(fallback);
+      }
+      return;
     }
-    return;
   }
 
-  // Avoid redundant re-renders
   if (currentContext && currentContext.timestamp === ctx.timestamp) return;
 
   currentContext = ctx;
-  lastKnownGoodConversation = ctx;
+  currentChannel = ctx.channel || currentChannel;
+  rememberLastKnownContext(ctx);
+
   console.log('[Zazi SP] Valid chat state stored in side panel cache', {
+    channel: ctx.channel,
     conversationKey: ctx.conversationKey,
     contact: ctx.contact?.full_name || ctx.contactInfo?.name || ctx.contactIdentifier,
   });
 
-  // Handle group chat
   if (ctx.isGroup) {
     $('noContext').classList.add('hidden');
     $('groupChatNotice').classList.remove('hidden');
@@ -263,7 +321,15 @@ async function selectCandidate(contact) {
   currentContext.contact = contact;
   currentContext.candidateMatches = [];
   currentContext.timestamp = Date.now();
-  await chrome.storage.local.set({ current_context: currentContext });
+
+  const channelKey = getLastKnownContextKey(currentContext.channel || 'whatsapp');
+  await chrome.storage.local.set({
+    current_channel: currentContext.channel || currentChannel || null,
+    current_context: currentContext,
+    [channelKey]: currentContext,
+  });
+
+  rememberLastKnownContext(currentContext);
   renderContext(currentContext);
   // Force adapter to re-send so background syncs follow-up state
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
