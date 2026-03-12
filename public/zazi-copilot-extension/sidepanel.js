@@ -147,6 +147,9 @@ function showDefaultEmptyState() {
 }
 
 async function pollContext() {
+  // GUARD: If user is editing, skip ALL rendering updates
+  if (isEditing) return;
+
   const data = await chrome.storage.local.get(CONTEXT_STORAGE_KEYS);
   const ctx = data.current_context;
   const storedChannel = data.current_channel;
