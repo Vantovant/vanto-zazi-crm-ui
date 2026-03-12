@@ -198,26 +198,45 @@
     try {
       const contactInfo = getActiveContact();
       if (!contactInfo || !contactInfo.name) {
+        consecutiveNoChatReads += 1;
+        console.log('[Zazi WA] Parse miss (no active chat)', {
+          consecutiveNoChatReads,
+          threshold: MAX_NO_CHAT_MISSES_BEFORE_CLEAR,
+        });
+
+        if (consecutiveNoChatReads < MAX_NO_CHAT_MISSES_BEFORE_CLEAR) {
+          console.log('[Zazi WA] Parse miss ignored — keeping last-known-good state');
+          return;
+        }
+
         if (lastContactName) {
+          console.log('[Zazi WA] Clearing context after confirmed no-chat reads');
+          await requestContextClear('confirmed_no_active_chat', {
+            consecutiveMisses: consecutiveNoChatReads,
+          });
           lastContactName = '';
           lastMessageHash = '';
-          // Clear context when no chat is open
-          await chrome.storage.local.remove('current_context');
+          hasContext = false;
+          updateLauncherBadge(false);
         }
         return;
       }
+
+      consecutiveNoChatReads = 0;
 
       // Detect and skip group chats
       if (isGroupChat()) {
         console.log('[Zazi WA] Group chat detected, skipping:', contactInfo.name);
         if (lastContactName !== contactInfo.name) {
           lastContactName = contactInfo.name;
+          lastMessageHash = '';
           // Store group indicator so side panel can show appropriate message
           await chrome.storage.local.set({
             current_context: {
               channel: 'whatsapp',
               isGroup: true,
               contactIdentifier: contactInfo.name,
+              conversationKey: `whatsapp:group:${getConversationKey(contactInfo)}`,
               timestamp: Date.now(),
             }
           });
@@ -236,7 +255,11 @@
       lastContactName = contactInfo.name;
       lastMessageHash = msgHash;
 
-      console.log('[Zazi WA] Chat context update:', contactInfo.name, isSameContact ? '(new messages)' : '(new chat)');
+      console.log('[Zazi WA] Valid chat detected:', {
+        contact: contactInfo.name,
+        conversationKey: `whatsapp:${getConversationKey(contactInfo)}`,
+        mode: isSameContact ? 'new_messages' : 'chat_switch',
+      });
 
       // Send context to background — background processes CRM match + intelligence
       const response = await chrome.runtime.sendMessage({
@@ -247,7 +270,11 @@
         messages,
       });
 
-      if (response && !response.error) {
+      if (response?.ignored) {
+        console.log('[Zazi WA] Null/empty overwrite attempt blocked by background');
+      }
+
+      if (response && !response.error && !response.ignored) {
         hasContext = true;
         updateLauncherBadge(true);
       }
