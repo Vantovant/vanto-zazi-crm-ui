@@ -385,6 +385,7 @@ export type Database = {
           contact_id: string | null
           contact_name: string
           created_at: string
+          dedupe_key: string | null
           id: string
           order_date: string
           order_id: string
@@ -404,6 +405,7 @@ export type Database = {
           contact_id?: string | null
           contact_name?: string
           created_at?: string
+          dedupe_key?: string | null
           id?: string
           order_date?: string
           order_id?: string
@@ -423,6 +425,7 @@ export type Database = {
           contact_id?: string | null
           contact_name?: string
           created_at?: string
+          dedupe_key?: string | null
           id?: string
           order_date?: string
           order_id?: string
