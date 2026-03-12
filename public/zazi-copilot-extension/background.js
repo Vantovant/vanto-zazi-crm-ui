@@ -8,6 +8,26 @@ importScripts('lib/config.js', 'lib/supabase-client.js', 'lib/followup-engine.js
 // Open side panel when extension icon clicked
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 
+const CONTEXT_KEYS = ['current_context', 'last_known_good_context'];
+const MIN_CLEAR_MISSES = 3;
+
+function getConversationKey({ channel, contactIdentifier, contactInfo, contact }) {
+  const fallback = (contactIdentifier || contactInfo?.name || '').toString().trim().toLowerCase();
+  return `${channel}:${contact?.id || fallback || 'unknown'}`;
+}
+
+function isStrongContextPayload({ channel, contactIdentifier, contactInfo, messages }) {
+  if (!channel) return false;
+  if (contactIdentifier?.toString().trim()) return true;
+  if (contactInfo?.name?.toString().trim()) return true;
+  return Array.isArray(messages) && messages.length > 0;
+}
+
+async function getStoredContexts() {
+  return chrome.storage.local.get(CONTEXT_KEYS);
+}
+
+
 // Listen for messages from content scripts and side panel
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   // Handle OPEN_SIDE_PANEL specially — needs sender.tab context
