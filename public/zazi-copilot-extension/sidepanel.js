@@ -709,6 +709,7 @@ $('createContactBtn')?.addEventListener('click', () => {
 });
 
 $('cancelCreateBtn')?.addEventListener('click', () => {
+  isEditing = false; // RESUME background refreshes
   $('inlineCreateForm').classList.add('hidden');
   $('noContactMatch').classList.remove('hidden');
 });
