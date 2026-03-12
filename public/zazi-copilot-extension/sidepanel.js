@@ -96,23 +96,52 @@ function showDefaultEmptyState() {
 }
 
 async function pollContext() {
-  const data = await chrome.storage.local.get('current_context');
+  const data = await chrome.storage.local.get(['current_context', 'last_known_good_context']);
   const ctx = data.current_context;
+  const persistedLastKnownGood = data.last_known_good_context;
 
-  if (!ctx || !ctx.timestamp) {
-    $('noContext').classList.remove('hidden');
-    $('groupChatNotice').classList.add('hidden');
-    $('activeContext').classList.add('hidden');
-    $('timelineSection').classList.add('hidden');
+  if (isContextPayloadValid(persistedLastKnownGood)) {
+    lastKnownGoodConversation = persistedLastKnownGood;
+  }
+
+  if (isExplicitClear(ctx)) {
+    console.log('[Zazi SP] Context cleared intentionally:', ctx.clearReason || 'unknown');
+    currentContext = null;
+    showDefaultEmptyState();
     return;
   }
 
-  // Stale check — allow up to 60s (adapter polls every 5s)
-  if (Date.now() - ctx.timestamp > 60000) return;
+  if (!isContextPayloadValid(ctx)) {
+    if (lastKnownGoodConversation && Date.now() - (lastKnownGoodConversation.timestamp || 0) <= REFRESH_GRACE_MS) {
+      console.log('[Zazi SP] Parse miss ignored — keeping last-known-good conversation');
+      renderContext(lastKnownGoodConversation);
+      return;
+    }
+
+    if (lastKnownGoodConversation && isFreshEnough(lastKnownGoodConversation)) {
+      renderContext(lastKnownGoodConversation);
+      return;
+    }
+
+    showDefaultEmptyState();
+    return;
+  }
+
+  if (!isFreshEnough(ctx) && lastKnownGoodConversation && isFreshEnough(lastKnownGoodConversation)) {
+    console.log('[Zazi SP] Stale refresh ignored — showing last-known-good conversation');
+    renderContext(lastKnownGoodConversation);
+    return;
+  }
 
   // Avoid redundant re-renders
   if (currentContext && currentContext.timestamp === ctx.timestamp) return;
+
   currentContext = ctx;
+  lastKnownGoodConversation = ctx;
+  console.log('[Zazi SP] Valid chat state stored in side panel cache', {
+    conversationKey: ctx.conversationKey,
+    contact: ctx.contact?.full_name || ctx.contactInfo?.name || ctx.contactIdentifier,
+  });
 
   // Handle group chat
   if (ctx.isGroup) {
