@@ -284,6 +284,7 @@
 
       lastContactName = contactInfo.name;
       lastMessageHash = msgHash;
+      lastRefreshLogAt = Date.now();
 
       console.log('[Zazi WA] Valid chat detected:', {
         contact: contactInfo.name,
