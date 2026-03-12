@@ -271,6 +271,7 @@ async function handleMessage(msg, sender) {
       const contextPayload = {
         channel,
         conversationKey,
+        sourceTabId,
         contact,
         candidateMatches,
         contactIdentifier,
