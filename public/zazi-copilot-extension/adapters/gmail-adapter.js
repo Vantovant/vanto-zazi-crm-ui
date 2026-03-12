@@ -1,7 +1,6 @@
 /**
  * Zazi Follow-Up Copilot — Gmail Web Content Script (Adapter)
  * Detects open email thread, reads messages, determines reply direction.
- * Architecture: adapter-based for future Outlook/Webmail support.
  */
 
 (() => {
@@ -33,9 +32,8 @@
   let wasInThread = false;
   let consecutiveNoThreadReads = 0;
   const MAX_NO_THREAD_MISSES = 3;
-  const SAME_THREAD_REFRESH_MS = 12000;
+  const SAME_THREAD_REFRESH_MS = 10000; // Reduced from 12s
 
-  // Attempt to get current user's email
   function getMyEmail() {
     const el = document.querySelector('a[aria-label*="Google Account"]');
     if (el) {
@@ -222,7 +220,6 @@
     return `${subject || ''}::${contactEmail || ''}::${tail}`;
   }
 
-  // ===== CONTEXT CLEAR =====
   async function requestContextClear(reason) {
     try {
       await chrome.runtime.sendMessage({
@@ -231,7 +228,6 @@
         reason,
         consecutiveMisses: consecutiveNoThreadReads,
       });
-      console.log('[Zazi Gmail] Context clear requested:', reason);
     } catch (err) {
       console.warn('[Zazi Gmail] Failed to request context clear:', err);
     }
@@ -244,7 +240,6 @@
         consecutiveNoThreadReads++;
 
         if (wasInThread && consecutiveNoThreadReads >= MAX_NO_THREAD_MISSES) {
-          console.log('[Zazi Gmail] Left thread view — clearing context');
           removeWidget();
           await requestContextClear('confirmed_no_active_chat');
           wasInThread = false;
@@ -267,19 +262,29 @@
       const signature = buildThreadSignature(subject, contactEmail, messages);
       const now = Date.now();
       const sameThread = signature === lastThreadSignature;
-      const shouldRefresh = now - lastContextSentAt >= SAME_THREAD_REFRESH_MS;
 
-      if (sameThread && !shouldRefresh) return;
-
-      if (sameThread) {
-        console.log('[Zazi Gmail] Valid thread refreshed', { subject, contactEmail });
-      } else {
-        console.log('[Zazi Gmail] Valid thread detected', { subject, contactEmail });
+      // CRITICAL: If thread changed, send IMMEDIATELY — no debounce
+      if (!sameThread) {
+        console.log('[Zazi Gmail] Thread switched:', { subject, contactEmail });
+        lastSubject = subject;
+        lastThreadSignature = signature;
+        lastContextSentAt = now;
+        await sendGmailContext(subject, contactEmail, messages);
+        return;
       }
 
-      lastSubject = subject;
-      lastThreadSignature = signature;
+      // Same thread — only refresh periodically
+      if (now - lastContextSentAt < SAME_THREAD_REFRESH_MS) return;
 
+      lastContextSentAt = now;
+      await sendGmailContext(subject, contactEmail, messages);
+    } catch (err) {
+      console.error('[Zazi Gmail] Poll error:', err);
+    }
+  }
+
+  async function sendGmailContext(subject, contactEmail, messages) {
+    try {
       const response = await chrome.runtime.sendMessage({
         type: 'CHAT_CONTEXT_UPDATE',
         channel: 'gmail',
@@ -296,10 +301,8 @@
           messages,
         });
       }
-
-      lastContextSentAt = now;
     } catch (err) {
-      console.error('[Zazi Gmail] Poll error:', err);
+      console.error('[Zazi Gmail] sendGmailContext error:', err);
     }
   }
 
@@ -325,11 +328,12 @@
     return true;
   });
 
-  setInterval(pollThread, 5000);
-  setTimeout(pollThread, 3000);
+  // Reduced polling from 5s to 3s
+  setInterval(pollThread, 3000);
+  setTimeout(pollThread, 1500);
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) {
-      setTimeout(pollThread, 500);
+      setTimeout(pollThread, 300);
     }
   });
 

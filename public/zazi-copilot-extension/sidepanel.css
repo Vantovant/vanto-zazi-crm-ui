@@ -43,6 +43,12 @@ body {
 }
 .btn-icon:hover { color: #f87171; }
 
+.btn-icon-small {
+  background: none; border: 1px solid #3a3a5a; border-radius: 6px; color: #94a3b8;
+  cursor: pointer; font-size: 12px; padding: 2px 6px; transition: all 0.2s;
+}
+.btn-icon-small:hover { background: #2a2a4a; color: #f1f5f9; border-color: #6366f1; }
+
 /* Section */
 .section { padding: 16px; }
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
@@ -51,7 +57,7 @@ body {
 .subtitle { color: #64748b; font-size: 12px; margin-bottom: 12px; }
 
 /* Inputs */
-input[type="email"], input[type="password"] {
+input[type="email"], input[type="password"], input[type="text"] {
   width: 100%; padding: 10px 12px; border: 1px solid #2a2a4a; border-radius: 8px;
   background: #1a1a2e; color: #e2e8f0; font-size: 13px; margin-bottom: 8px; outline: none;
 }
@@ -71,6 +77,13 @@ input:focus { border-color: #6366f1; }
   color: #e2e8f0; font-size: 11px; cursor: pointer;
 }
 .btn-small:hover { background: #3a3a6a; }
+
+.btn-ai {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6); border-color: #6366f1;
+  color: white; font-weight: 600;
+}
+.btn-ai:hover { opacity: 0.9; }
+.btn-ai:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .btn-action {
   padding: 6px 12px; border: 1px solid #2a2a4a; border-radius: 6px; background: #1a1a2e;
@@ -96,6 +109,7 @@ input:focus { border-color: #6366f1; }
 }
 .contact-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .contact-header h3 { font-size: 15px; color: #f1f5f9; }
+.contact-header-actions { display: flex; align-items: center; gap: 6px; }
 
 .reply-badge {
   font-size: 11px; padding: 2px 10px; border-radius: 12px; font-weight: 600;
@@ -156,7 +170,7 @@ input:focus { border-color: #6366f1; }
   display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;
 }
 .sugg-header span { font-size: 12px; font-weight: 600; color: #f1f5f9; }
-.sugg-controls { display: flex; gap: 4px; align-items: center; }
+.sugg-controls { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
 
 .select-small {
   padding: 3px 6px; border: 1px solid #3a3a5a; border-radius: 6px; background: #2a2a4a;
@@ -167,6 +181,11 @@ input:focus { border-color: #6366f1; }
   background: #0f0f23; border: 1px solid #2a2a4a; border-radius: 8px; padding: 10px;
   font-size: 12px; color: #cbd5e1; white-space: pre-wrap; max-height: 150px; overflow-y: auto;
   margin-bottom: 8px; line-height: 1.6;
+}
+
+.ai-indicator {
+  font-size: 10px; color: #a78bfa; margin-bottom: 6px; padding: 2px 8px;
+  background: #6366f115; border-radius: 4px; display: inline-block;
 }
 
 .sugg-actions { display: flex; gap: 6px; }
@@ -232,8 +251,21 @@ input:focus { border-color: #6366f1; }
   width: 100%; padding: 8px 10px; border-radius: 6px; margin-bottom: 8px;
   background: #1a1a2e; border: 1px solid #2a2a4a; color: #e2e8f0; font-size: 12px;
 }
+.form-label {
+  font-size: 10px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;
+  margin-bottom: 2px; display: block;
+}
 .inline-create-actions { display: flex; gap: 6px; }
 .btn-compact { padding: 8px 14px; font-size: 12px; flex: 1; }
+
+/* Inline Edit Contact Form */
+.inline-edit-form {
+  margin-top: 8px; padding: 10px; background: #3b82f608; border: 1px solid #3b82f630;
+  border-radius: 8px;
+}
+.inline-edit-form h4 {
+  font-size: 12px; color: #60a5fa; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;
+}
 
 /* Lead Type Intelligence */
 .lead-type-intel {
