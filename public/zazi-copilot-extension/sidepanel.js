@@ -5,6 +5,9 @@
 const $ = (id) => document.getElementById(id);
 
 let currentContext = null;
+let lastKnownGoodConversation = null;
+const MAX_CONTEXT_AGE_MS = 120000;
+const REFRESH_GRACE_MS = 45000;
 
 // ===== INIT =====
 async function init() {
