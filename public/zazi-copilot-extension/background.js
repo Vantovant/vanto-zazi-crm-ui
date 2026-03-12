@@ -412,14 +412,15 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 
 chrome.tabs.onRemoved.addListener(async (tabId) => {
   try {
-    const { current_context } = await getStoredContexts();
+    const { current_context, current_channel } = await getStoredContexts();
     if (!current_context?.sourceTabId || current_context.sourceTabId !== tabId) return;
 
     await chrome.storage.local.set({
+      current_channel: null,
       current_context: {
         cleared: true,
         clearReason: 'tab_unloaded',
-        channel: current_context.channel || null,
+        channel: current_context.channel || current_channel || null,
         timestamp: Date.now(),
       }
     });
