@@ -408,9 +408,11 @@
   function init() {
     ensureLauncher();
     startObserver();
-    // Reduced polling from 5s to 3s
-    setInterval(processActiveChat, 3000);
-    setTimeout(processActiveChat, 1500);
+    startHeaderObserver();
+    startChatListClickListener();
+    // Polling as safety net only — fast detection via header observer + click listener
+    setInterval(processActiveChat, 4000);
+    setTimeout(processActiveChat, 500);
   }
 
   if (document.readyState === 'complete') init();

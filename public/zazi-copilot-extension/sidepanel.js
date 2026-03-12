@@ -763,6 +763,7 @@ $('submitCreateBtn')?.addEventListener('click', async () => {
         }
 
         rememberLastKnownContext(currentContext);
+        isEditing = false; // RESUME background refreshes after create
         $('inlineCreateForm').classList.add('hidden');
         renderContext(currentContext);
 
