@@ -146,7 +146,12 @@ async function handleMessage(msg, sender) {
       const reason = msg.reason || 'unknown';
       const allowedReasons = new Set(['confirmed_no_active_chat', 'chat_switched', 'tab_unloaded', 'explicit_reset']);
       const misses = Number(msg.consecutiveMisses || 0);
-      const { current_context } = await getStoredContexts();
+      const stored = await getStoredContexts();
+      const currentContext = stored.current_context;
+      const currentChannel = stored.current_channel || currentContext?.channel || null;
+      const requestedChannel = msg.channel || null;
+      const effectiveChannel = requestedChannel || currentChannel;
+      const lastKnownForChannel = effectiveChannel ? stored[getLastKnownContextKey(effectiveChannel)] : null;
 
       if (!allowedReasons.has(reason)) {
         console.log('[Zazi BG] Blocked context clear request (invalid reason):', reason);
@@ -158,17 +163,37 @@ async function handleMessage(msg, sender) {
         return { success: false, blocked: true };
       }
 
-      if (current_context?.isGroup) {
-        console.log('[Zazi BG] Clearing group state intentionally:', reason);
-      } else {
-        console.log('[Zazi BG] State cleared intentionally:', reason);
+      if (effectiveChannel && currentChannel && effectiveChannel !== currentChannel) {
+        console.log('[Zazi BG] Blocked context clear request from non-active channel', {
+          requestedChannel: effectiveChannel,
+          currentChannel,
+          reason,
+        });
+        return { success: true, ignored: true, reason: 'non_active_channel_clear_blocked' };
       }
 
+      if (
+        reason === 'confirmed_no_active_chat' &&
+        lastKnownForChannel?.timestamp &&
+        Date.now() - lastKnownForChannel.timestamp <= CLEAR_GRACE_MS
+      ) {
+        console.log('[Zazi BG] Parse miss ignored — clear blocked by sticky grace window', {
+          channel: effectiveChannel,
+          lastKnownAgeMs: Date.now() - lastKnownForChannel.timestamp,
+        });
+        return { success: true, ignored: true, reason: 'clear_grace_window' };
+      }
+
+      console.log('[Zazi BG] State cleared intentionally:', reason, {
+        channel: effectiveChannel || null,
+      });
+
       await chrome.storage.local.set({
+        current_channel: null,
         current_context: {
           cleared: true,
           clearReason: reason,
-          channel: msg.channel || current_context?.channel || null,
+          channel: effectiveChannel || null,
           timestamp: Date.now(),
         }
       });
