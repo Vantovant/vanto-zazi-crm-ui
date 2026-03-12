@@ -10,6 +10,18 @@ chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 
 // Listen for messages from content scripts and side panel
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  // Handle OPEN_SIDE_PANEL specially — needs sender.tab context
+  if (msg.type === 'OPEN_SIDE_PANEL') {
+    const tabId = sender.tab?.id;
+    if (tabId) {
+      chrome.sidePanel.open({ tabId }).catch(err => {
+        console.warn('[Zazi BG] Could not open side panel:', err);
+      });
+    }
+    sendResponse({ success: true });
+    return true;
+  }
+
   handleMessage(msg, sender).then(sendResponse).catch(err => {
     console.error('[Zazi BG] Error:', err);
     sendResponse({ error: err.message });
@@ -67,6 +79,9 @@ async function handleMessage(msg, sender) {
     }
 
     case 'LOG_ACTIVITY': {
+      if (!msg.params?.contact_id) {
+        return { success: false, error: 'No contact matched — cannot log activity without a linked contact.' };
+      }
       await SupabaseClient.init();
       const result = await SupabaseClient.logActivity(msg.params);
       return { success: !result.error, result };

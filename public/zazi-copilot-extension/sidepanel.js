@@ -259,21 +259,26 @@ $('insertBtn').addEventListener('click', async () => {
   }
 });
 
-// Save as draft activity
+// Save as draft activity — requires matched contact
 $('logDraftBtn').addEventListener('click', async () => {
   if (!currentContext) return;
+  if (!currentContext.contact?.id) {
+    $('logDraftBtn').textContent = '⚠️ No contact matched';
+    setTimeout(() => { $('logDraftBtn').textContent = '💾 Save as Draft'; }, 2000);
+    return;
+  }
   const text = $('suggestionText').textContent;
   await chrome.runtime.sendMessage({
     type: 'LOG_ACTIVITY',
     params: {
-      contact_id: currentContext.contact?.id || null,
+      contact_id: currentContext.contact.id,
       activity_type: 'draft',
-      summary: `Draft ${currentContext.channel} reply prepared`,
+      summary: `Draft ${currentContext.channel} reply prepared for ${currentContext.contact.full_name}`,
       notes: text?.substring(0, 500) || '',
       next_action: currentContext.recommendation?.action || '',
     },
   });
-  $('logDraftBtn').textContent = '✅ Saved!';
+  $('logDraftBtn').textContent = '✅ Saved to CRM!';
   setTimeout(() => { $('logDraftBtn').textContent = '💾 Save as Draft'; }, 1500);
 });
 
