@@ -59,12 +59,15 @@ function formatTimeAgo(dateStr: string) {
 
 export function Activities() {
   const [showLogActivity, setShowLogActivity] = useState(false);
+  const [showGoalsModal, setShowGoalsModal] = useState(false);
   const [drawerContactId, setDrawerContactId] = useState<string | null>(null);
   const [templatePicker, setTemplatePicker] = useState<{ contact: Prospect; channel: 'whatsapp' | 'email' } | null>(null);
   const { contacts } = useCrm();
-  const { activities, loading, getNeglectedContacts } = useContactActivities();
+  const { activities, loading, getNeglectedContacts, getActivitiesToday, getActivitiesThisWeek } = useContactActivities();
+  const { goals } = useActivityGoals();
   const [aiInsight, setAiInsight] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
+  const [goalsPeriod, setGoalsPeriod] = useState<'today' | 'week'>('today');
 
   // Sort helper: Leg 1 first, then Leg 2, then unassigned
   const legSortOrder = (assignedTo: string | undefined) => {
