@@ -71,26 +71,52 @@ export function useOrders() {
 
   const addOrder = async (order: Omit<Order, 'id'> & { contact_id?: string }) => {
     if (!user) return null;
+
+    // Compute dedupe_key for backoffice-paste orders
+    let dedupe_key: string | null = null;
+    if (order.source === 'backoffice-paste') {
+      const parts = [
+        (order.contactName || '').trim().toLowerCase(),
+        (order.product || '').trim().toLowerCase(),
+        String(order.quantity || 0),
+        String(order.amount || 0),
+        String(order.pvAmount || 0),
+        (order.purchaseType || '').trim().toLowerCase(),
+        (order.orderDate || ''),
+        (order.source || 'manual').trim().toLowerCase(),
+      ].join('|');
+      // Use the same raw string; the DB unique index on (user_id, dedupe_key) prevents dups
+      dedupe_key = parts;
+    }
+
+    const insertPayload: Record<string, unknown> = {
+      user_id: user.id,
+      order_id: order.orderId,
+      contact_id: order.contact_id || null,
+      contact_name: order.contactName,
+      product: order.product,
+      quantity: order.quantity,
+      amount: order.amount,
+      status: order.status,
+      order_date: order.orderDate,
+      badges: order.badges || [],
+      purchase_type: order.purchaseType || '',
+      pv_amount: order.pvAmount || 0,
+      source: order.source || 'manual',
+    };
+    if (dedupe_key) insertPayload.dedupe_key = dedupe_key;
+
     const { data, error } = await supabase
       .from('orders')
-      .insert({
-        user_id: user.id,
-        order_id: order.orderId,
-        contact_id: order.contact_id || null,
-        contact_name: order.contactName,
-        product: order.product,
-        quantity: order.quantity,
-        amount: order.amount,
-        status: order.status,
-        order_date: order.orderDate,
-        badges: order.badges || [],
-        purchase_type: order.purchaseType || '',
-        pv_amount: order.pvAmount || 0,
-        source: order.source || 'manual',
-      })
+      .insert(insertPayload as any)
       .select()
       .single();
     if (error) {
+      // If duplicate key violation, treat as success (idempotent)
+      if (error.code === '23505' && dedupe_key) {
+        console.log('[useOrders] Duplicate order skipped by DB constraint');
+        return { id: 'duplicate-skipped' };
+      }
       console.error('Error adding order:', error);
       return null;
     }
