@@ -317,3 +317,23 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     }
   }
 });
+
+chrome.tabs.onRemoved.addListener(async (tabId) => {
+  try {
+    const { current_context } = await getStoredContexts();
+    if (!current_context?.sourceTabId || current_context.sourceTabId !== tabId) return;
+
+    await chrome.storage.local.set({
+      current_context: {
+        cleared: true,
+        clearReason: 'tab_unloaded',
+        channel: current_context.channel || null,
+        timestamp: Date.now(),
+      }
+    });
+
+    console.log('[Zazi BG] State cleared intentionally: tab_unloaded');
+  } catch (err) {
+    console.warn('[Zazi BG] Failed to clear context on tab close:', err);
+  }
+});
