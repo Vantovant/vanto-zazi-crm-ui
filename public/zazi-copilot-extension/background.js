@@ -79,6 +79,9 @@ async function handleMessage(msg, sender) {
     }
 
     case 'LOG_ACTIVITY': {
+      if (!msg.params?.contact_id) {
+        return { success: false, error: 'No contact matched — cannot log activity without a linked contact.' };
+      }
       await SupabaseClient.init();
       const result = await SupabaseClient.logActivity(msg.params);
       return { success: !result.error, result };
