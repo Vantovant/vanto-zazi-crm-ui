@@ -13,12 +13,16 @@ import {
   UserX,
   Zap,
   Mail,
+  Settings,
+  Target,
 } from 'lucide-react';
 import { LogActivityModal } from '../components/LogActivityModal';
+import { ActivityGoalsModal } from '../components/ActivityGoalsModal';
 import { ContactDrawer } from '../components/ContactDrawer';
 import { MessageTemplatePicker } from '../components/MessageTemplatePicker';
 import { useCrm } from '@/contexts/CrmContext';
 import { useContactActivities } from '@/hooks/useContactActivities';
+import { useActivityGoals } from '@/hooks/useActivityGoals';
 import { supabase } from '@/integrations/supabase/client';
 import ReactMarkdown from 'react-markdown';
 import type { Prospect } from '@/data/mockData';
