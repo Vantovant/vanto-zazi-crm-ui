@@ -215,6 +215,36 @@ input:focus { border-color: #6366f1; }
 
 .mt-16 { margin-top: 16px; }
 
+/* Inline Create Contact Form */
+.inline-create-form {
+  margin-top: 8px; padding: 10px; background: #22c55e08; border: 1px solid #22c55e30;
+  border-radius: 8px;
+}
+.inline-create-form h4 {
+  font-size: 12px; color: #4ade80; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;
+}
+.form-input {
+  width: 100%; padding: 8px 10px; border: 1px solid #2a2a4a; border-radius: 6px;
+  background: #1a1a2e; color: #e2e8f0; font-size: 12px; margin-bottom: 6px; outline: none;
+}
+.form-input:focus { border-color: #6366f1; }
+.form-select {
+  width: 100%; padding: 8px 10px; border-radius: 6px; margin-bottom: 8px;
+  background: #1a1a2e; border: 1px solid #2a2a4a; color: #e2e8f0; font-size: 12px;
+}
+.inline-create-actions { display: flex; gap: 6px; }
+.btn-compact { padding: 8px 14px; font-size: 12px; flex: 1; }
+
+/* Lead Type Intelligence */
+.lead-type-intel {
+  margin-top: 8px; padding: 8px 10px; background: #1e1b4b; border: 1px solid #4338ca20;
+  border-radius: 8px;
+}
+.intel-line {
+  font-size: 11px; color: #a5b4fc; margin-bottom: 2px; line-height: 1.4;
+}
+.intel-line:last-child { margin-bottom: 0; }
+
 /* Scrollbar */
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
