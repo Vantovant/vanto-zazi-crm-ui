@@ -148,6 +148,7 @@ async function handleMessage(msg, sender) {
 
     case 'CHAT_CONTEXT_UPDATE': {
       const { channel, contactIdentifier, messages, contactInfo } = msg;
+      const sourceTabId = sender?.tab?.id ?? null;
       await SupabaseClient.init();
 
       if (!isStrongContextPayload({ channel, contactIdentifier, contactInfo, messages })) {
