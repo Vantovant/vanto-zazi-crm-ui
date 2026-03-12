@@ -270,7 +270,17 @@
       // Skip if same contact AND same messages (no new activity)
       const isSameContact = contactInfo.name === lastContactName;
       const isSameMessages = msgHash === lastMessageHash;
-      if (isSameContact && isSameMessages) return;
+      if (isSameContact && isSameMessages) {
+        const now = Date.now();
+        if (now - lastRefreshLogAt >= REFRESH_LOG_INTERVAL_MS) {
+          console.log('[Zazi WA] Valid chat refreshed (sticky keepalive)', {
+            contact: contactInfo.name,
+            conversationKey: `whatsapp:${getConversationKey(contactInfo)}`,
+          });
+          lastRefreshLogAt = now;
+        }
+        return;
+      }
 
       lastContactName = contactInfo.name;
       lastMessageHash = msgHash;
