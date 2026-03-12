@@ -27,7 +27,11 @@
   let lastMessageHash = '';
   let hasContext = false;
   let consecutiveNoChatReads = 0;
+  let noChatSince = null;
+  let lastRefreshLogAt = 0;
   const MAX_NO_CHAT_MISSES_BEFORE_CLEAR = 3;
+  const MIN_NO_CHAT_DURATION_MS = 12000;
+  const REFRESH_LOG_INTERVAL_MS = 10000;
 
   // ===== MINIMAL FLOATING LAUNCHER (opens Chrome side panel) =====
   function ensureLauncher() {
