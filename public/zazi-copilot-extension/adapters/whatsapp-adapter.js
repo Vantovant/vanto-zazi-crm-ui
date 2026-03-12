@@ -306,6 +306,7 @@
       // Force re-process even if same chat (e.g. after creating contact)
       lastContactName = '';
       lastMessageHash = '';
+      consecutiveNoChatReads = 0;
       processActiveChat();
       sendResponse({ success: true });
     }
