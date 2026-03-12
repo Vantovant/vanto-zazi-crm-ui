@@ -112,6 +112,40 @@ async function handleMessage(msg, sender) {
       return { success: !result.error, result };
     }
 
+    case 'CONTEXT_CLEAR_REQUEST': {
+      const reason = msg.reason || 'unknown';
+      const allowedReasons = new Set(['confirmed_no_active_chat', 'chat_switched', 'tab_unloaded', 'explicit_reset']);
+      const misses = Number(msg.consecutiveMisses || 0);
+      const { current_context } = await getStoredContexts();
+
+      if (!allowedReasons.has(reason)) {
+        console.log('[Zazi BG] Blocked context clear request (invalid reason):', reason);
+        return { success: false, blocked: true };
+      }
+
+      if (reason === 'confirmed_no_active_chat' && misses < MIN_CLEAR_MISSES) {
+        console.log('[Zazi BG] Blocked context clear request (insufficient misses):', misses);
+        return { success: false, blocked: true };
+      }
+
+      if (current_context?.isGroup) {
+        console.log('[Zazi BG] Clearing group state intentionally:', reason);
+      } else {
+        console.log('[Zazi BG] State cleared intentionally:', reason);
+      }
+
+      await chrome.storage.local.set({
+        current_context: {
+          cleared: true,
+          clearReason: reason,
+          channel: msg.channel || current_context?.channel || null,
+          timestamp: Date.now(),
+        }
+      });
+
+      return { success: true, cleared: true };
+    }
+
     case 'CHAT_CONTEXT_UPDATE': {
       const { channel, contactIdentifier, messages, contactInfo } = msg;
       await SupabaseClient.init();
