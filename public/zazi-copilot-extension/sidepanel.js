@@ -6,6 +6,7 @@ const $ = (id) => document.getElementById(id);
 
 let currentContext = null;
 let currentChannel = null;
+let isEditing = false; // GUARD: block background refreshes during inline edits
 const lastKnownByChannel = {
   whatsapp: null,
   gmail: null,
@@ -146,6 +147,9 @@ function showDefaultEmptyState() {
 }
 
 async function pollContext() {
+  // GUARD: If user is editing, skip ALL rendering updates
+  if (isEditing) return;
+
   const data = await chrome.storage.local.get(CONTEXT_STORAGE_KEYS);
   const ctx = data.current_context;
   const storedChannel = data.current_channel;
@@ -198,10 +202,16 @@ async function pollContext() {
     }
   }
 
-  // STRICT CHANNEL ISOLATION: If ctx is from a different channel than current, ignore it
+  // ABSOLUTE CHANNEL ISOLATION: If ctx is from a different channel than current, NEVER render it
   if (currentChannel && ctx.channel && ctx.channel !== currentChannel) {
-    // Store it as last-known for its channel but don't render
+    // Store it for its own channel only — absolutely block rendering
     rememberLastKnownContext(ctx);
+    console.log('[Zazi SP] BLOCKED cross-channel render:', ctx.channel, 'while active channel is', currentChannel);
+    return;
+  }
+
+  // DOUBLE-CHECK: Even if channels match, verify the context channel matches currentChannel
+  if (ctx.channel && currentChannel && ctx.channel !== currentChannel) {
     return;
   }
 
@@ -591,6 +601,7 @@ $('logDraftBtn').addEventListener('click', async () => {
 // ===== INLINE EDIT CONTACT =====
 $('editContactBtn')?.addEventListener('click', () => {
   if (!currentContext?.contact) return;
+  isEditing = true; // BLOCK background refreshes
   const c = currentContext.contact;
   $('editName').value = c.full_name || '';
   $('editPhone').value = c.phone_number || '';
@@ -600,6 +611,7 @@ $('editContactBtn')?.addEventListener('click', () => {
 });
 
 $('cancelEditBtn')?.addEventListener('click', () => {
+  isEditing = false; // RESUME background refreshes
   $('inlineEditForm').classList.add('hidden');
 });
 
@@ -664,6 +676,7 @@ $('submitEditBtn')?.addEventListener('click', async () => {
       });
       rememberLastKnownContext(currentContext);
 
+      isEditing = false; // RESUME background refreshes after save
       $('inlineEditForm').classList.add('hidden');
       renderContext(currentContext);
     } else {
@@ -681,6 +694,7 @@ $('submitEditBtn')?.addEventListener('click', async () => {
 
 // ===== INLINE CREATE CONTACT =====
 $('createContactBtn')?.addEventListener('click', () => {
+  isEditing = true; // BLOCK background refreshes during create too
   $('noContactMatch').classList.add('hidden');
   $('inlineCreateForm').classList.remove('hidden');
   $('createError').classList.add('hidden');
@@ -695,6 +709,7 @@ $('createContactBtn')?.addEventListener('click', () => {
 });
 
 $('cancelCreateBtn')?.addEventListener('click', () => {
+  isEditing = false; // RESUME background refreshes
   $('inlineCreateForm').classList.add('hidden');
   $('noContactMatch').classList.remove('hidden');
 });
@@ -748,6 +763,7 @@ $('submitCreateBtn')?.addEventListener('click', async () => {
         }
 
         rememberLastKnownContext(currentContext);
+        isEditing = false; // RESUME background refreshes after create
         $('inlineCreateForm').classList.add('hidden');
         renderContext(currentContext);
 
