@@ -1,0 +1,46 @@
+{
+  "manifest_version": 3,
+  "name": "Zazi Follow-Up Copilot",
+  "version": "1.0.0",
+  "description": "Intelligent follow-up assistant for Vanto Zazi CRM — WhatsApp & Gmail",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting",
+    "tabs",
+    "alarms",
+    "sidePanel"
+  ],
+  "host_permissions": [
+    "https://web.whatsapp.com/*",
+    "https://mail.google.com/*",
+    "https://urfyfuakgabieellbuce.supabase.co/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://web.whatsapp.com/*"],
+      "js": ["adapters/whatsapp-adapter.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://mail.google.com/*"],
+      "js": ["adapters/gmail-adapter.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "action": {
+    "default_title": "Open Zazi Copilot"
+  }
+}

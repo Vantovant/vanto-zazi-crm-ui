@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zazi Follow-Up Copilot</title>
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <span class="logo">⚡</span>
+        <span class="title">Zazi Copilot</span>
+      </div>
+      <div class="header-right">
+        <span id="statusBadge" class="status-badge disconnected">Not Connected</span>
+        <button id="logoutBtn" class="btn-icon hidden" title="Logout">⏻</button>
+      </div>
+    </div>
+
+    <!-- Login Section -->
+    <div id="loginSection" class="section">
+      <h3>Connect to your CRM</h3>
+      <p class="subtitle">Use your Vanto Zazi CRM credentials</p>
+      <input type="email" id="email" placeholder="Email address" autocomplete="email">
+      <input type="password" id="password" placeholder="Password" autocomplete="current-password">
+      <button id="loginBtn" class="btn-primary">Connect</button>
+      <p id="loginError" class="error hidden"></p>
+    </div>
+
+    <!-- Connected Section -->
+    <div id="connectedSection" class="hidden">
+      <!-- User bar -->
+      <div class="user-bar">
+        <span>👤 <span id="userEmail"></span></span>
+      </div>
+
+      <!-- Active Context -->
+      <div id="contextSection" class="section">
+        <div class="section-header">
+          <h4>Current Conversation</h4>
+          <span id="channelBadge" class="channel-badge">—</span>
+        </div>
+        <div id="noContext" class="empty-state">
+          <p>📭 Open a WhatsApp chat or Gmail thread to get started</p>
+        </div>
+        <div id="activeContext" class="hidden">
+          <!-- Contact Card -->
+          <div class="contact-card">
+            <div class="contact-header">
+              <h3 id="contactName">—</h3>
+              <span id="replyBadge" class="reply-badge">—</span>
+            </div>
+            <div class="contact-meta">
+              <span id="contactType" class="meta-tag"></span>
+              <span id="contactTemp" class="meta-tag"></span>
+              <span id="contactStatus" class="meta-tag"></span>
+            </div>
+            <div id="noContactMatch" class="warning-box hidden">
+              <p>⚠️ No CRM match found</p>
+              <button id="createContactBtn" class="btn-small">+ Create Contact</button>
+            </div>
+          </div>
+
+          <!-- Recommendation -->
+          <div class="recommendation-card" id="recommendationCard">
+            <div class="rec-header">
+              <span class="rec-icon">🎯</span>
+              <span class="rec-title">Next Action</span>
+            </div>
+            <p id="recAction" class="rec-action">—</p>
+            <p id="recReason" class="rec-reason">—</p>
+          </div>
+
+          <!-- Smart Reply -->
+          <div class="suggestion-card">
+            <div class="sugg-header">
+              <span>💡 Suggested Reply</span>
+              <div class="sugg-controls">
+                <select id="toneSelect" class="select-small">
+                  <option value="warm">Warm</option>
+                  <option value="direct">Direct</option>
+                  <option value="professional">Professional</option>
+                </select>
+                <select id="objectiveSelect" class="select-small">
+                  <option value="check-in">Check-in</option>
+                  <option value="close">Close</option>
+                  <option value="reorder">Reorder</option>
+                  <option value="onboarding">Onboarding</option>
+                  <option value="reminder">Reminder</option>
+                  <option value="activation">Activation</option>
+                  <option value="revival">Revival</option>
+                  <option value="objection-handling">Objection</option>
+                </select>
+                <button id="regenerateBtn" class="btn-small">↻</button>
+              </div>
+            </div>
+            <div id="suggestionText" class="suggestion-body">—</div>
+            <div class="sugg-actions">
+              <button id="copyBtn" class="btn-action">📋 Copy</button>
+              <button id="insertBtn" class="btn-action">📥 Insert</button>
+              <button id="logDraftBtn" class="btn-action">💾 Save as Draft</button>
+            </div>
+          </div>
+
+          <!-- Recent Messages -->
+          <div class="messages-card">
+            <h4>Recent Messages</h4>
+            <div id="messagesList" class="messages-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Timeline Section -->
+      <div id="timelineSection" class="section hidden">
+        <h4>Activity Timeline</h4>
+        <div id="timelineList" class="timeline-list"></div>
+        <h4 class="mt-16">Recent Orders</h4>
+        <div id="ordersList" class="orders-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="lib/config.js"></script>
+  <script src="lib/followup-engine.js"></script>
+  <script src="lib/message-suggestions.js"></script>
+  <script src="sidepanel.js"></script>
+</body>
+</html>

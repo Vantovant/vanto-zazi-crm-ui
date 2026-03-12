@@ -243,6 +243,59 @@ export type Database = {
         }
         Relationships: []
       }
+      follow_up_states: {
+        Row: {
+          channel: string
+          contact_id: string
+          created_at: string
+          follow_up_attempts: number
+          id: string
+          last_inbound_at: string | null
+          last_message_preview: string
+          last_outbound_at: string | null
+          recommended_action: string
+          reply_status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          channel?: string
+          contact_id: string
+          created_at?: string
+          follow_up_attempts?: number
+          id?: string
+          last_inbound_at?: string | null
+          last_message_preview?: string
+          last_outbound_at?: string | null
+          recommended_action?: string
+          reply_status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          channel?: string
+          contact_id?: string
+          created_at?: string
+          follow_up_attempts?: number
+          id?: string
+          last_inbound_at?: string | null
+          last_message_preview?: string
+          last_outbound_at?: string | null
+          recommended_action?: string
+          reply_status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "follow_up_states_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory: {
         Row: {
           created_at: string
