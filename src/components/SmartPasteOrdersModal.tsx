@@ -42,7 +42,8 @@ interface SmartPasteOrdersModalProps {
 }
 
 export function SmartPasteOrdersModal({ onClose }: SmartPasteOrdersModalProps) {
-  const { contacts, addOrder } = useCrm();
+  const { contacts, addOrder, refetchOrders } = useCrm();
+  const { user } = useAuth();
   const [pastedText, setPastedText] = useState('');
   const [contactSearch, setContactSearch] = useState('');
   const [selectedContactId, setSelectedContactId] = useState('');
