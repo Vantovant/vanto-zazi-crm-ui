@@ -15,6 +15,8 @@
     contactInfo: '#main header span[title]',
     phoneFromHeader: 'header span[title*="+"]',
     composeBox: '#main footer div[contenteditable="true"], div[data-tab="10"]',
+    groupMeta: '#main header span[data-icon="default-group"], #main header span[data-icon="group"]',
+    participantCount: '#main header span[title*="participants"], #main header span[title*="members"]',
   };
 
   const $ = (s) => document.querySelector(s);
@@ -22,6 +24,7 @@
 
   // ===== STATE =====
   let lastContactName = '';
+  let lastMessageHash = '';
   let hasContext = false;
 
   // ===== MINIMAL FLOATING LAUNCHER (opens Chrome side panel) =====
@@ -86,6 +89,22 @@
     }
   }
 
+  // ===== GROUP DETECTION =====
+  function isGroupChat() {
+    // Check for group icon in header
+    if ($(SEL.groupMeta)) return true;
+    // Check for "participants" or "members" text in header subtitle
+    if ($(SEL.participantCount)) return true;
+    // Check header subtitle for comma-separated participant list
+    const subtitleEl = document.querySelector('#main header span[title]:nth-child(2)');
+    if (subtitleEl) {
+      const text = subtitleEl.getAttribute('title') || '';
+      // Group subtitles typically show participant names separated by commas
+      if (text.includes(',') && !text.includes('+')) return true;
+    }
+    return false;
+  }
+
   // ===== DOM HELPERS =====
   function getActiveContact() {
     const headerEl = $(SEL.contactInfo);
@@ -138,6 +157,12 @@
     return messages;
   }
 
+  /** Simple hash of last 5 messages to detect new messages in same chat */
+  function computeMessageHash(messages) {
+    const last5 = messages.slice(-5);
+    return last5.map(m => `${m.direction}:${m.text.substring(0, 30)}`).join('|');
+  }
+
   function insertIntoCompose(text) {
     const compose = $(SEL.composeBox);
     if (!compose) { console.warn('[Zazi WA] Compose box not found'); return false; }
@@ -152,19 +177,47 @@
     try {
       const contactInfo = getActiveContact();
       if (!contactInfo || !contactInfo.name) {
-        if (lastContactName) lastContactName = '';
+        if (lastContactName) {
+          lastContactName = '';
+          lastMessageHash = '';
+          // Clear context when no chat is open
+          await chrome.storage.local.remove('current_context');
+        }
         return;
       }
 
-      // Skip if same contact
-      if (contactInfo.name === lastContactName) return;
-      lastContactName = contactInfo.name;
-
-      console.log('[Zazi WA] Chat detected:', contactInfo.name);
+      // Detect and skip group chats
+      if (isGroupChat()) {
+        console.log('[Zazi WA] Group chat detected, skipping:', contactInfo.name);
+        if (lastContactName !== contactInfo.name) {
+          lastContactName = contactInfo.name;
+          // Store group indicator so side panel can show appropriate message
+          await chrome.storage.local.set({
+            current_context: {
+              channel: 'whatsapp',
+              isGroup: true,
+              contactIdentifier: contactInfo.name,
+              timestamp: Date.now(),
+            }
+          });
+        }
+        return;
+      }
 
       const messages = readVisibleMessages();
+      const msgHash = computeMessageHash(messages);
 
-      // Send context to background — background updates chrome.storage for side panel
+      // Skip if same contact AND same messages (no new activity)
+      const isSameContact = contactInfo.name === lastContactName;
+      const isSameMessages = msgHash === lastMessageHash;
+      if (isSameContact && isSameMessages) return;
+
+      lastContactName = contactInfo.name;
+      lastMessageHash = msgHash;
+
+      console.log('[Zazi WA] Chat context update:', contactInfo.name, isSameContact ? '(new messages)' : '(new chat)');
+
+      // Send context to background — background processes CRM match + intelligence
       const response = await chrome.runtime.sendMessage({
         type: 'CHAT_CONTEXT_UPDATE',
         channel: 'whatsapp',
@@ -201,6 +254,12 @@
       sendResponse({ success: insertIntoCompose(msg.text) });
     } else if (msg.action === 'get_chat_context') {
       sendResponse({ contactInfo: getActiveContact(), messages: readVisibleMessages() });
+    } else if (msg.action === 'force_refresh') {
+      // Force re-process even if same chat (e.g. after creating contact)
+      lastContactName = '';
+      lastMessageHash = '';
+      processActiveChat();
+      sendResponse({ success: true });
     }
     return true;
   });
@@ -209,8 +268,8 @@
   function init() {
     ensureLauncher();
     startObserver();
-    setInterval(processActiveChat, 8000);
-    setTimeout(processActiveChat, 3000);
+    setInterval(processActiveChat, 5000); // Poll every 5s for new messages
+    setTimeout(processActiveChat, 2000);
   }
 
   if (document.readyState === 'complete') {

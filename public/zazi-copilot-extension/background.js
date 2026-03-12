@@ -68,7 +68,6 @@ async function handleMessage(msg, sender) {
     }
 
     case 'EVALUATE_FOLLOWUP': {
-      // msg.context should contain all FollowUpEngine context fields
       const recommendation = FollowUpEngine.evaluate(msg.context);
       return { recommendation };
     }
@@ -94,34 +93,66 @@ async function handleMessage(msg, sender) {
     }
 
     case 'CHAT_CONTEXT_UPDATE': {
-      // Content script sends conversation data — process and update state
       const { channel, contactIdentifier, messages, contactInfo } = msg;
       await SupabaseClient.init();
 
-      // Find CRM contact
+      // ---- Contact matching: phone first, then name fallback ----
       let contact = null;
+      let candidateMatches = [];
+
       if (channel === 'whatsapp' && contactIdentifier) {
-        contact = await SupabaseClient.findContactByPhone(contactIdentifier);
+        // Try phone match first
+        const phoneDigits = contactIdentifier.replace(/[^0-9]/g, '');
+        if (phoneDigits.length >= 7) {
+          contact = await SupabaseClient.findContactByPhone(phoneDigits);
+        }
+
+        // Fallback: name match
+        if (!contact && contactInfo?.name) {
+          const nameResults = await SupabaseClient.findContactByName(contactInfo.name);
+          if (nameResults.length === 1) {
+            contact = nameResults[0];
+          } else if (nameResults.length > 1) {
+            candidateMatches = nameResults;
+          }
+        }
       } else if (channel === 'gmail' && contactIdentifier) {
         contact = await SupabaseClient.findContactByEmail(contactIdentifier);
+        if (!contact && contactInfo?.name) {
+          const nameResults = await SupabaseClient.findContactByName(contactInfo.name);
+          if (nameResults.length === 1) {
+            contact = nameResults[0];
+          } else if (nameResults.length > 1) {
+            candidateMatches = nameResults;
+          }
+        }
       }
 
-      // Compute reply status
+      // ---- Compute reply status from visible messages ----
       let lastInboundTime = null;
       let lastOutboundTime = null;
       let followUpAttempts = 0;
+      let lastInboundPreview = '';
+      let lastOutboundPreview = '';
 
       if (messages && messages.length > 0) {
         const sorted = [...messages].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
         for (const m of sorted) {
-          if (m.direction === 'inbound' && !lastInboundTime) lastInboundTime = new Date(m.timestamp);
-          if (m.direction === 'outbound' && !lastOutboundTime) lastOutboundTime = new Date(m.timestamp);
+          if (m.direction === 'inbound' && !lastInboundTime) {
+            lastInboundTime = new Date(m.timestamp);
+            lastInboundPreview = m.text?.substring(0, 200) || '';
+          }
+          if (m.direction === 'outbound' && !lastOutboundTime) {
+            lastOutboundTime = new Date(m.timestamp);
+            lastOutboundPreview = m.text?.substring(0, 200) || '';
+          }
         }
         followUpAttempts = FollowUpEngine.countFollowUpAttempts(sorted);
       }
 
       const replyStatus = FollowUpEngine.computeReplyStatus({ lastInboundTime, lastOutboundTime });
 
+      // ---- Build follow-up engine context ----
       const context = {
         replyStatus,
         hoursSinceLastInbound: lastInboundTime ? (Date.now() - lastInboundTime.getTime()) / 3600000 : null,
@@ -129,20 +160,24 @@ async function handleMessage(msg, sender) {
         leadTemperature: contact?.lead_temperature || 'Warm',
         leadType: contact?.lead_type || 'Prospect',
         registrationStatus: contact?.registration_status || 'Not Registered',
-        hasPurchased: false, // Will be checked via orders
+        hasPurchased: false,
         followUpAttempts,
         lastReplyTone: null,
       };
 
       // Check if contact has orders
+      let lastProduct = null;
       if (contact) {
         const orders = await SupabaseClient.getContactOrders(contact.id, 1);
-        context.hasPurchased = Array.isArray(orders) && orders.length > 0;
+        if (Array.isArray(orders) && orders.length > 0) {
+          context.hasPurchased = true;
+          lastProduct = orders[0].product || null;
+        }
       }
 
       const recommendation = FollowUpEngine.evaluate(context);
 
-      // Generate message suggestion
+      // ---- Generate message suggestion ----
       const suggestion = MessageSuggestions.generate({
         contactName: contact?.full_name || contactInfo?.name || 'there',
         objective: recommendation.suggestedObjective,
@@ -150,10 +185,10 @@ async function handleMessage(msg, sender) {
         channel,
         leadType: context.leadType,
         hasPurchased: context.hasPurchased,
-        lastProduct: null,
+        lastProduct,
       });
 
-      // Sync follow-up state to DB if we have a contact
+      // ---- Sync follow-up state to DB if we have a contact ----
       if (contact) {
         await SupabaseClient.upsertFollowUpState({
           contact_id: contact.id,
@@ -163,28 +198,32 @@ async function handleMessage(msg, sender) {
           last_outbound_at: lastOutboundTime?.toISOString() || null,
           follow_up_attempts: followUpAttempts,
           recommended_action: recommendation.action,
-          last_message_preview: messages?.[0]?.text?.substring(0, 200) || '',
+          last_message_preview: messages?.[messages.length - 1]?.text?.substring(0, 200) || '',
         });
       }
 
-      // Store latest state for side panel
+      // ---- Store latest state for side panel ----
       await chrome.storage.local.set({
         current_context: {
           channel,
           contact,
+          candidateMatches,
           contactIdentifier,
+          contactInfo,
           replyStatus,
           recommendation,
           suggestion,
           lastInboundTime: lastInboundTime?.toISOString(),
           lastOutboundTime: lastOutboundTime?.toISOString(),
+          lastInboundPreview,
+          lastOutboundPreview,
           followUpAttempts,
-          messages: (messages || []).slice(0, 10), // Last 10 for display
+          messages: (messages || []).slice(-10),
           timestamp: Date.now(),
         }
       });
 
-      return { contact, replyStatus, recommendation, suggestion };
+      return { contact, candidateMatches, replyStatus, recommendation, suggestion };
     }
 
     default:

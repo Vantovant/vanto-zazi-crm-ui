@@ -46,6 +46,9 @@
         <div id="noContext" class="empty-state">
           <p>📭 Open a WhatsApp chat or Gmail thread to get started</p>
         </div>
+        <div id="groupChatNotice" class="empty-state hidden">
+          <p>👥 Group chat detected — Copilot works with 1:1 chats only</p>
+        </div>
         <div id="activeContext" class="hidden">
           <!-- Contact Card -->
           <div class="contact-card">
@@ -61,6 +64,23 @@
             <div id="noContactMatch" class="warning-box hidden">
               <p>⚠️ No CRM match found</p>
               <button id="createContactBtn" class="btn-small">+ Create Contact</button>
+            </div>
+            <!-- Multiple candidate matches -->
+            <div id="candidateMatches" class="candidate-box hidden">
+              <p>🔍 Multiple possible matches:</p>
+              <div id="candidateList"></div>
+            </div>
+          </div>
+
+          <!-- Message Summary -->
+          <div class="message-summary-card">
+            <div class="summary-row">
+              <span class="summary-label">⬇️ Last from them:</span>
+              <span id="lastInboundPreview" class="summary-text">—</span>
+            </div>
+            <div class="summary-row">
+              <span class="summary-label">⬆️ Last from me:</span>
+              <span id="lastOutboundPreview" class="summary-text">—</span>
             </div>
           </div>
 
@@ -101,7 +121,8 @@
             <div class="sugg-actions">
               <button id="copyBtn" class="btn-action">📋 Copy</button>
               <button id="insertBtn" class="btn-action">📥 Insert</button>
-              <button id="logDraftBtn" class="btn-action">💾 Save as Draft</button>
+              <button id="logActivityBtn" class="btn-action btn-action-primary">📝 Log</button>
+              <button id="logDraftBtn" class="btn-action">💾 Draft</button>
             </div>
           </div>
 

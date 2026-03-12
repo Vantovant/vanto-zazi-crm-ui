@@ -8,6 +8,7 @@ let currentContext = null;
 
 // ===== INIT =====
 async function init() {
+  console.log('[Zazi SP] Side panel initializing');
   const res = await chrome.runtime.sendMessage({ type: 'AUTH_STATUS' });
   if (res.authenticated) {
     showConnected(res.email);
@@ -61,7 +62,7 @@ function showConnected(email) {
 // ===== CONTEXT POLLING =====
 function startContextPolling() {
   pollContext();
-  setInterval(pollContext, 3000);
+  setInterval(pollContext, 2000);
 }
 
 async function pollContext() {
@@ -70,19 +71,30 @@ async function pollContext() {
 
   if (!ctx || !ctx.timestamp) {
     $('noContext').classList.remove('hidden');
+    $('groupChatNotice').classList.add('hidden');
     $('activeContext').classList.add('hidden');
     $('timelineSection').classList.add('hidden');
     return;
   }
 
-  // Only update if context is fresh (within last 30s)
-  if (Date.now() - ctx.timestamp > 30000) return;
+  // Stale check — allow up to 60s (adapter polls every 5s)
+  if (Date.now() - ctx.timestamp > 60000) return;
 
   // Avoid redundant re-renders
   if (currentContext && currentContext.timestamp === ctx.timestamp) return;
   currentContext = ctx;
 
+  // Handle group chat
+  if (ctx.isGroup) {
+    $('noContext').classList.add('hidden');
+    $('groupChatNotice').classList.remove('hidden');
+    $('activeContext').classList.add('hidden');
+    $('timelineSection').classList.add('hidden');
+    return;
+  }
+
   $('noContext').classList.add('hidden');
+  $('groupChatNotice').classList.add('hidden');
   $('activeContext').classList.remove('hidden');
 
   renderContext(ctx);
@@ -96,15 +108,24 @@ function renderContext(ctx) {
 
   // Contact
   const contact = ctx.contact;
-  $('contactName').textContent = contact?.full_name || ctx.contactIdentifier || 'Unknown';
+  $('contactName').textContent = contact?.full_name || ctx.contactInfo?.name || ctx.contactIdentifier || 'Unknown';
 
   if (contact) {
     $('noContactMatch').classList.add('hidden');
+    $('candidateMatches').classList.add('hidden');
     $('contactType').textContent = contact.lead_type || '';
     $('contactTemp').textContent = contact.lead_temperature || '';
     $('contactStatus').textContent = contact.communication_status || '';
+  } else if (ctx.candidateMatches && ctx.candidateMatches.length > 0) {
+    $('noContactMatch').classList.add('hidden');
+    $('candidateMatches').classList.remove('hidden');
+    $('contactType').textContent = '';
+    $('contactTemp').textContent = '';
+    $('contactStatus').textContent = '';
+    renderCandidates(ctx.candidateMatches);
   } else {
     $('noContactMatch').classList.remove('hidden');
+    $('candidateMatches').classList.add('hidden');
     $('contactType').textContent = '';
     $('contactTemp').textContent = '';
     $('contactStatus').textContent = '';
@@ -122,6 +143,10 @@ function renderContext(ctx) {
   $('replyBadge').textContent = rs.text;
   $('replyBadge').style.background = rs.bg;
   $('replyBadge').style.color = rs.color;
+
+  // Message summary previews
+  $('lastInboundPreview').textContent = ctx.lastInboundPreview || '—';
+  $('lastOutboundPreview').textContent = ctx.lastOutboundPreview || '—';
 
   // Recommendation
   const rec = ctx.recommendation || {};
@@ -150,10 +175,37 @@ function renderContext(ctx) {
   }
 }
 
+function renderCandidates(candidates) {
+  const list = $('candidateList');
+  list.innerHTML = '';
+  for (const c of candidates.slice(0, 5)) {
+    const btn = document.createElement('button');
+    btn.className = 'btn-candidate';
+    btn.textContent = `${c.full_name} (${c.phone_number || c.email_address || '—'})`;
+    btn.addEventListener('click', () => selectCandidate(c));
+    list.appendChild(btn);
+  }
+}
+
+async function selectCandidate(contact) {
+  if (!currentContext) return;
+  // Update context with selected contact and re-process
+  currentContext.contact = contact;
+  currentContext.candidateMatches = [];
+  currentContext.timestamp = Date.now();
+  await chrome.storage.local.set({ current_context: currentContext });
+  renderContext(currentContext);
+  // Force adapter to re-send so background syncs follow-up state
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (tab) {
+    chrome.tabs.sendMessage(tab.id, { action: 'force_refresh' }).catch(() => {});
+  }
+}
+
 function renderMessages(messages) {
   const list = $('messagesList');
   list.innerHTML = '';
-  for (const msg of messages.slice(0, 10)) {
+  for (const msg of messages.slice(-10)) {
     const div = document.createElement('div');
     div.className = `msg-item ${msg.direction === 'outbound' ? 'msg-outbound' : 'msg-inbound'}`;
     div.innerHTML = `
@@ -218,16 +270,17 @@ async function loadTimeline(contactId) {
 
 // Regenerate suggestion with selected tone/objective
 $('regenerateBtn').addEventListener('click', async () => {
-  if (!currentContext?.contact) return;
+  if (!currentContext) return;
+  const contactName = currentContext.contact?.full_name || currentContext.contactInfo?.name || 'there';
   const res = await chrome.runtime.sendMessage({
     type: 'GENERATE_SUGGESTION',
     params: {
-      contactName: currentContext.contact.full_name,
+      contactName,
       objective: $('objectiveSelect').value,
       tone: $('toneSelect').value,
       channel: currentContext.channel,
-      leadType: currentContext.contact.lead_type,
-      hasPurchased: false,
+      leadType: currentContext.contact?.lead_type || 'Prospect',
+      hasPurchased: currentContext.recommendation?.hasPurchased || false,
     },
   });
   if (res.suggestion) {
@@ -242,8 +295,7 @@ $('copyBtn').addEventListener('click', () => {
   const text = $('suggestionText').textContent;
   if (text && text !== '—') {
     navigator.clipboard.writeText(text);
-    $('copyBtn').textContent = '✅ Copied!';
-    setTimeout(() => { $('copyBtn').textContent = '📋 Copy'; }, 1500);
+    flashButton('copyBtn', '✅ Copied!', '📋 Copy');
   }
 });
 
@@ -254,8 +306,34 @@ $('insertBtn').addEventListener('click', async () => {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (tab) {
     chrome.tabs.sendMessage(tab.id, { action: 'insert_message', text });
-    $('insertBtn').textContent = '✅ Inserted!';
-    setTimeout(() => { $('insertBtn').textContent = '📥 Insert'; }, 1500);
+    flashButton('insertBtn', '✅ Inserted!', '📥 Insert');
+  }
+});
+
+// Log Activity — creates real CRM activity entry
+$('logActivityBtn').addEventListener('click', async () => {
+  if (!currentContext) return;
+  if (!currentContext.contact?.id) {
+    flashButton('logActivityBtn', '⚠️ No contact', '📝 Log', 2000);
+    return;
+  }
+  const rec = currentContext.recommendation || {};
+  const res = await chrome.runtime.sendMessage({
+    type: 'LOG_ACTIVITY',
+    params: {
+      contact_id: currentContext.contact.id,
+      activity_type: 'whatsapp',
+      summary: `${currentContext.channel} follow-up: ${rec.badge || rec.action || 'check-in'}`,
+      notes: `Reply status: ${currentContext.replyStatus || 'unknown'}. Suggestion: ${$('suggestionText').textContent?.substring(0, 300) || ''}`,
+      next_action: rec.reason || '',
+    },
+  });
+  if (res.success) {
+    flashButton('logActivityBtn', '✅ Logged!', '📝 Log');
+    // Refresh timeline
+    if (currentContext.contact?.id) loadTimeline(currentContext.contact.id);
+  } else {
+    flashButton('logActivityBtn', '❌ Error', '📝 Log', 2000);
   }
 });
 
@@ -263,23 +341,25 @@ $('insertBtn').addEventListener('click', async () => {
 $('logDraftBtn').addEventListener('click', async () => {
   if (!currentContext) return;
   if (!currentContext.contact?.id) {
-    $('logDraftBtn').textContent = '⚠️ No contact matched';
-    setTimeout(() => { $('logDraftBtn').textContent = '💾 Save as Draft'; }, 2000);
+    flashButton('logDraftBtn', '⚠️ No contact', '💾 Draft', 2000);
     return;
   }
   const text = $('suggestionText').textContent;
-  await chrome.runtime.sendMessage({
+  const res = await chrome.runtime.sendMessage({
     type: 'LOG_ACTIVITY',
     params: {
       contact_id: currentContext.contact.id,
       activity_type: 'draft',
-      summary: `Draft ${currentContext.channel} reply prepared for ${currentContext.contact.full_name}`,
+      summary: `Draft ${currentContext.channel} reply for ${currentContext.contact.full_name}`,
       notes: text?.substring(0, 500) || '',
       next_action: currentContext.recommendation?.action || '',
     },
   });
-  $('logDraftBtn').textContent = '✅ Saved to CRM!';
-  setTimeout(() => { $('logDraftBtn').textContent = '💾 Save as Draft'; }, 1500);
+  if (res.success) {
+    flashButton('logDraftBtn', '✅ Saved!', '💾 Draft');
+  } else {
+    flashButton('logDraftBtn', '❌ Error', '💾 Draft', 2000);
+  }
 });
 
 // Create contact from extension
@@ -289,6 +369,13 @@ $('createContactBtn')?.addEventListener('click', () => {
 });
 
 // ===== HELPERS =====
+function flashButton(id, tempText, originalText, duration = 1500) {
+  const btn = $(id);
+  if (!btn) return;
+  btn.textContent = tempText;
+  setTimeout(() => { btn.textContent = originalText; }, duration);
+}
+
 function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str;
