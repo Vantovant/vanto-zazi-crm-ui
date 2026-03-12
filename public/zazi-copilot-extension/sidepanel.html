@@ -54,7 +54,10 @@
           <div class="contact-card">
             <div class="contact-header">
               <h3 id="contactName">—</h3>
-              <span id="replyBadge" class="reply-badge">—</span>
+              <div class="contact-header-actions">
+                <span id="replyBadge" class="reply-badge">—</span>
+                <button id="editContactBtn" class="btn-icon-small hidden" title="Edit contact">✏️</button>
+              </div>
             </div>
             <div class="contact-meta">
               <span id="contactType" class="meta-tag"></span>
@@ -63,6 +66,30 @@
             </div>
             <!-- Lead Type Intelligence -->
             <div id="leadTypeIntel" class="lead-type-intel hidden"></div>
+
+            <!-- Inline Edit Contact Form -->
+            <div id="inlineEditForm" class="inline-edit-form hidden">
+              <h4>Edit Contact</h4>
+              <label class="form-label">Name</label>
+              <input type="text" id="editName" placeholder="Full name" class="form-input">
+              <label class="form-label">Phone</label>
+              <input type="text" id="editPhone" placeholder="Phone number" class="form-input">
+              <label class="form-label">Lead Type</label>
+              <select id="editLeadType" class="select-small form-select">
+                <option value="Prospect">Prospect</option>
+                <option value="Registered_Nopurchase">Registered (No Purchase)</option>
+                <option value="Purchase_Nostatus">Purchase (No Status)</option>
+                <option value="Purchase_Status">Purchase (Status)</option>
+                <option value="Expired">Expired</option>
+                <option value="Customer">Customer</option>
+                <option value="Distributor">Distributor</option>
+              </select>
+              <div class="inline-create-actions">
+                <button id="submitEditBtn" class="btn-primary btn-compact">Save</button>
+                <button id="cancelEditBtn" class="btn-small">Cancel</button>
+              </div>
+              <p id="editError" class="error hidden"></p>
+            </div>
 
             <div id="noContactMatch" class="warning-box hidden">
               <p>⚠️ No CRM match found</p>
@@ -138,10 +165,12 @@
                   <option value="revival">Revival</option>
                   <option value="objection-handling">Objection</option>
                 </select>
-                <button id="regenerateBtn" class="btn-small">↻</button>
+                <button id="regenerateBtn" class="btn-small" title="Rule-based suggestion">↻</button>
+                <button id="aiSuggestBtn" class="btn-small btn-ai" title="AI-powered suggestion">🤖 AI</button>
               </div>
             </div>
             <div id="suggestionText" class="suggestion-body">—</div>
+            <div id="aiIndicator" class="ai-indicator hidden">🤖 AI-generated</div>
             <div class="sugg-actions">
               <button id="copyBtn" class="btn-action">📋 Copy</button>
               <button id="insertBtn" class="btn-action">📥 Insert</button>

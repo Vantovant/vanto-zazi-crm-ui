@@ -40,7 +40,7 @@ const SupabaseClient = {
         refresh_token: this._refreshToken,
         user_email: this._userEmail,
         user_id: this._userId,
-        remembered_email: email, // Remember for prefill
+        remembered_email: email,
       });
       return { success: true, user: data.user };
     }
@@ -53,7 +53,6 @@ const SupabaseClient = {
     this._userEmail = null;
     this._userId = null;
     await chrome.storage.local.remove(['access_token', 'refresh_token', 'user_email', 'user_id']);
-    // Keep remembered_email for prefill
   },
 
   async refreshSession() {
@@ -113,6 +112,15 @@ const SupabaseClient = {
     return res.json();
   },
 
+  async _update(table, id, updates) {
+    const res = await fetch(`${CONFIG.SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
+      method: 'PATCH',
+      headers: { ...this._headers(), 'Prefer': 'return=representation' },
+      body: JSON.stringify(updates),
+    });
+    return res.json();
+  },
+
   async _upsert(table, row, onConflict) {
     const headers = {
       ...this._headers(),
@@ -132,80 +140,47 @@ const SupabaseClient = {
     if (!digits || digits.length < 7) return null;
 
     // Try exact normalized match first
-    console.log('[Supabase] Phone lookup (exact):', digits);
     let data = await this._query('contacts', `phone_normalized=eq.${digits}&limit=1`);
-    if (Array.isArray(data) && data.length > 0) {
-      console.log('[Supabase] Phone matched (exact):', data[0].full_name);
-      return data[0];
-    }
+    if (Array.isArray(data) && data.length > 0) return data[0];
 
-    // Try suffix match — last 9 digits (handles country code differences)
+    // Suffix match — last 9 digits
     const suffix = digits.slice(-9);
     if (suffix.length >= 7) {
-      console.log('[Supabase] Phone lookup (suffix):', suffix);
       data = await this._query('contacts', `phone_normalized=like.*${suffix}&limit=3`);
-      if (Array.isArray(data) && data.length === 1) {
-        console.log('[Supabase] Phone matched (suffix):', data[0].full_name);
-        return data[0];
-      }
-      if (Array.isArray(data) && data.length > 1) {
-        console.log('[Supabase] Phone suffix matched multiple:', data.length);
-        // Return first — caller can handle ambiguity
-        return data[0];
-      }
+      if (Array.isArray(data) && data.length >= 1) return data[0];
     }
 
-    // Try raw phone_number field as well (unnormalized)
+    // Try raw phone_number field
     data = await this._query('contacts', `phone_number=like.*${suffix}&limit=3`);
-    if (Array.isArray(data) && data.length === 1) {
-      console.log('[Supabase] Phone matched (raw field suffix):', data[0].full_name);
-      return data[0];
-    }
+    if (Array.isArray(data) && data.length >= 1) return data[0];
 
-    console.log('[Supabase] Phone lookup: no match for', digits);
     return null;
   },
 
   async findContactByEmail(email) {
     const norm = email.trim().toLowerCase();
     if (!norm) return null;
-    console.log('[Supabase] Email lookup:', norm);
     const data = await this._query('contacts', `email_normalized=eq.${encodeURIComponent(norm)}&limit=1`);
-    if (Array.isArray(data) && data.length > 0) {
-      console.log('[Supabase] Email matched:', data[0].full_name);
-      return data[0];
-    }
-    // Also try raw email_address
+    if (Array.isArray(data) && data.length > 0) return data[0];
+
     const data2 = await this._query('contacts', `email_address=ilike.${encodeURIComponent(norm)}&limit=1`);
-    if (Array.isArray(data2) && data2.length > 0) {
-      console.log('[Supabase] Email matched (raw field):', data2[0].full_name);
-      return data2[0];
-    }
-    console.log('[Supabase] Email lookup: no match for', norm);
+    if (Array.isArray(data2) && data2.length > 0) return data2[0];
     return null;
   },
 
   async findContactByName(name) {
     const norm = name.trim();
     if (!norm) return null;
-    console.log('[Supabase] Name lookup:', norm);
     const data = await this._query('contacts', `full_name=ilike.${encodeURIComponent('%' + norm + '%')}&limit=5`);
-    console.log('[Supabase] Name lookup results:', Array.isArray(data) ? data.length : 0);
     return Array.isArray(data) ? data : [];
   },
 
   async getContactActivities(contactId, limit = 20) {
-    return this._query(
-      'contact_activities',
-      `contact_id=eq.${contactId}&order=created_at.desc&limit=${limit}`
-    );
+    return this._query('contact_activities', `contact_id=eq.${contactId}&order=created_at.desc&limit=${limit}`);
   },
 
   async getContactOrders(contactId, limit = 10) {
-    return this._query(
-      'orders',
-      `contact_id=eq.${contactId}&order=order_date.desc&limit=${limit}`
-    );
+    return this._query('orders', `contact_id=eq.${contactId}&order=order_date.desc&limit=${limit}`);
   },
 
   async logActivity(params) {
@@ -220,7 +195,6 @@ const SupabaseClient = {
   },
 
   async createContact(params) {
-    console.log('[Supabase] Creating contact:', params.full_name);
     const row = {
       user_id: this._userId,
       full_name: params.full_name || '',
@@ -237,15 +211,24 @@ const SupabaseClient = {
     };
     const result = await this._insert('contacts', row);
     if (Array.isArray(result) && result.length > 0) {
-      console.log('[Supabase] Contact created:', result[0].id, result[0].full_name);
       return { success: true, contact: result[0] };
     }
     if (result?.id) {
-      console.log('[Supabase] Contact created:', result.id);
       return { success: true, contact: result };
     }
-    console.error('[Supabase] Contact creation failed:', result);
     return { success: false, error: result?.message || result?.error || 'Creation failed' };
+  },
+
+  async updateContact(contactId, updates) {
+    if (!contactId) return { success: false, error: 'No contact ID' };
+    const result = await this._update('contacts', contactId, updates);
+    if (Array.isArray(result) && result.length > 0) {
+      return { success: true, contact: result[0] };
+    }
+    if (result?.id) {
+      return { success: true, contact: result };
+    }
+    return { success: false, error: result?.message || result?.error || 'Update failed' };
   },
 
   async upsertFollowUpState(state) {
@@ -257,9 +240,80 @@ const SupabaseClient = {
   },
 
   async getFollowUpStates(contactId) {
-    return this._query(
-      'follow_up_states',
-      `contact_id=eq.${contactId}&order=updated_at.desc`
-    );
+    return this._query('follow_up_states', `contact_id=eq.${contactId}&order=updated_at.desc`);
+  },
+
+  // ---- AI Suggestion (calls zazi-copilot edge function) ----
+  async callAISuggest(params) {
+    const { contactData, messages, channel, tone, objective, leadType } = params;
+
+    // Build a concise conversation excerpt
+    const recentMessages = (messages || []).slice(-6).map(m =>
+      `${m.direction === 'outbound' ? 'Me' : 'Them'}: ${(m.text || '').substring(0, 120)}`
+    ).join('\n');
+
+    const userMessage = `Generate a ${tone || 'warm'} ${channel || 'whatsapp'} follow-up message for this contact.
+
+Contact: ${contactData?.full_name || 'Unknown'}
+Lead Type: ${leadType || 'Prospect'}
+Objective: ${objective || 'check-in'}
+Channel: ${channel || 'whatsapp'}
+
+Recent conversation:
+${recentMessages || '(no messages)'}
+
+${channel === 'whatsapp' ? 'Keep it short, conversational, max 3-4 sentences. Use appropriate emoji.' : 'Write a professional email body, 4-6 sentences.'}
+
+Output ONLY the message text — no quotes, no labels, no markdown.`;
+
+    const res = await fetch(`${CONFIG.SUPABASE_URL}/functions/v1/zazi-copilot`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': CONFIG.SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${this._token}`,
+      },
+      body: JSON.stringify({
+        action: 'suggest_message',
+        message: userMessage,
+        contactData: contactData || {},
+      }),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`AI request failed (${res.status}): ${errText}`);
+    }
+
+    // Parse SSE stream
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let fullText = '';
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      let newlineIndex;
+      while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
+        let line = buffer.slice(0, newlineIndex);
+        buffer = buffer.slice(newlineIndex + 1);
+
+        if (line.endsWith('\r')) line = line.slice(0, -1);
+        if (!line.startsWith('data: ')) continue;
+        const jsonStr = line.slice(6).trim();
+        if (jsonStr === '[DONE]') break;
+
+        try {
+          const parsed = JSON.parse(jsonStr);
+          const content = parsed.choices?.[0]?.delta?.content;
+          if (content) fullText += content;
+        } catch { /* partial chunk */ }
+      }
+    }
+
+    return { success: true, text: fullText.trim() };
   },
 };

@@ -11,7 +11,7 @@ const lastKnownByChannel = {
   gmail: null,
 };
 const MAX_CONTEXT_AGE_MS = 120000;
-const REFRESH_GRACE_MS = 45000;
+const REFRESH_GRACE_MS = 30000; // Reduced from 45s
 const CONTEXT_STORAGE_KEYS = [
   'current_channel',
   'current_context',
@@ -19,7 +19,6 @@ const CONTEXT_STORAGE_KEYS = [
   'last_known_good_gmail_context',
 ];
 
-// Lead type intelligence map
 const LEAD_TYPE_INTEL = {
   'Prospect': { icon: '🎯', label: 'Prospect', color: '#6b7280', hint: 'Prospecting / conversion path' },
   'Registered_Nopurchase': { icon: '📋', label: 'Registered (No Purchase)', color: '#f59e0b', hint: 'Activation / first-purchase follow-up' },
@@ -48,23 +47,10 @@ function hydrateLastKnownContexts(data) {
   }
 }
 
-function pickFallbackContext(preferredChannel) {
-  const now = Date.now();
-  const preferred = preferredChannel ? lastKnownByChannel[preferredChannel] : null;
-  if (isContextPayloadValid(preferred) && now - (preferred.timestamp || 0) <= REFRESH_GRACE_MS) {
-    return preferred;
-  }
-  const candidates = Object.values(lastKnownByChannel)
-    .filter((ctx) => isContextPayloadValid(ctx) && now - (ctx.timestamp || 0) <= MAX_CONTEXT_AGE_MS)
-    .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-  return candidates[0] || null;
-}
-
 // ===== INIT =====
 async function init() {
   console.log('[Zazi SP] Side panel initializing');
 
-  // Prefill remembered email
   try {
     const remembered = await chrome.runtime.sendMessage({ type: 'GET_REMEMBERED_EMAIL' });
     if (remembered?.email) {
@@ -129,7 +115,7 @@ function showConnected(email) {
 // ===== CONTEXT POLLING =====
 function startContextPolling() {
   pollContext();
-  setInterval(pollContext, 2000);
+  setInterval(pollContext, 1500); // Reduced from 2s
 }
 
 function isExplicitClear(ctx) {
@@ -162,16 +148,21 @@ function showDefaultEmptyState() {
 async function pollContext() {
   const data = await chrome.storage.local.get(CONTEXT_STORAGE_KEYS);
   const ctx = data.current_context;
+  const storedChannel = data.current_channel;
 
   hydrateLastKnownContexts(data);
-  currentChannel = data.current_channel || currentChannel;
+
+  // STRICT: Always use stored channel as truth
+  if (storedChannel) {
+    currentChannel = storedChannel;
+  }
 
   if (isExplicitClear(ctx)) {
-    const fallback = pickFallbackContext(currentChannel || ctx.channel);
-    if (fallback && Date.now() - (fallback.timestamp || 0) <= REFRESH_GRACE_MS) {
+    // STRICT CHANNEL ISOLATION: Only fall back to same-channel context
+    const fallback = currentChannel ? lastKnownByChannel[currentChannel] : null;
+    if (fallback && isContextPayloadValid(fallback) && Date.now() - (fallback.timestamp || 0) <= REFRESH_GRACE_MS) {
       if (!currentContext || currentContext.timestamp !== fallback.timestamp) {
         currentContext = fallback;
-        currentChannel = fallback.channel || currentChannel;
         renderContext(fallback);
       }
       return;
@@ -182,8 +173,9 @@ async function pollContext() {
   }
 
   if (!isContextPayloadValid(ctx)) {
-    const fallback = pickFallbackContext(currentChannel);
-    if (fallback) {
+    // STRICT: Only use fallback from current channel
+    const fallback = currentChannel ? lastKnownByChannel[currentChannel] : null;
+    if (fallback && isContextPayloadValid(fallback)) {
       if (!currentContext || currentContext.timestamp !== fallback.timestamp) {
         currentContext = fallback;
         currentChannel = fallback.channel || currentChannel;
@@ -196,15 +188,21 @@ async function pollContext() {
   }
 
   if (!isFreshEnough(ctx)) {
-    const fallback = pickFallbackContext(ctx.channel || currentChannel);
-    if (fallback && fallback.timestamp !== ctx.timestamp) {
+    const fallback = currentChannel ? lastKnownByChannel[currentChannel] : null;
+    if (fallback && isContextPayloadValid(fallback) && fallback.timestamp !== ctx.timestamp) {
       if (!currentContext || currentContext.timestamp !== fallback.timestamp) {
         currentContext = fallback;
-        currentChannel = fallback.channel || currentChannel;
         renderContext(fallback);
       }
       return;
     }
+  }
+
+  // STRICT CHANNEL ISOLATION: If ctx is from a different channel than current, ignore it
+  if (currentChannel && ctx.channel && ctx.channel !== currentChannel) {
+    // Store it as last-known for its channel but don't render
+    rememberLastKnownContext(ctx);
+    return;
   }
 
   if (currentContext && currentContext.timestamp === ctx.timestamp) return;
@@ -238,14 +236,15 @@ function renderContext(ctx) {
   const contact = ctx.contact;
   $('contactName').textContent = contact?.full_name || ctx.contactInfo?.name || ctx.contactIdentifier || 'Unknown';
 
-  // Hide inline create form when re-rendering
+  // Hide forms when re-rendering
   $('inlineCreateForm').classList.add('hidden');
+  $('inlineEditForm').classList.add('hidden');
 
   if (contact) {
     $('noContactMatch').classList.add('hidden');
     $('candidateMatches').classList.add('hidden');
+    $('editContactBtn').classList.remove('hidden');
 
-    // Lead type with intelligence
     const lt = contact.lead_type || 'Prospect';
     const intel = LEAD_TYPE_INTEL[lt] || LEAD_TYPE_INTEL['Prospect'];
     $('contactType').textContent = `${intel.icon} ${intel.label}`;
@@ -254,11 +253,11 @@ function renderContext(ctx) {
     $('contactTemp').textContent = contact.lead_temperature || '';
     $('contactStatus').textContent = contact.communication_status || '';
 
-    // Lead type intelligence bar
     renderLeadTypeIntel(contact);
   } else if (ctx.candidateMatches && ctx.candidateMatches.length > 0) {
     $('noContactMatch').classList.add('hidden');
     $('candidateMatches').classList.remove('hidden');
+    $('editContactBtn').classList.add('hidden');
     $('leadTypeIntel').classList.add('hidden');
     $('contactType').textContent = '';
     $('contactTemp').textContent = '';
@@ -267,6 +266,7 @@ function renderContext(ctx) {
   } else {
     $('noContactMatch').classList.remove('hidden');
     $('candidateMatches').classList.add('hidden');
+    $('editContactBtn').classList.add('hidden');
     $('leadTypeIntel').classList.add('hidden');
     $('contactType').textContent = '';
     $('contactTemp').textContent = '';
@@ -304,6 +304,7 @@ function renderContext(ctx) {
     const text = ctx.channel === 'whatsapp' ? sugg.whatsapp : sugg.email?.body;
     $('suggestionText').textContent = text || '—';
   }
+  $('aiIndicator').classList.add('hidden');
 
   renderMessages(ctx.messages || []);
 
@@ -325,27 +326,16 @@ function renderLeadTypeIntel(contact) {
 
   let details = [`${intel.icon} ${intel.hint}`];
 
-  if (lt === 'Expired') {
-    details.push('⚠️ Account expired — reactivation needed');
-  } else if (lt === 'Registered_Nopurchase') {
-    details.push('📦 Registered but no purchase yet — help them activate');
-  } else if (lt === 'Purchase_Nostatus') {
-    details.push('🔄 Has purchased but no active status — follow up on status');
-  } else if (lt === 'Purchase_Status') {
-    details.push('💪 Active with status — support, reorder, or progression');
-  }
+  if (lt === 'Expired') details.push('⚠️ Account expired — reactivation needed');
+  else if (lt === 'Registered_Nopurchase') details.push('📦 Registered but no purchase yet — help them activate');
+  else if (lt === 'Purchase_Nostatus') details.push('🔄 Has purchased but no active status — follow up on status');
+  else if (lt === 'Purchase_Status') details.push('💪 Active with status — support, reorder, or progression');
 
-  if (regStatus === 'Not Registered') {
-    details.push('📝 Not registered yet');
-  } else if (regStatus === 'Registered') {
-    details.push('✅ Registered');
-  } else if (regStatus === 'Activated') {
-    details.push('🚀 Activated');
-  }
+  if (regStatus === 'Not Registered') details.push('📝 Not registered yet');
+  else if (regStatus === 'Registered') details.push('✅ Registered');
+  else if (regStatus === 'Activated') details.push('🚀 Activated');
 
-  if (goStatus) {
-    details.push(`🏷️ GO Status: ${goStatus}`);
-  }
+  if (goStatus) details.push(`🏷️ GO Status: ${goStatus}`);
 
   el.innerHTML = details.map(d => `<div class="intel-line">${d}</div>`).join('');
   el.classList.remove('hidden');
@@ -376,7 +366,6 @@ async function selectCandidate(contact) {
     [channelKey]: currentContext,
   });
 
-  // Save persistent mapping
   const mapKey = `${currentContext.channel}:${(currentContext.contactIdentifier || currentContext.contactInfo?.name || '').trim().toLowerCase()}`;
   if (mapKey && contact.id) {
     await chrome.runtime.sendMessage({
@@ -459,7 +448,7 @@ async function loadTimeline(contactId) {
 
 // ===== ACTIONS =====
 
-// Regenerate suggestion
+// Regenerate suggestion (rule-based)
 $('regenerateBtn').addEventListener('click', async () => {
   if (!currentContext) return;
   const contactName = currentContext.contact?.full_name || currentContext.contactInfo?.name || 'there';
@@ -479,12 +468,58 @@ $('regenerateBtn').addEventListener('click', async () => {
     $('suggestionText').textContent = text || '—';
     currentContext.suggestion = res.suggestion;
   }
+  $('aiIndicator').classList.add('hidden');
+});
+
+// AI-powered suggestion
+$('aiSuggestBtn').addEventListener('click', async () => {
+  if (!currentContext) return;
+
+  $('aiSuggestBtn').disabled = true;
+  $('aiSuggestBtn').textContent = '⏳';
+  $('suggestionText').textContent = 'Generating AI suggestion...';
+
+  try {
+    const res = await chrome.runtime.sendMessage({
+      type: 'AI_SUGGEST',
+      params: {
+        contactData: currentContext.contact || {
+          full_name: currentContext.contactInfo?.name || 'Unknown',
+          lead_type: 'Prospect',
+        },
+        messages: currentContext.messages || [],
+        channel: currentContext.channel,
+        tone: $('toneSelect').value,
+        objective: $('objectiveSelect').value,
+        leadType: currentContext.contact?.lead_type || 'Prospect',
+      },
+    });
+
+    if (res.success && res.text) {
+      $('suggestionText').textContent = res.text;
+      $('aiIndicator').classList.remove('hidden');
+    } else {
+      // Fallback to rule-based
+      console.warn('[Zazi SP] AI failed, falling back to rules:', res.error);
+      $('regenerateBtn').click();
+      flashButton('aiSuggestBtn', '⚠️', '🤖 AI', 2000);
+      return;
+    }
+  } catch (err) {
+    console.error('[Zazi SP] AI suggest error:', err);
+    $('regenerateBtn').click();
+    flashButton('aiSuggestBtn', '⚠️', '🤖 AI', 2000);
+    return;
+  }
+
+  $('aiSuggestBtn').disabled = false;
+  $('aiSuggestBtn').textContent = '🤖 AI';
 });
 
 // Copy suggestion
 $('copyBtn').addEventListener('click', () => {
   const text = $('suggestionText').textContent;
-  if (text && text !== '—') {
+  if (text && text !== '—' && text !== 'Generating AI suggestion...') {
     navigator.clipboard.writeText(text);
     flashButton('copyBtn', '✅ Copied!', '📋 Copy');
   }
@@ -553,14 +588,103 @@ $('logDraftBtn').addEventListener('click', async () => {
   }
 });
 
+// ===== INLINE EDIT CONTACT =====
+$('editContactBtn')?.addEventListener('click', () => {
+  if (!currentContext?.contact) return;
+  const c = currentContext.contact;
+  $('editName').value = c.full_name || '';
+  $('editPhone').value = c.phone_number || '';
+  $('editLeadType').value = c.lead_type || 'Prospect';
+  $('editError').classList.add('hidden');
+  $('inlineEditForm').classList.remove('hidden');
+});
+
+$('cancelEditBtn')?.addEventListener('click', () => {
+  $('inlineEditForm').classList.add('hidden');
+});
+
+$('submitEditBtn')?.addEventListener('click', async () => {
+  if (!currentContext?.contact?.id) return;
+
+  const name = $('editName').value.trim();
+  const phone = $('editPhone').value.trim();
+  const leadType = $('editLeadType').value;
+
+  if (!name) {
+    $('editError').textContent = 'Name is required';
+    $('editError').classList.remove('hidden');
+    return;
+  }
+
+  $('submitEditBtn').disabled = true;
+  $('submitEditBtn').textContent = 'Saving...';
+  $('editError').classList.add('hidden');
+
+  try {
+    const res = await chrome.runtime.sendMessage({
+      type: 'UPDATE_CONTACT',
+      contactId: currentContext.contact.id,
+      updates: {
+        full_name: name,
+        phone_number: phone,
+        lead_type: leadType,
+      },
+    });
+
+    if (res.success && res.contact) {
+      // Update in-memory context immediately
+      currentContext.contact = res.contact;
+      currentContext.timestamp = Date.now();
+
+      // Recalculate recommendation with new lead type
+      const newRec = FollowUpEngine.evaluate({
+        ...currentContext,
+        leadType: res.contact.lead_type,
+        leadTemperature: res.contact.lead_temperature,
+        registrationStatus: res.contact.registration_status,
+      });
+      currentContext.recommendation = newRec;
+
+      // Regenerate suggestion with new context
+      const newSugg = MessageSuggestions.generate({
+        contactName: res.contact.full_name,
+        objective: newRec.suggestedObjective,
+        tone: newRec.suggestedTone,
+        channel: currentContext.channel,
+        leadType: res.contact.lead_type,
+        hasPurchased: currentContext.recommendation?.hasPurchased || false,
+      });
+      currentContext.suggestion = newSugg;
+
+      // Persist
+      const channelKey = getLastKnownContextKey(currentContext.channel || 'whatsapp');
+      await chrome.storage.local.set({
+        current_context: currentContext,
+        [channelKey]: currentContext,
+      });
+      rememberLastKnownContext(currentContext);
+
+      $('inlineEditForm').classList.add('hidden');
+      renderContext(currentContext);
+    } else {
+      $('editError').textContent = res.error || 'Update failed';
+      $('editError').classList.remove('hidden');
+    }
+  } catch (err) {
+    $('editError').textContent = 'Error: ' + err.message;
+    $('editError').classList.remove('hidden');
+  }
+
+  $('submitEditBtn').disabled = false;
+  $('submitEditBtn').textContent = 'Save';
+});
+
 // ===== INLINE CREATE CONTACT =====
 $('createContactBtn')?.addEventListener('click', () => {
-  // Show inline form, prefill from context
   $('noContactMatch').classList.add('hidden');
   $('inlineCreateForm').classList.remove('hidden');
   $('createError').classList.add('hidden');
 
-  // Prefill
   const ctx = currentContext;
   if (ctx) {
     $('createName').value = ctx.contactInfo?.name || ctx.contactIdentifier || '';
@@ -594,18 +718,10 @@ $('submitCreateBtn')?.addEventListener('click', async () => {
   try {
     const res = await chrome.runtime.sendMessage({
       type: 'CREATE_CONTACT',
-      params: {
-        full_name: name,
-        phone_number: phone,
-        email_address: email,
-        lead_type: leadType,
-      },
+      params: { full_name: name, phone_number: phone, email_address: email, lead_type: leadType },
     });
 
     if (res.success && res.contact) {
-      console.log('[Zazi SP] Contact created:', res.contact.id, res.contact.full_name);
-
-      // Link to current conversation
       if (currentContext) {
         currentContext.contact = res.contact;
         currentContext.candidateMatches = [];
@@ -618,7 +734,6 @@ $('submitCreateBtn')?.addEventListener('click', async () => {
           [channelKey]: currentContext,
         });
 
-        // Save persistent mapping
         const mapKeys = [
           `${currentContext.channel}:${(currentContext.contactIdentifier || '').trim().toLowerCase()}`,
           `${currentContext.channel}:${(currentContext.contactInfo?.name || '').trim().toLowerCase()}`,
@@ -636,7 +751,6 @@ $('submitCreateBtn')?.addEventListener('click', async () => {
         $('inlineCreateForm').classList.add('hidden');
         renderContext(currentContext);
 
-        // Force adapter to re-send
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
         if (tab) {
           chrome.tabs.sendMessage(tab.id, { action: 'force_refresh' }).catch(() => {});

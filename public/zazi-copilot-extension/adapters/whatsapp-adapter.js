@@ -9,7 +9,6 @@
 
   console.log('[Zazi WA] Copilot adapter loaded');
 
-  // ===== SELECTORS =====
   const SEL = {
     contactInfo: '#main header span[title]',
     phoneFromHeader: 'header span[title*="+"]',
@@ -29,7 +28,7 @@
   let noChatSince = null;
   let lastRefreshLogAt = 0;
   const MAX_NO_CHAT_MISSES_BEFORE_CLEAR = 3;
-  const MIN_NO_CHAT_DURATION_MS = 12000;
+  const MIN_NO_CHAT_DURATION_MS = 8000; // Reduced from 12s for faster clearing
   const REFRESH_LOG_INTERVAL_MS = 10000;
 
   // ===== MINIMAL FLOATING LAUNCHER =====
@@ -143,7 +142,7 @@
       }
     }
 
-    // Strategy 5: Extract from data-id attributes on messages (contains phone in some formats)
+    // Strategy 5: Extract from data-id attributes on messages
     if (!phone) {
       const msgEl = document.querySelector('#main [data-id*="@"]');
       if (msgEl) {
@@ -156,7 +155,6 @@
     }
 
     const cleanPhone = phone.replace(/[^0-9+]/g, '');
-    console.log('[Zazi WA] Identity extracted:', { name, phone: cleanPhone || '(none)' });
     return { name, phone: cleanPhone };
   }
 
@@ -211,7 +209,6 @@
         reason,
         ...extra,
       });
-      console.log('[Zazi WA] Context clear requested:', reason, extra);
     } catch (err) {
       console.warn('[Zazi WA] Failed to request context clear:', err);
     }
@@ -283,25 +280,38 @@
 
       const isSameContact = contactInfo.name === lastContactName;
       const isSameMessages = msgHash === lastMessageHash;
-      if (isSameContact && isSameMessages) {
+
+      // CRITICAL: If contact changed, send update IMMEDIATELY — no debounce
+      if (!isSameContact) {
+        console.log('[Zazi WA] Chat switched:', { from: lastContactName, to: contactInfo.name, phone: contactInfo.phone || '(none)' });
+        lastContactName = contactInfo.name;
+        lastMessageHash = msgHash;
+        lastRefreshLogAt = Date.now();
+        await sendContextUpdate(contactInfo, messages);
+        return;
+      }
+
+      // Same contact, same messages — periodic keepalive only
+      if (isSameMessages) {
         const now = Date.now();
         if (now - lastRefreshLogAt >= REFRESH_LOG_INTERVAL_MS) {
-          console.log('[Zazi WA] Valid chat refreshed (sticky keepalive)', { contact: contactInfo.name });
           lastRefreshLogAt = now;
         }
         return;
       }
 
-      lastContactName = contactInfo.name;
+      // Same contact, new messages
       lastMessageHash = msgHash;
       lastRefreshLogAt = Date.now();
+      console.log('[Zazi WA] New messages in current chat:', contactInfo.name);
+      await sendContextUpdate(contactInfo, messages);
+    } catch (err) {
+      console.error('[Zazi WA] processActiveChat error:', err);
+    }
+  }
 
-      console.log('[Zazi WA] Valid chat detected:', {
-        contact: contactInfo.name,
-        phone: contactInfo.phone || '(none)',
-        mode: isSameContact ? 'new_messages' : 'chat_switch',
-      });
-
+  async function sendContextUpdate(contactInfo, messages) {
+    try {
       const response = await chrome.runtime.sendMessage({
         type: 'CHAT_CONTEXT_UPDATE',
         channel: 'whatsapp',
@@ -315,19 +325,20 @@
         updateLauncherBadge(true);
       }
     } catch (err) {
-      console.error('[Zazi WA] processActiveChat error:', err);
+      console.error('[Zazi WA] sendContextUpdate error:', err);
     }
   }
 
-  // ===== MUTATION OBSERVER =====
+  // ===== MUTATION OBSERVER — fast debounce =====
   function startObserver() {
     const target = document.getElementById('app') || document.body;
     const observer = new MutationObserver(() => {
       clearTimeout(startObserver._timer);
+      // Reduced from 800ms to 250ms for faster detection
       startObserver._timer = setTimeout(() => {
         ensureLauncher();
         processActiveChat();
-      }, 800);
+      }, 250);
     });
     observer.observe(target, { childList: true, subtree: true });
   }
@@ -354,8 +365,9 @@
   function init() {
     ensureLauncher();
     startObserver();
-    setInterval(processActiveChat, 5000);
-    setTimeout(processActiveChat, 2000);
+    // Reduced polling from 5s to 3s
+    setInterval(processActiveChat, 3000);
+    setTimeout(processActiveChat, 1500);
   }
 
   if (document.readyState === 'complete') init();

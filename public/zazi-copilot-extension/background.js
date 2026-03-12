@@ -16,7 +16,7 @@ const CONTEXT_KEYS = [
   'contact_mappings',
 ];
 const MIN_CLEAR_MISSES = 3;
-const CLEAR_GRACE_MS = 15000;
+const CLEAR_GRACE_MS = 10000; // Reduced from 15s for faster clearing
 const CHANNEL_HOSTS = {
   whatsapp: 'web.whatsapp.com',
   gmail: 'mail.google.com',
@@ -44,20 +44,6 @@ async function getStoredContexts() {
   return chrome.storage.local.get(CONTEXT_KEYS);
 }
 
-async function isSenderTabActiveForChannel(tabId, channel) {
-  if (!tabId || !channel) return false;
-  try {
-    const tab = await chrome.tabs.get(tabId);
-    if (!tab?.active) return false;
-    const expectedHost = CHANNEL_HOSTS[channel];
-    if (!expectedHost) return true;
-    return (tab.url || '').includes(expectedHost);
-  } catch {
-    return false;
-  }
-}
-
-// ===== PERSISTENT CONTACT MAPPINGS =====
 async function getContactMappings() {
   const data = await chrome.storage.local.get('contact_mappings');
   return data.contact_mappings || {};
@@ -69,6 +55,48 @@ async function saveContactMapping(conversationKey, contactId) {
   await chrome.storage.local.set({ contact_mappings: mappings });
   console.log('[Zazi BG] Contact mapping saved:', conversationKey, '→', contactId);
 }
+
+// ===== TAB ACTIVATION — instant channel switching =====
+chrome.tabs.onActivated.addListener(async (activeInfo) => {
+  try {
+    const tab = await chrome.tabs.get(activeInfo.tabId);
+    const url = tab?.url || '';
+    let newChannel = null;
+
+    if (url.includes('web.whatsapp.com')) newChannel = 'whatsapp';
+    else if (url.includes('mail.google.com')) newChannel = 'gmail';
+
+    if (!newChannel) return;
+
+    const stored = await getStoredContexts();
+    if (stored.current_channel === newChannel) return;
+
+    // Switch to the last-known-good context for this channel
+    const lastKnownKey = getLastKnownContextKey(newChannel);
+    const lastKnown = stored[lastKnownKey];
+
+    if (lastKnown && !lastKnown.cleared) {
+      console.log('[Zazi BG] Tab switch → promoting', newChannel, 'context');
+      await chrome.storage.local.set({
+        current_channel: newChannel,
+        current_context: { ...lastKnown, timestamp: Date.now() },
+      });
+    } else {
+      // No cached context — just switch channel, adapters will send fresh data
+      await chrome.storage.local.set({
+        current_channel: newChannel,
+        current_context: {
+          cleared: true,
+          clearReason: 'tab_switch_no_cached_context',
+          channel: newChannel,
+          timestamp: Date.now(),
+        },
+      });
+    }
+  } catch (err) {
+    console.warn('[Zazi BG] Tab activation handler error:', err);
+  }
+});
 
 // ===== MESSAGE HANDLER =====
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -161,6 +189,12 @@ async function handleMessage(msg, sender) {
       return createResult;
     }
 
+    case 'UPDATE_CONTACT': {
+      await SupabaseClient.init();
+      const updateResult = await SupabaseClient.updateContact(msg.contactId, msg.updates);
+      return updateResult;
+    }
+
     case 'SYNC_FOLLOWUP_STATE': {
       await SupabaseClient.init();
       const result = await SupabaseClient.upsertFollowUpState(msg.state);
@@ -175,6 +209,17 @@ async function handleMessage(msg, sender) {
       return { success: false, error: 'Missing conversationKey or contactId' };
     }
 
+    case 'AI_SUGGEST': {
+      await SupabaseClient.init();
+      try {
+        const aiResult = await SupabaseClient.callAISuggest(msg.params);
+        return aiResult;
+      } catch (err) {
+        console.error('[Zazi BG] AI suggestion error:', err);
+        return { success: false, error: err.message, fallback: true };
+      }
+    }
+
     case 'CONTEXT_CLEAR_REQUEST': {
       const reason = msg.reason || 'unknown';
       const allowedReasons = new Set(['confirmed_no_active_chat', 'chat_switched', 'tab_unloaded', 'explicit_reset']);
@@ -187,22 +232,15 @@ async function handleMessage(msg, sender) {
       const lastKnownForChannel = effectiveChannel ? stored[getLastKnownContextKey(effectiveChannel)] : null;
 
       if (!allowedReasons.has(reason)) {
-        console.log('[Zazi BG] Blocked context clear request (invalid reason):', reason);
         return { success: false, blocked: true };
       }
 
       if (reason === 'confirmed_no_active_chat' && misses < MIN_CLEAR_MISSES) {
-        console.log('[Zazi BG] Blocked context clear request (insufficient misses):', misses);
         return { success: false, blocked: true };
       }
 
       // Don't let a non-active channel clear the active channel's context
       if (effectiveChannel && currentChannel && effectiveChannel !== currentChannel) {
-        console.log('[Zazi BG] Blocked context clear from non-active channel', {
-          requestedChannel: effectiveChannel,
-          currentChannel,
-          reason,
-        });
         if (effectiveChannel) {
           await chrome.storage.local.set({
             [getLastKnownContextKey(effectiveChannel)]: null,
@@ -216,11 +254,10 @@ async function handleMessage(msg, sender) {
         lastKnownForChannel?.timestamp &&
         Date.now() - lastKnownForChannel.timestamp <= CLEAR_GRACE_MS
       ) {
-        console.log('[Zazi BG] Parse miss ignored — clear blocked by sticky grace window');
         return { success: true, ignored: true, reason: 'clear_grace_window' };
       }
 
-      console.log('[Zazi BG] State cleared intentionally:', reason, { channel: effectiveChannel });
+      console.log('[Zazi BG] State cleared:', reason, { channel: effectiveChannel });
 
       await chrome.storage.local.set({
         current_channel: null,
@@ -253,22 +290,17 @@ async function handleMessage(msg, sender) {
 
       if (!isStrongContextPayload({ channel, contactIdentifier, contactInfo, messages })) {
         if (existingChannelContext?.conversationKey || (currentChannel === channel && currentContext?.conversationKey)) {
-          console.log('[Zazi BG] Null/empty update blocked', { channel, reason: 'weak_payload_blocked' });
           return { success: true, ignored: true, reason: 'weak_payload_blocked' };
         }
         return { success: true, ignored: true, reason: 'weak_payload_no_state' };
       }
 
-      // ---- Contact matching: phone/email → persistent mapping → name fallback ----
+      // ---- Contact matching ----
       let contact = null;
       let candidateMatches = [];
       const contactMappings = await getContactMappings();
 
-      console.log('[Zazi BG] CRM search started', {
-        channel,
-        contactIdentifier,
-        contactName: contactInfo?.name,
-      });
+      console.log('[Zazi BG] CRM search started', { channel, contactIdentifier, contactName: contactInfo?.name });
 
       if (channel === 'whatsapp') {
         // Try phone first
@@ -280,7 +312,7 @@ async function handleMessage(msg, sender) {
           }
         }
 
-        // Try name-as-phone (when WhatsApp shows unsaved number as name)
+        // Try name-as-phone
         if (!contact && contactInfo?.name) {
           const nameDigits = contactInfo.name.replace(/[^0-9]/g, '');
           if (nameDigits.length >= 7) {
@@ -318,7 +350,6 @@ async function handleMessage(msg, sender) {
             console.log('[Zazi BG] CRM matched by name:', contact.full_name);
           } else if (nameResults.length > 1) {
             candidateMatches = nameResults;
-            console.log('[Zazi BG] CRM name search returned multiple matches:', nameResults.length);
           }
         }
       } else if (channel === 'gmail' && contactIdentifier) {
@@ -341,7 +372,6 @@ async function handleMessage(msg, sender) {
           const nameResults = await SupabaseClient.findContactByName(contactInfo.name);
           if (nameResults.length === 1) {
             contact = nameResults[0];
-            console.log('[Zazi BG] CRM matched by name (Gmail):', contact.full_name);
           } else if (nameResults.length > 1) {
             candidateMatches = nameResults;
           }
@@ -349,11 +379,7 @@ async function handleMessage(msg, sender) {
       }
 
       if (!contact && candidateMatches.length === 0) {
-        console.log('[Zazi BG] CRM search: no match found', {
-          channel,
-          identifier: contactIdentifier,
-          name: contactInfo?.name,
-        });
+        console.log('[Zazi BG] CRM search: no match found', { channel, identifier: contactIdentifier, name: contactInfo?.name });
       }
 
       // Save persistent mapping if contact found
@@ -407,7 +433,6 @@ async function handleMessage(msg, sender) {
         lastReplyTone: null,
       };
 
-      // Check if contact has orders
       let lastProduct = null;
       if (contact) {
         const orders = await SupabaseClient.getContactOrders(contact.id, 1);
@@ -466,35 +491,19 @@ async function handleMessage(msg, sender) {
         timestamp: Date.now(),
       };
 
-      const tabIsActiveForChannel = await isSenderTabActiveForChannel(sourceTabId, channel);
-      const shouldPromoteToCurrent =
-        tabIsActiveForChannel ||
-        currentChannel === channel ||
-        !currentContext?.conversationKey ||
-        currentContext?.cleared;
-
-      const previousChannelContext = existingChannelContext;
-      const updateType = previousChannelContext?.conversationKey === conversationKey ? 'refreshed' : 'detected';
-
-      const storageUpdate = {
+      // Always update the channel's last-known-good + promote to current
+      await chrome.storage.local.set({
+        current_channel: channel,
+        current_context: contextPayload,
         [channelLastKnownKey]: contextPayload,
-      };
+      });
 
-      if (shouldPromoteToCurrent) {
-        storageUpdate.current_channel = channel;
-        storageUpdate.current_context = contextPayload;
-      }
-
-      await chrome.storage.local.set(storageUpdate);
-
-      if (shouldPromoteToCurrent) {
-        console.log(`[Zazi BG] Valid chat ${updateType}`, {
-          channel,
-          conversationKey,
-          contactId: contact?.id || null,
-          contactName: contact?.full_name || contactInfo?.name || null,
-        });
-      }
+      console.log(`[Zazi BG] Context updated`, {
+        channel,
+        conversationKey,
+        contactId: contact?.id || null,
+        contactName: contact?.full_name || contactInfo?.name || null,
+      });
 
       return { contact, candidateMatches, replyStatus, recommendation, suggestion };
     }
@@ -530,7 +539,7 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
       },
     });
 
-    console.log('[Zazi BG] State cleared intentionally: tab_unloaded');
+    console.log('[Zazi BG] State cleared: tab_unloaded');
   } catch (err) {
     console.warn('[Zazi BG] Failed to clear context on tab close:', err);
   }
