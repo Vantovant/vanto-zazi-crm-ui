@@ -676,6 +676,7 @@ $('submitEditBtn')?.addEventListener('click', async () => {
       });
       rememberLastKnownContext(currentContext);
 
+      isEditing = false; // RESUME background refreshes after save
       $('inlineEditForm').classList.add('hidden');
       renderContext(currentContext);
     } else {
