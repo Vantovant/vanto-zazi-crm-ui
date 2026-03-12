@@ -321,7 +321,15 @@ async function selectCandidate(contact) {
   currentContext.contact = contact;
   currentContext.candidateMatches = [];
   currentContext.timestamp = Date.now();
-  await chrome.storage.local.set({ current_context: currentContext });
+
+  const channelKey = getLastKnownContextKey(currentContext.channel || 'whatsapp');
+  await chrome.storage.local.set({
+    current_channel: currentContext.channel || currentChannel || null,
+    current_context: currentContext,
+    [channelKey]: currentContext,
+  });
+
+  rememberLastKnownContext(currentContext);
   renderContext(currentContext);
   // Force adapter to re-send so background syncs follow-up state
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
