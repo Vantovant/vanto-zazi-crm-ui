@@ -212,6 +212,17 @@
 
   // ===== POLL FOR THREAD CHANGES =====
   let lastSubject = '';
+  let lastThreadSignature = '';
+  let lastContextSentAt = 0;
+  const SAME_THREAD_REFRESH_MS = 12000;
+
+  function buildThreadSignature(subject, contactEmail, messages) {
+    const tail = (messages || [])
+      .slice(-3)
+      .map((m) => `${m.direction}:${(m.text || '').substring(0, 40)}`)
+      .join('|');
+    return `${subject || ''}::${contactEmail || ''}::${tail}`;
+  }
 
   async function pollThread() {
     try {
@@ -219,17 +230,31 @@
         const w = document.getElementById('zazi-gmail-widget');
         if (w) w.remove();
         lastSubject = '';
+        lastThreadSignature = '';
+        lastContextSentAt = 0;
         return;
       }
 
       const subject = getThreadSubject();
-      if (subject === lastSubject) return;
-      lastSubject = subject;
-
       const contactEmail = getContactEmail();
       if (!contactEmail) return;
 
       const messages = readThreadMessages();
+      const signature = buildThreadSignature(subject, contactEmail, messages);
+      const now = Date.now();
+      const sameThread = signature === lastThreadSignature;
+      const shouldRefresh = now - lastContextSentAt >= SAME_THREAD_REFRESH_MS;
+
+      if (sameThread && !shouldRefresh) return;
+
+      if (sameThread) {
+        console.log('[Zazi Gmail] Valid thread refreshed', { subject, contactEmail });
+      } else {
+        console.log('[Zazi Gmail] Valid thread detected', { subject, contactEmail });
+      }
+
+      lastSubject = subject;
+      lastThreadSignature = signature;
 
       const response = await chrome.runtime.sendMessage({
         type: 'CHAT_CONTEXT_UPDATE',
@@ -247,6 +272,8 @@
           messages,
         });
       }
+
+      lastContextSentAt = now;
     } catch (err) {
       console.error('[Zazi Gmail] Poll error:', err);
     }
