@@ -68,6 +68,33 @@ function startContextPolling() {
   setInterval(pollContext, 2000);
 }
 
+function isExplicitClear(ctx) {
+  return Boolean(ctx?.cleared || ctx?.clearReason);
+}
+
+function isContextPayloadValid(ctx) {
+  if (!ctx || isExplicitClear(ctx)) return false;
+  if (ctx.isGroup) return true;
+  return Boolean(
+    ctx.contact?.id ||
+    ctx.contactIdentifier ||
+    ctx.contactInfo?.name ||
+    (Array.isArray(ctx.messages) && ctx.messages.length > 0)
+  );
+}
+
+function isFreshEnough(ctx) {
+  if (!ctx?.timestamp) return false;
+  return Date.now() - ctx.timestamp <= MAX_CONTEXT_AGE_MS;
+}
+
+function showDefaultEmptyState() {
+  $('noContext').classList.remove('hidden');
+  $('groupChatNotice').classList.add('hidden');
+  $('activeContext').classList.add('hidden');
+  $('timelineSection').classList.add('hidden');
+}
+
 async function pollContext() {
   const data = await chrome.storage.local.get('current_context');
   const ctx = data.current_context;
