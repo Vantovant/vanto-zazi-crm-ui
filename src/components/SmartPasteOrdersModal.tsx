@@ -152,12 +152,85 @@ export function SmartPasteOrdersModal({ onClose }: SmartPasteOrdersModalProps) {
   const totalZAR = selectedOrders.reduce((sum, o) => sum + o.zar_amount, 0);
 
   const handleSave = async () => {
-    if (selectedOrders.length === 0) return;
+    if (selectedOrders.length === 0 || !user) return;
     setSaving(true);
     setError('');
 
-    let successCount = 0;
+    let insertedCount = 0;
+    let skippedCount = 0;
+
+    // Step 1: Dedupe within the batch itself
+    const seenKeys = new Set<string>();
+    const uniqueOrders: ParsedOrder[] = [];
     for (const order of selectedOrders) {
+      const key = computeDedupeKey({
+        contactName: selectedContactName,
+        product: order.product,
+        quantity: order.quantity,
+        amount: order.zar_amount,
+        pvAmount: order.pv_amount,
+        purchaseType: order.purchase_type,
+        orderDate: order.order_date || new Date().toISOString().split('T')[0],
+        source: 'backoffice-paste',
+      });
+      if (seenKeys.has(key)) {
+        skippedCount++;
+        continue;
+      }
+      seenKeys.add(key);
+      uniqueOrders.push(order);
+    }
+
+    // Step 2: Check existing orders in DB for this user with matching dedupe keys
+    const dedupeKeys = Array.from(seenKeys);
+    let existingKeys = new Set<string>();
+    try {
+      // We need to compute md5 server-side to match the index, so query by components
+      // Instead, fetch all backoffice-paste orders for this user and compute keys client-side
+      const { data: existingOrders } = await supabase
+        .from('orders')
+        .select('contact_name, product, quantity, amount, pv_amount, purchase_type, order_date, source')
+        .eq('user_id', user.id)
+        .eq('source', 'backoffice-paste');
+
+      if (existingOrders) {
+        for (const eo of existingOrders) {
+          const key = computeDedupeKey({
+            contactName: eo.contact_name,
+            product: eo.product,
+            quantity: eo.quantity,
+            amount: Number(eo.amount),
+            pvAmount: Number(eo.pv_amount),
+            purchaseType: eo.purchase_type,
+            orderDate: eo.order_date,
+            source: eo.source,
+          });
+          existingKeys.add(key);
+        }
+      }
+    } catch (e) {
+      console.error('Error checking existing orders for dedup:', e);
+    }
+
+    // Step 3: Insert only truly new orders
+    for (const order of uniqueOrders) {
+      const key = computeDedupeKey({
+        contactName: selectedContactName,
+        product: order.product,
+        quantity: order.quantity,
+        amount: order.zar_amount,
+        pvAmount: order.pv_amount,
+        purchaseType: order.purchase_type,
+        orderDate: order.order_date || new Date().toISOString().split('T')[0],
+        source: 'backoffice-paste',
+      });
+
+      if (existingKeys.has(key)) {
+        skippedCount++;
+        console.log(`[SmartPaste] Skipped duplicate: ${order.product} ${order.order_date} ${order.pv_amount}PV`);
+        continue;
+      }
+
       const result = await addOrder({
         orderId: order.order_id || `BO-${Date.now().toString(36).toUpperCase()}`,
         contactName: selectedContactName,
@@ -172,11 +245,21 @@ export function SmartPasteOrdersModal({ onClose }: SmartPasteOrdersModalProps) {
         pvAmount: order.pv_amount,
         source: 'backoffice-paste',
       });
-      if (result) successCount++;
+      if (result) insertedCount++;
     }
 
     setSaving(false);
-    if (successCount > 0) {
+
+    // Show result summary
+    const parts: string[] = [];
+    if (insertedCount > 0) parts.push(`${insertedCount} new orders saved`);
+    if (skippedCount > 0) parts.push(`${skippedCount} duplicates skipped`);
+    const msg = parts.join(', ') || 'No orders saved';
+    console.log(`[SmartPaste] Result: ${msg}`);
+
+    if (insertedCount > 0 || skippedCount > 0) {
+      setSummary(msg);
+      await refetchOrders();
       onClose();
     } else {
       setError('Failed to save orders.');
