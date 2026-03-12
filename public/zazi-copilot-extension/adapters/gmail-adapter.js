@@ -26,40 +26,43 @@
   function $(sel) { return document.querySelector(sel); }
   function $$(sel) { return [...document.querySelectorAll(sel)]; }
 
+  // ===== STATE =====
+  let lastSubject = '';
+  let lastThreadSignature = '';
+  let lastContextSentAt = 0;
+  let wasInThread = false;
+  let consecutiveNoThreadReads = 0;
+  const MAX_NO_THREAD_MISSES = 3;
+  const SAME_THREAD_REFRESH_MS = 12000;
+
   // Attempt to get current user's email
   function getMyEmail() {
-    // Gmail often has the email in various places
     const el = document.querySelector('a[aria-label*="Google Account"]');
     if (el) {
       const label = el.getAttribute('aria-label') || '';
       const match = label.match(/[\w.+-]+@[\w.-]+/);
       if (match) return match[0].toLowerCase();
     }
-    // Fallback: check title
     const titleMatch = document.title.match(/[\w.+-]+@[\w.-]+/);
     if (titleMatch) return titleMatch[0].toLowerCase();
     return null;
   }
 
-  // Detect if we're viewing a thread
   function isThreadView() {
     return Boolean($(SELECTORS.threadSubject));
   }
 
-  // Get thread subject
   function getThreadSubject() {
     const el = $(SELECTORS.threadSubject);
     return el?.textContent?.trim() || '';
   }
 
-  // Read messages in the open thread
   function readThreadMessages() {
     const myEmail = getMyEmail();
     const messages = [];
     const cards = $$('[data-message-id]');
 
     if (cards.length === 0) {
-      // Fallback: try expanded messages
       const altCards = $$('.gs');
       for (const card of altCards) {
         const parsed = parseMessageCard(card, myEmail);
@@ -76,22 +79,18 @@
   }
 
   function parseMessageCard(card, myEmail) {
-    // Get sender
     const senderEl = card.querySelector('span[email]');
     const senderEmail = senderEl?.getAttribute('email')?.toLowerCase() || '';
     const senderName = senderEl?.getAttribute('name') || senderEl?.textContent?.trim() || '';
 
     if (!senderEmail && !senderName) return null;
 
-    // Determine direction
     const isOutbound = myEmail && senderEmail === myEmail;
     const direction = isOutbound ? 'outbound' : 'inbound';
 
-    // Get body text
     const bodyEl = card.querySelector('.a3s, .gmail_default');
     const text = bodyEl?.textContent?.trim()?.substring(0, 500) || '';
 
-    // Get timestamp
     let timestamp = null;
     const timeEl = card.querySelector('span[data-tooltip]');
     if (timeEl) {
@@ -112,7 +111,6 @@
     };
   }
 
-  // Get the contact email (the other person in the thread, not me)
   function getContactEmail() {
     const myEmail = getMyEmail();
     const messages = readThreadMessages();
@@ -121,7 +119,6 @@
         return msg.senderEmail;
       }
     }
-    // Check To: field
     const toEl = document.querySelector('span.g2');
     if (toEl) {
       const emailEl = toEl.querySelector('span[email]');
@@ -141,7 +138,6 @@
     return null;
   }
 
-  // Insert text into Gmail reply compose
   function insertIntoReply(text) {
     const compose = $(SELECTORS.composeBody);
     if (!compose) {
@@ -186,7 +182,6 @@
 
     document.getElementById('zazi-gmail-suggest')?.addEventListener('click', () => {
       if (data.suggestion?.email?.body) {
-        // Try to click reply first
         const replyBtn = $(SELECTORS.replyBtn);
         if (replyBtn) replyBtn.click();
         setTimeout(() => insertIntoReply(data.suggestion.email.body), 500);
@@ -194,10 +189,14 @@
     });
 
     document.getElementById('zazi-gmail-log')?.addEventListener('click', () => {
+      if (!contact?.id) {
+        console.warn('[Zazi Gmail] Cannot log activity — no matched contact');
+        return;
+      }
       chrome.runtime.sendMessage({
         type: 'LOG_ACTIVITY',
         params: {
-          contact_id: contact?.id || null,
+          contact_id: contact.id,
           activity_type: 'email',
           summary: `Email follow-up: ${getThreadSubject()}`,
           notes: data.messages?.[0]?.text?.substring(0, 200) || '',
@@ -210,11 +209,10 @@
     });
   }
 
-  // ===== POLL FOR THREAD CHANGES =====
-  let lastSubject = '';
-  let lastThreadSignature = '';
-  let lastContextSentAt = 0;
-  const SAME_THREAD_REFRESH_MS = 12000;
+  function removeWidget() {
+    const w = document.getElementById('zazi-gmail-widget');
+    if (w) w.remove();
+  }
 
   function buildThreadSignature(subject, contactEmail, messages) {
     const tail = (messages || [])
@@ -224,16 +222,42 @@
     return `${subject || ''}::${contactEmail || ''}::${tail}`;
   }
 
+  // ===== CONTEXT CLEAR =====
+  async function requestContextClear(reason) {
+    try {
+      await chrome.runtime.sendMessage({
+        type: 'CONTEXT_CLEAR_REQUEST',
+        channel: 'gmail',
+        reason,
+        consecutiveMisses: consecutiveNoThreadReads,
+      });
+      console.log('[Zazi Gmail] Context clear requested:', reason);
+    } catch (err) {
+      console.warn('[Zazi Gmail] Failed to request context clear:', err);
+    }
+  }
+
+  // ===== POLL FOR THREAD CHANGES =====
   async function pollThread() {
     try {
       if (!isThreadView()) {
-        const w = document.getElementById('zazi-gmail-widget');
-        if (w) w.remove();
-        lastSubject = '';
-        lastThreadSignature = '';
-        lastContextSentAt = 0;
+        consecutiveNoThreadReads++;
+
+        if (wasInThread && consecutiveNoThreadReads >= MAX_NO_THREAD_MISSES) {
+          console.log('[Zazi Gmail] Left thread view — clearing context');
+          removeWidget();
+          await requestContextClear('confirmed_no_active_chat');
+          wasInThread = false;
+          lastSubject = '';
+          lastThreadSignature = '';
+          lastContextSentAt = 0;
+        }
         return;
       }
+
+      // We are in a thread view
+      consecutiveNoThreadReads = 0;
+      wasInThread = true;
 
       const subject = getThreadSubject();
       const contactEmail = getContactEmail();
@@ -290,6 +314,13 @@
     } else if (msg.action === 'insert_message') {
       const ok = insertIntoReply(msg.text);
       sendResponse({ success: ok });
+    } else if (msg.action === 'force_refresh') {
+      lastSubject = '';
+      lastThreadSignature = '';
+      lastContextSentAt = 0;
+      consecutiveNoThreadReads = 0;
+      pollThread();
+      sendResponse({ success: true });
     }
     return true;
   });
@@ -300,5 +331,9 @@
     if (!document.hidden) {
       setTimeout(pollThread, 500);
     }
+  });
+
+  window.addEventListener('beforeunload', () => {
+    requestContextClear('tab_unloaded');
   });
 })();

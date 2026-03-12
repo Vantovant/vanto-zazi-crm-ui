@@ -329,6 +329,16 @@ async function selectCandidate(contact) {
     [channelKey]: currentContext,
   });
 
+  // Save persistent mapping so this contact is reused next time
+  const mapKey = `${currentContext.channel}:${(currentContext.contactIdentifier || currentContext.contactInfo?.name || '').trim().toLowerCase()}`;
+  if (mapKey && contact.id) {
+    await chrome.runtime.sendMessage({
+      type: 'SAVE_CONTACT_MAPPING',
+      conversationKey: mapKey,
+      contactId: contact.id,
+    });
+  }
+
   rememberLastKnownContext(currentContext);
   renderContext(currentContext);
   // Force adapter to re-send so background syncs follow-up state
@@ -454,11 +464,12 @@ $('logActivityBtn').addEventListener('click', async () => {
     return;
   }
   const rec = currentContext.recommendation || {};
+  const activityType = currentContext.channel === 'gmail' ? 'email' : 'whatsapp';
   const res = await chrome.runtime.sendMessage({
     type: 'LOG_ACTIVITY',
     params: {
       contact_id: currentContext.contact.id,
-      activity_type: 'whatsapp',
+      activity_type: activityType,
       summary: `${currentContext.channel} follow-up: ${rec.badge || rec.action || 'check-in'}`,
       notes: `Reply status: ${currentContext.replyStatus || 'unknown'}. Suggestion: ${$('suggestionText').textContent?.substring(0, 300) || ''}`,
       next_action: rec.reason || '',
