@@ -8,8 +8,22 @@ importScripts('lib/config.js', 'lib/supabase-client.js', 'lib/followup-engine.js
 // Open side panel when extension icon clicked
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 
-const CONTEXT_KEYS = ['current_context', 'last_known_good_context'];
+const CONTEXT_KEYS = [
+  'current_channel',
+  'current_context',
+  'last_known_good_whatsapp_context',
+  'last_known_good_gmail_context',
+];
 const MIN_CLEAR_MISSES = 3;
+const CLEAR_GRACE_MS = 15000;
+const CHANNEL_HOSTS = {
+  whatsapp: 'web.whatsapp.com',
+  gmail: 'mail.google.com',
+};
+
+function getLastKnownContextKey(channel) {
+  return channel === 'gmail' ? 'last_known_good_gmail_context' : 'last_known_good_whatsapp_context';
+}
 
 function getConversationKey({ channel, contactIdentifier, contactInfo, contact }) {
   const fallback = (contactIdentifier || contactInfo?.name || '').toString().trim().toLowerCase();
@@ -25,6 +39,22 @@ function isStrongContextPayload({ channel, contactIdentifier, contactInfo, messa
 
 async function getStoredContexts() {
   return chrome.storage.local.get(CONTEXT_KEYS);
+}
+
+async function isSenderTabActiveForChannel(tabId, channel) {
+  if (!tabId || !channel) return false;
+
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    if (!tab?.active) return false;
+
+    const expectedHost = CHANNEL_HOSTS[channel];
+    if (!expectedHost) return true;
+
+    return (tab.url || '').includes(expectedHost);
+  } catch {
+    return false;
+  }
 }
 
 
