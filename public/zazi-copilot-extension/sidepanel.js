@@ -6,6 +6,7 @@ const $ = (id) => document.getElementById(id);
 
 let currentContext = null;
 let currentChannel = null;
+let isEditing = false; // GUARD: block background refreshes during inline edits
 const lastKnownByChannel = {
   whatsapp: null,
   gmail: null,
