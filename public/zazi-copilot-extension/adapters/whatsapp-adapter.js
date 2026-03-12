@@ -329,16 +329,59 @@
     }
   }
 
-  // ===== MUTATION OBSERVER — fast debounce =====
+  // ===== HEADER-SPECIFIC OBSERVER — instant chat switch detection =====
+  function startHeaderObserver() {
+    // Watch #main header specifically for title changes (chat switches)
+    const checkHeader = () => {
+      const headerEl = document.querySelector('#main header span[title]');
+      if (!headerEl) return;
+
+      const observer = new MutationObserver(() => {
+        // Header changed — likely a chat switch, fire immediately
+        processActiveChat();
+      });
+      observer.observe(headerEl, { attributes: true, attributeFilter: ['title'] });
+
+      // Also watch the parent for child swaps (when header element is replaced)
+      const headerParent = headerEl.closest('header');
+      if (headerParent) {
+        const parentObs = new MutationObserver(() => {
+          processActiveChat();
+        });
+        parentObs.observe(headerParent, { childList: true, subtree: true });
+      }
+    };
+
+    // Retry until header is available
+    const headerInterval = setInterval(() => {
+      if (document.querySelector('#main header span[title]')) {
+        clearInterval(headerInterval);
+        checkHeader();
+      }
+    }, 500);
+  }
+
+  // ===== CHAT LIST CLICK — instant switch on click =====
+  function startChatListClickListener() {
+    // WhatsApp chat list items — clicking one switches the chat
+    document.addEventListener('click', (e) => {
+      const chatRow = e.target.closest('[data-testid="cell-frame-container"], [data-testid="list-item"], div[tabindex="-1"][role="listitem"], #pane-side [role="row"], #pane-side div[tabindex]');
+      if (chatRow) {
+        // Chat row clicked — fire context check after a tiny DOM settle
+        setTimeout(processActiveChat, 80);
+      }
+    }, true); // capture phase for speed
+  }
+
+  // ===== GENERAL MUTATION OBSERVER — reduced debounce =====
   function startObserver() {
     const target = document.getElementById('app') || document.body;
     const observer = new MutationObserver(() => {
       clearTimeout(startObserver._timer);
-      // Reduced from 800ms to 250ms for faster detection
       startObserver._timer = setTimeout(() => {
         ensureLauncher();
         processActiveChat();
-      }, 250);
+      }, 400); // General mutations can be slower — header observer handles fast switches
     });
     observer.observe(target, { childList: true, subtree: true });
   }
