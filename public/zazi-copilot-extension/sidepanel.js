@@ -611,6 +611,7 @@ $('editContactBtn')?.addEventListener('click', () => {
 });
 
 $('cancelEditBtn')?.addEventListener('click', () => {
+  isEditing = false; // RESUME background refreshes
   $('inlineEditForm').classList.add('hidden');
 });
 
