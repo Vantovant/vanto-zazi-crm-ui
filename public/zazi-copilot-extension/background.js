@@ -150,6 +150,15 @@ async function handleMessage(msg, sender) {
       const { channel, contactIdentifier, messages, contactInfo } = msg;
       await SupabaseClient.init();
 
+      if (!isStrongContextPayload({ channel, contactIdentifier, contactInfo, messages })) {
+        const { current_context } = await getStoredContexts();
+        if (current_context?.conversationKey) {
+          console.log('[Zazi BG] Null/empty overwrite blocked — keeping last-known-good conversation');
+          return { success: true, ignored: true, reason: 'weak_payload_blocked' };
+        }
+      }
+
+
       // ---- Contact matching: phone first, then name fallback ----
       let contact = null;
       let candidateMatches = [];
