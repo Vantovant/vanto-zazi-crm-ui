@@ -296,4 +296,9 @@
 
   setInterval(pollThread, 5000);
   setTimeout(pollThread, 3000);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      setTimeout(pollThread, 500);
+    }
+  });
 })();
