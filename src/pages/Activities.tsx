@@ -423,6 +423,10 @@ export function Activities() {
         <LogActivityModal onClose={() => setShowLogActivity(false)} />
       )}
 
+      {showGoalsModal && (
+        <ActivityGoalsModal onClose={() => setShowGoalsModal(false)} />
+      )}
+
       {drawerContactId && (() => {
         const c = contacts.find(ct => String(ct.id) === drawerContactId);
         return c ? <ContactDrawer prospect={c} onClose={() => setDrawerContactId(null)} onOpenTemplatePicker={(channel) => {
