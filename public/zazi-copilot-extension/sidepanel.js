@@ -45,12 +45,14 @@ $('loginBtn').addEventListener('click', async () => {
 
 $('logoutBtn').addEventListener('click', async () => {
   await chrome.runtime.sendMessage({ type: 'AUTH_LOGOUT' });
+  await chrome.storage.local.remove(['current_context', 'last_known_good_context']);
   $('loginSection').classList.remove('hidden');
   $('connectedSection').classList.add('hidden');
   $('logoutBtn').classList.add('hidden');
   $('statusBadge').textContent = 'Not Connected';
   $('statusBadge').className = 'status-badge disconnected';
   currentContext = null;
+  lastKnownGoodConversation = null;
 });
 
 function showConnected(email) {
