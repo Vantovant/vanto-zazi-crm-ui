@@ -1,8 +1,9 @@
 import { useState, useMemo, useCallback } from 'react';
 import {
   X, MessageCircle, Mail, Sparkles, ChevronRight, Copy, ExternalLink,
-  Check, Clock, Loader2, Send, BookOpen, Zap, ChevronDown, ChevronUp, PenLine,
+  Check, Clock, Loader2, Send, BookOpen, Zap, ChevronDown, ChevronUp, PenLine, Download, Image,
 } from 'lucide-react';
+import aplgoLogo from '@/assets/aplgo-logo.png';
 import type { Prospect } from '@/data/mockData';
 import type { MessageTemplate } from '@/hooks/useMessageTemplates';
 import { useMessageTemplates, TEMPLATE_CATEGORIES } from '@/hooks/useMessageTemplates';
