@@ -29,8 +29,23 @@ const confidenceColors = {
 type PickerStep = 'choose' | 'preview' | 'custom';
 
 export function MessageTemplatePicker({ contact, channel, onClose }: MessageTemplatePickerProps) {
+  const { user } = useAuth();
   const { templates, loading: templatesLoading } = useMessageTemplates();
   const { logActivity, daysSinceLastActivity, getContactActivities } = useContactActivities();
+  const { updateContact } = useCrm();
+
+  // Fetch sender profile for signature
+  const [senderSignature, setSenderSignature] = useState('');
+  useEffect(() => {
+    if (!user) return;
+    supabase.from('profiles').select('display_name, email').eq('id', user.id).single()
+      .then(({ data }) => {
+        const name = data?.display_name || user.user_metadata?.display_name || '';
+        const email = data?.email || user.email || '';
+        const parts = [name, email].filter(Boolean);
+        setSenderSignature(parts.join('\n'));
+      });
+  }, [user]);
   const { updateContact } = useCrm();
 
   const [step, setStep] = useState<PickerStep>('choose');
