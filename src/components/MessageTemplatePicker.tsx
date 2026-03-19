@@ -90,10 +90,10 @@ export function MessageTemplatePicker({ contact, channel, onClose }: MessageTemp
   }, []);
 
   const handleCustomPreview = useCallback(() => {
-    setEditedBody(personalizeCustom(customRawBody));
+    setEditedBody(appendBrandLink(personalizeCustom(customRawBody), channel));
     if (channel === 'email') setEditedSubject(personalizeCustom(customRawSubject));
     setStep('preview');
-  }, [customRawBody, customRawSubject, channel, personalizeCustom]);
+  }, [customRawBody, customRawSubject, channel, personalizeCustom, appendBrandLink]);
 
   /* ---------- Send helpers ---------- */
   const handleCopy = useCallback(() => {
