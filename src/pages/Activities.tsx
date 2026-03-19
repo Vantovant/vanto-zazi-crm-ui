@@ -69,31 +69,50 @@ export function Activities() {
   const [aiLoading, setAiLoading] = useState(false);
   const [goalsPeriod, setGoalsPeriod] = useState<'today' | 'week'>('today');
 
-  // Sort helper: Leg 1 first, then Leg 2, then unassigned
-  const legSortOrder = (assignedTo: string | undefined) => {
-    if (assignedTo === 'Manager_Leg_1') return 0;
-    if (assignedTo === 'Manager_Leg_2') return 1;
-    return 2;
+  // Lead type sort order (mirrors lifecycle progression)
+  const LEAD_TYPE_ORDER = ['Prospect', 'Registered_Nopurchase', 'Purchase_Nostatus', 'Purchase_Status', 'Expired', 'Customer', 'Distributor'] as const;
+  const [leadTypeFilter, setLeadTypeFilter] = useState<string>('All');
+
+  const leadTypeSortOrder = (lt: string | undefined) => {
+    const idx = LEAD_TYPE_ORDER.indexOf(lt as any);
+    return idx === -1 ? 99 : idx;
   };
 
-  // Neglected contacts (no activity in 7+ days), Leg 1 first
+  // Sort helper: Leg 1 first, then Leg 2, then by lead type
+  const contactSortKey = (c: Prospect | undefined) => {
+    if (!c) return [99, 99];
+    const leg = c.AssignedTo === 'Manager_Leg_1' ? 0 : c.AssignedTo === 'Manager_Leg_2' ? 1 : 2;
+    return [leadTypeSortOrder(c.LeadType), leg];
+  };
+
+  // Neglected contacts (no activity in 7+ days), sorted by lead type then leg
   const neglectedContacts = useMemo(() => {
     const neglected = getNeglectedContacts(7);
     return neglected.map(n => {
       const contact = contacts.find(c => String(c.id) === n.contact_id);
       return { ...n, contact };
     }).filter(n => n.contact)
-      .sort((a, b) => legSortOrder(a.contact?.AssignedTo) - legSortOrder(b.contact?.AssignedTo));
-  }, [getNeglectedContacts, contacts]);
+      .filter(n => leadTypeFilter === 'All' || n.contact?.LeadType === leadTypeFilter)
+      .sort((a, b) => {
+        const [aLt, aLeg] = contactSortKey(a.contact);
+        const [bLt, bLeg] = contactSortKey(b.contact);
+        return aLt - bLt || aLeg - bLeg;
+      });
+  }, [getNeglectedContacts, contacts, leadTypeFilter]);
 
-  // Contacts with zero activity ever, Leg 1 first
+  // Contacts with zero activity ever, sorted by lead type then leg
   const neverContactedList = useMemo(() => {
     const contactsWithActivity = new Set(activities.map(a => a.contact_id).filter(Boolean));
     return contacts
       .filter(c => !contactsWithActivity.has(String(c.id)))
-      .sort((a, b) => legSortOrder(a.AssignedTo) - legSortOrder(b.AssignedTo))
-      .slice(0, 10);
-  }, [contacts, activities]);
+      .filter(c => leadTypeFilter === 'All' || c.LeadType === leadTypeFilter)
+      .sort((a, b) => {
+        const [aLt, aLeg] = contactSortKey(a);
+        const [bLt, bLeg] = contactSortKey(b);
+        return aLt - bLt || aLeg - bLeg;
+      })
+      .slice(0, 20);
+  }, [contacts, activities, leadTypeFilter]);
 
   const handleAIAnalysis = async () => {
     setAiLoading(true);
@@ -156,7 +175,7 @@ export function Activities() {
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-white">Activities</h1>
           <p className="text-sm text-slate-400 mt-0.5">
@@ -164,10 +183,20 @@ export function Activities() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Lead Type Filter */}
+          <select
+            value={leadTypeFilter}
+            onChange={e => setLeadTypeFilter(e.target.value)}
+            className="px-3 py-2 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-300 focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+          >
+            <option value="All">All Lead Types</option>
+            {LEAD_TYPE_ORDER.map(lt => (
+              <option key={lt} value={lt}>{lt.replace(/_/g, ' ')}</option>
+            ))}
+          </select>
           <button
             type="button"
             onClick={() => {
-              // Open template picker for highest-priority neglected contact
               const topNeglected = neglectedContacts[0]?.contact || neverContactedList[0];
               if (topNeglected) {
                 setTemplatePicker({ contact: topNeglected, channel: 'whatsapp' });
