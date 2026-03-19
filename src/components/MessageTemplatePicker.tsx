@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   X, MessageCircle, Mail, Sparkles, ChevronRight, Copy, ExternalLink,
   Check, Clock, Loader2, Send, BookOpen, Zap, ChevronDown, ChevronUp, PenLine, Download, Image,
@@ -11,6 +11,8 @@ import { useContactActivities } from '@/hooks/useContactActivities';
 import { useCrm } from '@/contexts/CrmContext';
 import { mergeTemplate, mergeSubject } from '@/utils/templateMerge';
 import { recommendTemplate } from '@/utils/templateRecommender';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 
 interface MessageTemplatePickerProps {
   contact: Prospect;
