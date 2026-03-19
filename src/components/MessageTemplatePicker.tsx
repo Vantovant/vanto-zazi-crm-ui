@@ -46,7 +46,6 @@ export function MessageTemplatePicker({ contact, channel, onClose }: MessageTemp
         setSenderSignature(parts.join('\n'));
       });
   }, [user]);
-  const { updateContact } = useCrm();
 
   const [step, setStep] = useState<PickerStep>('choose');
   const [selectedTemplate, setSelectedTemplate] = useState<MessageTemplate | null>(null);
