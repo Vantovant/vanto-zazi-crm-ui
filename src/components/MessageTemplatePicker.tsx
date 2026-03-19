@@ -63,7 +63,7 @@ export function MessageTemplatePicker({ contact, channel, onClose }: MessageTemp
 
   const appendBrandLink = useCallback((body: string, ch: 'whatsapp' | 'email') => {
     if (ch === 'whatsapp') {
-      return `${body}\n\n${APLGO_BRAND_URL}`;
+      return `${APLGO_BRAND_URL}\n\n${body}`;
     }
     return body;
   }, []);
