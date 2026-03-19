@@ -1,8 +1,9 @@
 import { useState, useMemo, useCallback } from 'react';
 import {
   X, MessageCircle, Mail, Sparkles, ChevronRight, Copy, ExternalLink,
-  Check, Clock, Loader2, Send, BookOpen, Zap, ChevronDown, ChevronUp, PenLine,
+  Check, Clock, Loader2, Send, BookOpen, Zap, ChevronDown, ChevronUp, PenLine, Download, Image,
 } from 'lucide-react';
+import aplgoLogo from '@/assets/aplgo-logo.png';
 import type { Prospect } from '@/data/mockData';
 import type { MessageTemplate } from '@/hooks/useMessageTemplates';
 import { useMessageTemplates, TEMPLATE_CATEGORIES } from '@/hooks/useMessageTemplates';
@@ -158,6 +159,8 @@ export function MessageTemplatePicker({ contact, channel, onClose }: MessageTemp
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700 shrink-0">
             <div className="flex items-center gap-3">
+              <img src={aplgoLogo} alt="APLGO" className="h-8 w-auto object-contain" />
+              <div className="h-8 w-px bg-slate-700" />
               <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${channel === 'whatsapp' ? 'bg-green-500/20' : 'bg-violet-500/20'}`}>
                 {channel === 'whatsapp' ? <MessageCircle className="w-5 h-5 text-green-400" /> : <Mail className="w-5 h-5 text-violet-400" />}
               </div>
@@ -364,6 +367,19 @@ export function MessageTemplatePicker({ contact, channel, onClose }: MessageTemp
                   placeholder="What's the next step after this message?"
                   className="w-full px-3 py-2.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500/40 placeholder:text-slate-500" />
               </div>
+
+              {channel === 'whatsapp' && (
+                <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-3 flex items-center gap-3">
+                  <img src={aplgoLogo} alt="APLGO Logo" className="h-8 w-auto" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-slate-400">Send the APLGO logo as a separate image in WhatsApp</p>
+                  </div>
+                  <a href={aplgoLogo} download="APLGO-Logo.png"
+                    className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors shrink-0">
+                    <Download className="w-3.5 h-3.5" /> Save Logo
+                  </a>
+                </div>
+              )}
 
               <div className="flex flex-wrap gap-2 pt-2">
                 <button type="button" onClick={handleCopy}
