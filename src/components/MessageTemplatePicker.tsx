@@ -159,6 +159,8 @@ export function MessageTemplatePicker({ contact, channel, onClose }: MessageTemp
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700 shrink-0">
             <div className="flex items-center gap-3">
+              <img src={aplgoLogo} alt="APLGO" className="h-8 w-auto object-contain" />
+              <div className="h-8 w-px bg-slate-700" />
               <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${channel === 'whatsapp' ? 'bg-green-500/20' : 'bg-violet-500/20'}`}>
                 {channel === 'whatsapp' ? <MessageCircle className="w-5 h-5 text-green-400" /> : <Mail className="w-5 h-5 text-violet-400" />}
               </div>
