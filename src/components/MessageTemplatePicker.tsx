@@ -90,7 +90,7 @@ export function MessageTemplatePicker({ contact, channel, onClose }: MessageTemp
     setEditedBody(appendBrandLink(mergeTemplate(t.body, mergeCtx), channel));
     setEditedSubject(channel === 'email' ? mergeSubject(t.subject, mergeCtx) : '');
     setStep('preview');
-  }, [mergeCtx, channel]);
+  }, [mergeCtx, channel, appendBrandLink]);
 
   /* ---------- Custom message helpers ---------- */
   const personalizeCustom = useCallback((raw: string) => {
