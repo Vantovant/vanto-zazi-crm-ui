@@ -57,11 +57,20 @@ export function MessageTemplatePicker({ contact, channel, onClose }: MessageTemp
     );
   }, [templates, channel]);
 
+  const APLGO_BRAND_URL = 'https://vanto-zazi-bloom.lovable.app/aplgo.html';
+
   const mergeCtx = useMemo(() => ({ contact }), [contact]);
+
+  const appendBrandLink = useCallback((body: string, ch: 'whatsapp' | 'email') => {
+    if (ch === 'whatsapp') {
+      return `${body}\n\n${APLGO_BRAND_URL}`;
+    }
+    return body;
+  }, []);
 
   const handleSelectTemplate = useCallback((t: MessageTemplate) => {
     setSelectedTemplate(t);
-    setEditedBody(mergeTemplate(t.body, mergeCtx));
+    setEditedBody(appendBrandLink(mergeTemplate(t.body, mergeCtx), channel));
     setEditedSubject(channel === 'email' ? mergeSubject(t.subject, mergeCtx) : '');
     setStep('preview');
   }, [mergeCtx, channel]);
