@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   X, MessageCircle, Mail, Sparkles, ChevronRight, Copy, ExternalLink,
   Check, Clock, Loader2, Send, BookOpen, Zap, ChevronDown, ChevronUp, PenLine, Download, Image,
@@ -11,6 +11,8 @@ import { useContactActivities } from '@/hooks/useContactActivities';
 import { useCrm } from '@/contexts/CrmContext';
 import { mergeTemplate, mergeSubject } from '@/utils/templateMerge';
 import { recommendTemplate } from '@/utils/templateRecommender';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 
 interface MessageTemplatePickerProps {
   contact: Prospect;
@@ -27,9 +29,23 @@ const confidenceColors = {
 type PickerStep = 'choose' | 'preview' | 'custom';
 
 export function MessageTemplatePicker({ contact, channel, onClose }: MessageTemplatePickerProps) {
+  const { user } = useAuth();
   const { templates, loading: templatesLoading } = useMessageTemplates();
   const { logActivity, daysSinceLastActivity, getContactActivities } = useContactActivities();
   const { updateContact } = useCrm();
+
+  // Fetch sender profile for signature
+  const [senderSignature, setSenderSignature] = useState('');
+  useEffect(() => {
+    if (!user) return;
+    supabase.from('profiles').select('display_name, email').eq('id', user.id).single()
+      .then(({ data }) => {
+        const name = data?.display_name || user.user_metadata?.display_name || '';
+        const email = data?.email || user.email || '';
+        const parts = [name, email].filter(Boolean);
+        setSenderSignature(parts.join('\n'));
+      });
+  }, [user]);
 
   const [step, setStep] = useState<PickerStep>('choose');
   const [selectedTemplate, setSelectedTemplate] = useState<MessageTemplate | null>(null);
@@ -63,10 +79,11 @@ export function MessageTemplatePicker({ contact, channel, onClose }: MessageTemp
 
   const appendBrandLink = useCallback((body: string, ch: 'whatsapp' | 'email') => {
     if (ch === 'whatsapp') {
-      return `${APLGO_BRAND_URL}\n\n${body}`;
+      const signature = senderSignature ? `\n\n— ${senderSignature}` : '';
+      return `${APLGO_BRAND_URL}\n\n${body}${signature}`;
     }
     return body;
-  }, []);
+  }, [senderSignature]);
 
   const handleSelectTemplate = useCallback((t: MessageTemplate) => {
     setSelectedTemplate(t);
