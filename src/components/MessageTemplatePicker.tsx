@@ -368,6 +368,19 @@ export function MessageTemplatePicker({ contact, channel, onClose }: MessageTemp
                   className="w-full px-3 py-2.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500/40 placeholder:text-slate-500" />
               </div>
 
+              {channel === 'whatsapp' && (
+                <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-3 flex items-center gap-3">
+                  <img src={aplgoLogo} alt="APLGO Logo" className="h-8 w-auto" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-slate-400">Send the APLGO logo as a separate image in WhatsApp</p>
+                  </div>
+                  <a href={aplgoLogo} download="APLGO-Logo.png"
+                    className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors shrink-0">
+                    <Download className="w-3.5 h-3.5" /> Save Logo
+                  </a>
+                </div>
+              )}
+
               <div className="flex flex-wrap gap-2 pt-2">
                 <button type="button" onClick={handleCopy}
                   className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition-colors">
