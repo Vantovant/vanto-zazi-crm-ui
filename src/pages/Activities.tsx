@@ -175,7 +175,7 @@ export function Activities() {
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-white">Activities</h1>
           <p className="text-sm text-slate-400 mt-0.5">
@@ -183,10 +183,20 @@ export function Activities() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Lead Type Filter */}
+          <select
+            value={leadTypeFilter}
+            onChange={e => setLeadTypeFilter(e.target.value)}
+            className="px-3 py-2 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-300 focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+          >
+            <option value="All">All Lead Types</option>
+            {LEAD_TYPE_ORDER.map(lt => (
+              <option key={lt} value={lt}>{lt.replace(/_/g, ' ')}</option>
+            ))}
+          </select>
           <button
             type="button"
             onClick={() => {
-              // Open template picker for highest-priority neglected contact
               const topNeglected = neglectedContacts[0]?.contact || neverContactedList[0];
               if (topNeglected) {
                 setTemplatePicker({ contact: topNeglected, channel: 'whatsapp' });
