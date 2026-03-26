@@ -334,43 +334,51 @@ export function Activities() {
             <h3 className="font-semibold text-white">Needs Attention</h3>
             <span className="ml-auto text-xs text-amber-400 font-medium">{neglectedContacts.length}</span>
           </div>
-          <div className="divide-y divide-slate-700/50 max-h-80 overflow-y-auto">
+          <div className="max-h-96 overflow-y-auto">
             {neglectedContacts.length === 0 ? (
               <div className="p-5 text-center">
                 <CheckCircle className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
                 <p className="text-sm text-slate-400">All contacts are up to date!</p>
               </div>
-            ) : neglectedContacts.map((item) => (
-              <div key={item.contact_id} className="px-5 py-3 hover:bg-slate-700/30 transition-colors">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 cursor-pointer" onClick={() => setDrawerContactId(item.contact_id)}>
-                    <p className="text-sm font-medium text-white">{item.contact?.FullName}</p>
-                    {item.contact?.AssignedTo === 'Manager_Leg_1' && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-400">L1</span>
-                    )}
-                    {item.contact?.AssignedTo === 'Manager_Leg_2' && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-500/20 text-slate-400">L2</span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    {item.contact && (
-                      <>
-                        <button type="button" onClick={() => item.contact && setTemplatePicker({ contact: item.contact, channel: 'whatsapp' })}
-                          className="p-1 rounded text-green-400 hover:bg-green-500/20 transition-colors" title="Send WhatsApp">
-                          <MessageCircle className="w-3.5 h-3.5" />
-                        </button>
-                        <button type="button" onClick={() => item.contact && setTemplatePicker({ contact: item.contact, channel: 'email' })}
-                          className="p-1 rounded text-violet-400 hover:bg-violet-500/20 transition-colors" title="Send Email">
-                          <Mail className="w-3.5 h-3.5" />
-                        </button>
-                      </>
-                    )}
-                    <span className="text-xs font-medium text-amber-400 ml-1">{item.daysSince}d ago</span>
-                  </div>
+            ) : groupByLeadType(neglectedContacts.map(n => ({ ...n, LeadType: n.contact?.LeadType }))).map(group => (
+              <div key={group.type}>
+                <div className="px-5 py-2 bg-slate-700/40 border-y border-slate-700/50 sticky top-0 z-10">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-teal-400">{group.label}</span>
+                  <span className="ml-2 text-[10px] text-slate-500">{group.items.length}</span>
                 </div>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  {item.contact?.LeadTemperature} · {item.contact?.LeadType}
-                </p>
+                {group.items.map((item) => (
+                  <div key={item.contact_id} className="px-5 py-3 hover:bg-slate-700/30 transition-colors border-b border-slate-700/30">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 cursor-pointer" onClick={() => setDrawerContactId(item.contact_id)}>
+                        <p className="text-sm font-medium text-white">{item.contact?.FullName}</p>
+                        {item.contact?.AssignedTo === 'Manager_Leg_1' && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-400">L1</span>
+                        )}
+                        {item.contact?.AssignedTo === 'Manager_Leg_2' && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-500/20 text-slate-400">L2</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        {item.contact && (
+                          <>
+                            <button type="button" onClick={() => item.contact && setTemplatePicker({ contact: item.contact, channel: 'whatsapp' })}
+                              className="p-1 rounded text-green-400 hover:bg-green-500/20 transition-colors" title="Send WhatsApp">
+                              <MessageCircle className="w-3.5 h-3.5" />
+                            </button>
+                            <button type="button" onClick={() => item.contact && setTemplatePicker({ contact: item.contact, channel: 'email' })}
+                              className="p-1 rounded text-violet-400 hover:bg-violet-500/20 transition-colors" title="Send Email">
+                              <Mail className="w-3.5 h-3.5" />
+                            </button>
+                          </>
+                        )}
+                        <span className="text-xs font-medium text-amber-400 ml-1">{item.daysSince}d ago</span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {item.contact?.LeadTemperature}
+                    </p>
+                  </div>
+                ))}
               </div>
             ))}
           </div>
