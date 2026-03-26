@@ -1,0 +1,1 @@
+UPDATE message_templates SET body = 'Hi {{firstName}} 👋\n\n🌿 Before month-end, make sure you have your 2 products ✅\n\nIf you''re done, help your family or team do the same for health, activity, and growth 💚\n\n— {{senderName}}' WHERE id = '69c1f395-3036-4800-8e3a-5a423f1f1dbe';
