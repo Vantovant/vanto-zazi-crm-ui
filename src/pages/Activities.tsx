@@ -71,6 +71,15 @@ export function Activities() {
 
   // Lead type sort order (mirrors lifecycle progression)
   const LEAD_TYPE_ORDER = ['Prospect', 'Registered_Nopurchase', 'Purchase_Nostatus', 'Purchase_Status', 'Expired', 'Customer', 'Distributor'] as const;
+  const LEAD_TYPE_LABELS: Record<string, string> = {
+    Prospect: 'Prospects',
+    Registered_Nopurchase: 'Registered – No Purchase',
+    Purchase_Nostatus: 'Purchased – No Status',
+    Purchase_Status: 'Purchased – Active',
+    Expired: 'Expired',
+    Customer: 'Customers',
+    Distributor: 'Distributors',
+  };
   const [leadTypeFilter, setLeadTypeFilter] = useState<string>('All');
 
   const leadTypeSortOrder = (lt: string | undefined) => {
@@ -78,12 +87,24 @@ export function Activities() {
     return idx === -1 ? 99 : idx;
   };
 
-  // Sort helper: Leg 1 first, then Leg 2, then by lead type
+  // Sort helper: lead type first, then Leg 1 before Leg 2
   const contactSortKey = (c: Prospect | undefined) => {
     if (!c) return [99, 99];
     const leg = c.AssignedTo === 'Manager_Leg_1' ? 0 : c.AssignedTo === 'Manager_Leg_2' ? 1 : 2;
     return [leadTypeSortOrder(c.LeadType), leg];
   };
+
+  /** Group a sorted array by LeadType, preserving order */
+  function groupByLeadType<T extends { LeadType?: string }>(items: T[]): { type: string; label: string; items: T[] }[] {
+    const groups: { type: string; label: string; items: T[] }[] = [];
+    for (const item of items) {
+      const lt = item.LeadType || 'Unknown';
+      const last = groups[groups.length - 1];
+      if (last && last.type === lt) { last.items.push(item); }
+      else { groups.push({ type: lt, label: LEAD_TYPE_LABELS[lt] || lt, items: [item] }); }
+    }
+    return groups;
+  }
 
   // Neglected contacts (no activity in 7+ days), sorted by lead type then leg
   const neglectedContacts = useMemo(() => {
