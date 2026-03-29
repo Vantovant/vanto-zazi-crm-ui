@@ -15,6 +15,7 @@ import { Deals } from './pages/Deals';
 import { TeamDashboard } from './pages/TeamDashboard';
 import { Duplicates } from './pages/Duplicates';
 import { Inventory } from './pages/Inventory';
+import { MomentumRun } from './pages/MomentumRun';
 
 function App() {
   return (
@@ -43,6 +44,7 @@ function App() {
             <Route path="import-export" element={<ImportExport />} />
             <Route path="duplicates" element={<Duplicates />} />
             <Route path="team" element={<TeamDashboard />} />
+            <Route path="momentum" element={<MomentumRun />} />
             <Route path="help" element={<PlaceholderPage title="Help" />} />
           </Route>
         </Routes>
