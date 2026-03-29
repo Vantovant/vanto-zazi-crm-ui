@@ -273,6 +273,7 @@ export function MomentumRun() {
       {templateContact && (
         <MessageTemplatePicker
           contact={templateContact}
+          channel="whatsapp"
           onClose={() => setTemplateContact(null)}
         />
       )}
