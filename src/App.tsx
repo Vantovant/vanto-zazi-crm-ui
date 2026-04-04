@@ -22,6 +22,7 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <OfflineBanner />
         <EnvStatusBanner />
         <Routes>
           <Route path="/auth" element={<Auth />} />
