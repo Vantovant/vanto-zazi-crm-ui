@@ -2,7 +2,6 @@ import {
   createContext,
   useContext,
   useEffect,
-  useMemo,
   useState,
   type ReactNode,
 } from 'react';
@@ -25,6 +24,30 @@ const PwaInstallContext = createContext<PwaInstallContextValue | undefined>(unde
 const DISMISS_KEY = 'zazi-pwa-install-dismissed-until';
 const DISMISS_MS = 7 * 24 * 60 * 60 * 1000;
 
+function readDismissUntil() {
+  try {
+    return window.localStorage.getItem(DISMISS_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeDismissUntil(value: string) {
+  try {
+    window.localStorage.setItem(DISMISS_KEY, value);
+  } catch {
+    console.info('[PWA] could not persist dismiss state');
+  }
+}
+
+function clearDismissUntil() {
+  try {
+    window.localStorage.removeItem(DISMISS_KEY);
+  } catch {
+    console.info('[PWA] could not clear dismiss state');
+  }
+}
+
 function isStandaloneMode() {
   return (
     window.matchMedia('(display-mode: standalone)').matches ||
@@ -42,11 +65,11 @@ function isIosSafari() {
 }
 
 function getDismissedState() {
-  const rawValue = window.localStorage.getItem(DISMISS_KEY);
+  const rawValue = readDismissUntil();
   const expiresAt = rawValue ? Number(rawValue) : 0;
 
   if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
-    window.localStorage.removeItem(DISMISS_KEY);
+    clearDismissUntil();
     return false;
   }
 
@@ -64,7 +87,7 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
       console.info('[PWA] beforeinstallprompt captured');
       setDeferredPrompt(event as BeforeInstallPromptEvent);
       setDismissed(false);
-      window.localStorage.removeItem(DISMISS_KEY);
+      clearDismissUntil();
     };
 
     const handleAppInstalled = () => {
@@ -72,7 +95,7 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
       setIsInstalled(true);
       setDeferredPrompt(null);
       setDismissed(false);
-      window.localStorage.removeItem(DISMISS_KEY);
+      clearDismissUntil();
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -101,7 +124,7 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
 
   const dismissInstallUi = () => {
     const expiresAt = Date.now() + DISMISS_MS;
-    window.localStorage.setItem(DISMISS_KEY, String(expiresAt));
+    writeDismissUntil(String(expiresAt));
     setDismissed(true);
     setDeferredPrompt(null);
   };
@@ -118,29 +141,30 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
 
     if (outcome === 'accepted') {
       setIsInstalled(true);
-      window.localStorage.removeItem(DISMISS_KEY);
+      clearDismissUntil();
       setDismissed(false);
     } else {
       const expiresAt = Date.now() + DISMISS_MS;
-      window.localStorage.setItem(DISMISS_KEY, String(expiresAt));
+      writeDismissUntil(String(expiresAt));
       setDismissed(true);
     }
 
     setDeferredPrompt(null);
   };
 
-  const value = useMemo(
-    () => ({
-      canInstall,
-      isInstalled,
-      showFallback,
-      promptInstall,
-      dismissInstallUi,
-    }),
-    [canInstall, isInstalled, showFallback],
+  return (
+    <PwaInstallContext.Provider
+      value={{
+        canInstall,
+        isInstalled,
+        showFallback,
+        promptInstall,
+        dismissInstallUi,
+      }}
+    >
+      {children}
+    </PwaInstallContext.Provider>
   );
-
-  return <PwaInstallContext.Provider value={value}>{children}</PwaInstallContext.Provider>;
 }
 
 export function usePwaInstall() {
