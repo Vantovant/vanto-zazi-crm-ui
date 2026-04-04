@@ -87,8 +87,9 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
           </ul>
         </nav>
 
-        {/* Help at bottom */}
-        <div className="p-3 border-t border-slate-800">
+        {/* Install + Help at bottom */}
+        <div className="p-3 border-t border-slate-800 space-y-1">
+          <PwaInstallButton />
           <NavLink
             to="/help"
             onClick={onClose}
