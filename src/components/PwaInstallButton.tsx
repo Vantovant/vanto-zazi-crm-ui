@@ -1,47 +1,23 @@
-import { useState, useEffect } from 'react';
 import { Download } from 'lucide-react';
+import { usePwaInstall } from '@/contexts/PwaInstallContext';
 
-interface BeforeInstallPromptEvent extends Event {
-  prompt(): Promise<void>;
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+interface PwaInstallButtonProps {
+  label?: string;
 }
 
-export function PwaInstallButton() {
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [installed, setInstalled] = useState(false);
+export function PwaInstallButton({ label = 'Install Zazi CRM' }: PwaInstallButtonProps) {
+  const { canInstall, promptInstall } = usePwaInstall();
 
-  useEffect(() => {
-    const handler = (e: Event) => {
-      e.preventDefault();
-      setDeferredPrompt(e as BeforeInstallPromptEvent);
-    };
-    window.addEventListener('beforeinstallprompt', handler);
-    window.addEventListener('appinstalled', () => setInstalled(true));
-
-    // Check if already installed
-    if (window.matchMedia('(display-mode: standalone)').matches) {
-      setInstalled(true);
-    }
-
-    return () => window.removeEventListener('beforeinstallprompt', handler);
-  }, []);
-
-  if (installed || !deferredPrompt) return null;
-
-  const handleInstall = async () => {
-    await deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') setInstalled(true);
-    setDeferredPrompt(null);
-  };
+  if (!canInstall) return null;
 
   return (
     <button
-      onClick={handleInstall}
-      className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-teal-400 hover:text-teal-300 hover:bg-teal-500/10 transition-all duration-150"
+      type="button"
+      onClick={promptInstall}
+      className="inline-flex items-center gap-2 rounded-lg bg-teal-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-teal-500"
     >
-      <Download className="w-5 h-5" />
-      Install Zazi CRM
+      <Download className="h-4 w-4" />
+      {label}
     </button>
   );
 }
