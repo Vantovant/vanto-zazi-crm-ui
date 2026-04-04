@@ -6,6 +6,8 @@ import { Auth } from './pages/Auth';
 import { ResetPassword } from './pages/ResetPassword';
 import { EnvStatusBanner } from './components/EnvStatusBanner';
 import { OfflineBanner } from './components/OfflineBanner';
+import { PwaInstallBanner } from './components/PwaInstallBanner';
+import { PwaInstallProvider } from './contexts/PwaInstallContext';
 import { Dashboard } from './pages/Dashboard';
 import { Contacts } from './pages/Contacts';
 import { Orders } from './pages/Orders';
@@ -20,38 +22,41 @@ import { MomentumRun } from './pages/MomentumRun';
 
 function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <OfflineBanner />
-        <EnvStatusBanner />
-        <Routes>
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <Layout />
-              </ProtectedRoute>
-            }
-          >
-            <Route index element={<Navigate to="/dashboard" replace />} />
-            <Route path="dashboard" element={<Dashboard />} />
-            <Route path="contacts" element={<Contacts />} />
-            <Route path="activities" element={<Activities />} />
-            <Route path="orders" element={<Orders />} />
-            <Route path="inventory" element={<Inventory />} />
-            <Route path="deals" element={<Deals />} />
-            <Route path="whatsapp" element={<WhatsApp />} />
-            <Route path="import-export" element={<ImportExport />} />
-            <Route path="duplicates" element={<Duplicates />} />
-            <Route path="team" element={<TeamDashboard />} />
-            <Route path="momentum" element={<MomentumRun />} />
-            <Route path="help" element={<PlaceholderPage title="Help" />} />
-          </Route>
-        </Routes>
-      </AuthProvider>
-    </BrowserRouter>
+    <PwaInstallProvider>
+      <BrowserRouter>
+        <AuthProvider>
+          <OfflineBanner />
+          <EnvStatusBanner />
+          <PwaInstallBanner />
+          <Routes>
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute>
+                  <Layout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<Navigate to="/dashboard" replace />} />
+              <Route path="dashboard" element={<Dashboard />} />
+              <Route path="contacts" element={<Contacts />} />
+              <Route path="activities" element={<Activities />} />
+              <Route path="orders" element={<Orders />} />
+              <Route path="inventory" element={<Inventory />} />
+              <Route path="deals" element={<Deals />} />
+              <Route path="whatsapp" element={<WhatsApp />} />
+              <Route path="import-export" element={<ImportExport />} />
+              <Route path="duplicates" element={<Duplicates />} />
+              <Route path="team" element={<TeamDashboard />} />
+              <Route path="momentum" element={<MomentumRun />} />
+              <Route path="help" element={<PlaceholderPage title="Help" />} />
+            </Route>
+          </Routes>
+        </AuthProvider>
+      </BrowserRouter>
+    </PwaInstallProvider>
   );
 }
 

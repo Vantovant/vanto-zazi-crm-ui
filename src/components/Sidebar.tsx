@@ -1,7 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import logo from '@/assets/logo.jpg';
 import { useAuth } from '@/contexts/AuthContext';
-import { PwaInstallButton } from './PwaInstallButton';
 import {
   LayoutDashboard,
   Users,
@@ -89,7 +88,6 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
 
         {/* Install + Help at bottom */}
         <div className="p-3 border-t border-slate-800 space-y-1">
-          <PwaInstallButton />
           <NavLink
             to="/help"
             onClick={onClose}
