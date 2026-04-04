@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import logo from '@/assets/logo.jpg';
 import { useAuth } from '@/contexts/AuthContext';
+import { PwaInstallButton } from './PwaInstallButton';
 import {
   LayoutDashboard,
   Users,
