@@ -10,7 +10,7 @@ export function PwaInstallBanner() {
   }
 
   return (
-    <div className="fixed top-16 left-4 right-4 sm:left-auto sm:w-[22rem] z-[90]">
+    <div className="fixed bottom-4 left-4 right-4 sm:bottom-auto sm:top-16 sm:left-auto sm:right-4 sm:w-[22rem] z-[90]">
       <div className="rounded-xl border border-slate-700 bg-slate-900 shadow-2xl p-4 text-slate-200">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3 min-w-0">

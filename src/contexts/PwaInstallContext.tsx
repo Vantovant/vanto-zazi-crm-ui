@@ -82,6 +82,11 @@ export function PwaInstallProvider({ children }: { children: ReactNode }) {
   const [dismissed, setDismissed] = useState(() => getDismissedState());
 
   useEffect(() => {
+    const ua = window.navigator.userAgent;
+    const isAndroid = /android/i.test(ua);
+    const isIos = /iphone|ipad|ipod/i.test(ua) || (window.navigator.platform === 'MacIntel' && window.navigator.maxTouchPoints > 1);
+    console.info(`[PWA] platform detected — iOS: ${isIos}, Android: ${isAndroid}, standalone: ${isStandaloneMode()}, iosSafari: ${isIosSafari()}`);
+
     const handleBeforeInstallPrompt = (event: Event) => {
       event.preventDefault();
       console.info('[PWA] beforeinstallprompt captured');
