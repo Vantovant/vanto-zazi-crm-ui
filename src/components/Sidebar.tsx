@@ -40,7 +40,7 @@ interface SidebarProps {
 export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
   const { user } = useAuth();
   const navItems = user?.id === OWNER_ID
-    ? [...baseNavItems, { path: '/momentum', label: '90-Day Run', icon: Flame }, { path: '/team', label: 'Tester Dashboard', icon: BarChart3 }]
+    ? [...baseNavItems, { path: '/team', label: 'Tester Dashboard', icon: BarChart3 }]
     : baseNavItems;
   return (
     <>
