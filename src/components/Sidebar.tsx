@@ -29,6 +29,7 @@ const baseNavItems = [
   { path: '/whatsapp', label: 'WhatsApp', icon: MessageCircle },
   { path: '/import-export', label: 'Import / Export', icon: ArrowUpDown },
   { path: '/duplicates', label: 'Duplicates', icon: GitMerge },
+  { path: '/momentum', label: '90-Day Run', icon: Flame },
 ];
 
 interface SidebarProps {
