@@ -442,7 +442,6 @@ export function Activities() {
       {/* Activity Paid This Month */}
       {(() => {
         const activityOrders = orders.filter(o => o.source === 'monthly-activity-paste');
-        if (activityOrders.length === 0) return null;
         // Group by month (product contains "Monthly Activity - March 2026")
         const monthGroups = new Map<string, typeof activityOrders>();
         for (const o of activityOrders) {
