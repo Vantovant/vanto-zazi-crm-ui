@@ -300,7 +300,7 @@ export function Activities() {
 
       {/* Activity Paid This Month — MOBILE: show before grid for visibility */}
       <div className="block lg:hidden">
-        {renderActivityPaid()}
+        {renderActivityPaidSection()}
       </div>
 
       {/* Mobile: Activity Goals First | Desktop: 3-column grid */}
