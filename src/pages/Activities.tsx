@@ -64,7 +64,7 @@ export function Activities() {
   const [showGoalsModal, setShowGoalsModal] = useState(false);
   const [drawerContactId, setDrawerContactId] = useState<string | null>(null);
   const [templatePicker, setTemplatePicker] = useState<{ contact: Prospect; channel: 'whatsapp' | 'email'; mergeOverrides?: Record<string, string> } | null>(null);
-  const { contacts: _contacts } = useCrm(); // already destructured above
+  
   const { activities, loading, getNeglectedContacts, getActivitiesToday, getActivitiesThisWeek } = useContactActivities();
   const { goals } = useActivityGoals();
   const [aiInsight, setAiInsight] = useState('');
