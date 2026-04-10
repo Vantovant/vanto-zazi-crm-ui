@@ -501,7 +501,7 @@ export function Activities() {
           const entries: { contact: Prospect; order: typeof latestOrders[0]; month: string }[] = [];
           for (const order of filteredOrders) {
             const contact = contacts.find(c => String(c.id) === order.contactId);
-            if (contact && (!selectedActivityRows.size || selectedActivityRows.has(order.id))) {
+            if (contact && (!selectedActivityRows.size || selectedActivityRows.has(String(order.id)))) {
               entries.push({ contact, order, month: latestMonth });
             }
           }
@@ -524,7 +524,7 @@ export function Activities() {
           if (selectedActivityRows.size === filteredOrders.length) {
             setSelectedActivityRows(new Set());
           } else {
-            setSelectedActivityRows(new Set(filteredOrders.map(o => o.id)));
+            setSelectedActivityRows(new Set(filteredOrders.map(o => String(o.id))));
           }
         };
 
@@ -601,8 +601,8 @@ export function Activities() {
                     return (
                       <div key={order.id} className="px-5 py-3 hover:bg-slate-700/30 transition-colors">
                         <div className="flex items-center gap-3">
-                          <input type="checkbox" checked={selectedActivityRows.has(order.id)}
-                            onChange={() => toggleSelect(order.id)}
+                          <input type="checkbox" checked={selectedActivityRows.has(String(order.id))}
+                            onChange={() => toggleSelect(String(order.id))}
                             className="rounded border-slate-600 bg-slate-800 text-emerald-500 focus:ring-emerald-500/40 w-3.5 h-3.5 shrink-0" />
                           <div className="flex-1 min-w-0 cursor-pointer" onClick={() => order.contactId && setDrawerContactId(order.contactId)}>
                             <div className="flex items-center gap-2">
