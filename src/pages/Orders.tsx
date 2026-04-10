@@ -102,6 +102,14 @@ export function Orders() {
         <div className="flex items-center gap-2">
           <button
             type="button"
+            onClick={() => setShowMonthlyPaste(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            <Users className="w-4 h-4" />
+            Monthly Activity
+          </button>
+          <button
+            type="button"
             onClick={() => setShowSmartPaste(true)}
             className="flex items-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium rounded-lg transition-colors"
           >
