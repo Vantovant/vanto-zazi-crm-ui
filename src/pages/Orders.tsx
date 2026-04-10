@@ -6,6 +6,7 @@ import {
   X,
   Calendar,
   Sparkles,
+  Users,
 } from 'lucide-react';
 import { orderFilterOptions, type Order } from '../data/mockData';
 import { DataStatusBanner } from '../components/DataStatusBanner';
@@ -522,6 +523,10 @@ export function Orders() {
 
       {showSmartPaste && (
         <SmartPasteOrdersModal onClose={() => setShowSmartPaste(false)} />
+      )}
+
+      {showMonthlyPaste && (
+        <MonthlyActivityPasteModal onClose={() => setShowMonthlyPaste(false)} />
       )}
     </div>
   );
