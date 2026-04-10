@@ -1100,6 +1100,14 @@ export function ImportExport() {
                       <p className="text-xs text-slate-400">Errors</p>
                     </div>
                   </div>
+                  {importErrors.length > 0 && (
+                    <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/20 rounded-lg text-left max-h-40 overflow-y-auto">
+                      <p className="text-xs font-medium text-rose-300 mb-1">Error details:</p>
+                      {importErrors.map((e, i) => (
+                        <p key={i} className="text-[10px] text-rose-400/80 font-mono">{e}</p>
+                      ))}
+                    </div>
+                  )}
                   {activeSmartTags.length > 0 && (
                     <div className="mb-4 p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
                       <p className="text-xs font-medium text-purple-300 mb-1 flex items-center gap-1">
