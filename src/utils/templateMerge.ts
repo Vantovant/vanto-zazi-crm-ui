@@ -15,6 +15,11 @@ export interface MergeContext {
   rankName?: string;
   pvNeeded?: string;
   expiryDate?: string;
+  amount?: string;
+  month?: string;
+  actualLevel?: string;
+  displayedLevel?: string;
+  userId?: string;
 }
 
 /** Normalise literal escape sequences (\n, \\n) into real line breaks */
@@ -34,6 +39,7 @@ export function mergeTemplate(body: string, ctx: MergeContext): string {
   const firstName = generateGreeting(ctx.contact);
   const map: Record<string, string> = {
     firstName,
+    full_name: ctx.contact.FullName,
     senderName: ctx.senderName || 'Your Team Leader',
     teamName: ctx.teamName || 'Our Team',
     trainingLink: ctx.trainingLink || '[Training Link]',
@@ -43,6 +49,12 @@ export function mergeTemplate(body: string, ctx: MergeContext): string {
     rankName: ctx.rankName || '[Rank]',
     pvNeeded: ctx.pvNeeded || '[PV Amount]',
     expiryDate: ctx.expiryDate || '[Expiry Date]',
+    amount: ctx.amount || '[Amount]',
+    month: ctx.month || '[Month]',
+    actual_level: ctx.actualLevel || '[Level]',
+    displayed_level: ctx.displayedLevel || '[Level]',
+    user_id: ctx.userId || ctx.contact.APLGoID || '[User ID]',
+    sender_email: '[Email]',
   };
   const merged = body.replace(/\{\{(\w+)\}\}/g, (_, key) => map[key] || `[${key}]`);
   return cleanEscapes(merged);

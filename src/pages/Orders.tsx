@@ -6,12 +6,14 @@ import {
   X,
   Calendar,
   Sparkles,
+  Users,
 } from 'lucide-react';
 import { orderFilterOptions, type Order } from '../data/mockData';
 import { DataStatusBanner } from '../components/DataStatusBanner';
 import { useCrm } from '@/contexts/CrmContext';
 import { AddOrderModal } from '@/components/AddOrderModal';
 import { SmartPasteOrdersModal } from '@/components/SmartPasteOrdersModal';
+import { MonthlyActivityPasteModal } from '@/components/MonthlyActivityPasteModal';
 
 const statusColors: Record<string, string> = {
   Pending: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
@@ -41,6 +43,7 @@ export function Orders() {
   const [dateRange, setDateRange] = useState({ from: '', to: '' });
   const [showAddOrder, setShowAddOrder] = useState(false);
   const [showSmartPaste, setShowSmartPaste] = useState(false);
+  const [showMonthlyPaste, setShowMonthlyPaste] = useState(false);
 
   const uniqueContacts = useMemo(() => {
     return [...new Set(orders.map(o => o.contactName))];
@@ -98,6 +101,14 @@ export function Orders() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowMonthlyPaste(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            <Users className="w-4 h-4" />
+            Monthly Activity
+          </button>
           <button
             type="button"
             onClick={() => setShowSmartPaste(true)}
@@ -512,6 +523,10 @@ export function Orders() {
 
       {showSmartPaste && (
         <SmartPasteOrdersModal onClose={() => setShowSmartPaste(false)} />
+      )}
+
+      {showMonthlyPaste && (
+        <MonthlyActivityPasteModal onClose={() => setShowMonthlyPaste(false)} />
       )}
     </div>
   );
