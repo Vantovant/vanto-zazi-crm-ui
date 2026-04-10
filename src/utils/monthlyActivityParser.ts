@@ -29,7 +29,8 @@ export function parseMonthlyActivityReport(text: string): MonthlyActivityRow[] {
 
   const levelHeaderRe = /^level\s+(\d+)$/i;
   // Match: 1129930(6): 2,520.00 R  or  934517: 2385.00 R
-  const entryRe = /(\d+)(?:\((\d+)\))?\s*:\s*([\d,.]+)\s*R/gi;
+  // Amount uses non-greedy digits/dots/commas followed by \s*R to avoid greedy comma consumption
+  const entryRe = /(\d{4,})(?:\((\d+)\))?\s*:\s*(\d[\d.,]*\d)\s*R\b/gi;
 
   for (const rawLine of rawLines) {
     const headerMatch = rawLine.match(levelHeaderRe);
