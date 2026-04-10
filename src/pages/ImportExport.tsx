@@ -432,7 +432,7 @@ export function ImportExport() {
           delete merged.id;
           if (Object.keys(merged).length > 0) {
             const { error } = await supabase.from('contacts').update(merged).eq('id', existingId);
-            if (error) { console.error('Import update error:', error.message); failed++; }
+            if (error) { console.error(`Import update error row ${rowIdx}:`, error.message, error.code, 'id:', existingId); failed++; }
             else { updated++; }
           } else {
             updated++; // No changes needed
@@ -444,7 +444,7 @@ export function ImportExport() {
         // INSERT new
         const { error } = await supabase.from('contacts').insert(dbRow as any);
         if (error) {
-          console.error('Import insert error:', error.message);
+          console.error(`Import insert error row ${rowIdx}:`, error.message, error.code, 'fullName:', fullName, 'date:', dbRow.date_captured);
           if (error.code === '23505') {
             // Unique violation - try update instead
             updated++;
