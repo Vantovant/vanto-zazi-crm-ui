@@ -219,13 +219,29 @@ export function ImportExport() {
           setAiSummary(data.summary || '');
           setAiUsed(true);
 
-          // Apply AI mappings to column mapping
+          // Apply AI mappings to column mapping (with fuzzy key matching)
           const mapping: Record<string, string> = {};
+          const crmKeyMap = Object.fromEntries(CRM_FIELDS.map(f => [f.key.toLowerCase(), f.key]));
           for (const m of data.mappings as AiMapping[]) {
             if (m.crmField && m.confidence >= 0.4) {
-              mapping[m.crmField] = m.spreadsheetColumn;
+              // Try exact match first, then case-insensitive
+              const exactKey = CRM_FIELDS.find(f => f.key === m.crmField)?.key;
+              const fuzzyKey = crmKeyMap[(m.crmField || '').toLowerCase()];
+              const resolvedKey = exactKey || fuzzyKey;
+              if (resolvedKey) {
+                mapping[resolvedKey] = m.spreadsheetColumn;
+              }
             }
           }
+
+          // Fill gaps with rule-based fallback for unmapped fields
+          for (const crmField of CRM_FIELDS) {
+            if (!mapping[crmField.key]) {
+              const matchIdx = headers.findIndex(h => autoMapHeader(h) === crmField.key);
+              if (matchIdx !== -1) mapping[crmField.key] = headers[matchIdx];
+            }
+          }
+
           setColumnMapping(mapping);
           setImportStep('mapping');
           return;
@@ -350,6 +366,21 @@ export function ImportExport() {
         }
       }
 
+      // Parse Location field: "South AfricaMaclear" → country + city
+      const cityVal = (record.City || '').trim();
+      const knownCountries = ['South Africa', 'Botswana', 'Namibia', 'Zimbabwe', 'Mozambique', 'Lesotho', 'Eswatini', 'Swaziland'];
+      for (const country of knownCountries) {
+        if (cityVal.startsWith(country) && cityVal.length > country.length) {
+          record.Country = country;
+          record.City = cityVal.slice(country.length).trim();
+          break;
+        } else if (cityVal === country) {
+          record.Country = country;
+          record.City = '';
+          break;
+        }
+      }
+
       const dbRow: Record<string, unknown> = { user_id: user.id };
       for (const [k, v] of Object.entries(record)) {
         if (fieldToCol[k]) dbRow[fieldToCol[k]] = v;
@@ -416,7 +447,7 @@ export function ImportExport() {
           delete merged.id;
           if (Object.keys(merged).length > 0) {
             const { error } = await supabase.from('contacts').update(merged).eq('id', existingId);
-            if (error) { console.error('Import update error:', error.message); failed++; }
+            if (error) { console.error(`Import update error row ${rowIdx}:`, error.message, error.code, 'id:', existingId); failed++; }
             else { updated++; }
           } else {
             updated++; // No changes needed
@@ -428,7 +459,7 @@ export function ImportExport() {
         // INSERT new
         const { error } = await supabase.from('contacts').insert(dbRow as any);
         if (error) {
-          console.error('Import insert error:', error.message);
+          console.error(`Import insert error row ${rowIdx}:`, error.message, error.code, 'fullName:', fullName, 'date:', dbRow.date_captured);
           if (error.code === '23505') {
             // Unique violation - try update instead
             updated++;
