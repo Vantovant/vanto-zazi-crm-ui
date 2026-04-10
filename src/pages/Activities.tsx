@@ -298,6 +298,11 @@ export function Activities() {
         </div>
       )}
 
+      {/* Activity Paid This Month — MOBILE: show before grid for visibility */}
+      <div className="block lg:hidden">
+        {renderActivityPaid()}
+      </div>
+
       {/* Mobile: Activity Goals First | Desktop: 3-column grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Activity Goals & Progress — MOBILE FIRST */}
@@ -466,7 +471,7 @@ export function Activities() {
         </div>
       </div>
 
-      {/* Activity Paid This Month — Dedicated Appreciation Engine */}
+      {/* Activity Paid This Month — Dedicated Appreciation Engine — ALWAYS VISIBLE */}
       {(() => {
         const activityOrders = orders.filter(o => o.source === 'monthly-activity-paste');
         const monthGroups = new Map<string, typeof activityOrders>();
