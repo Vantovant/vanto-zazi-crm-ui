@@ -93,6 +93,8 @@ export interface Prospect {
   AdditionalNotes: string;
   GOStatus: string;
   SalutationTitle?: string;
+  Leg: string;
+  Level: string;
 }
 
 export const prospects: Prospect[] = [
@@ -122,6 +124,8 @@ export const prospects: Prospect[] = [
     AssociateStatus: 'Pending',
     AdditionalNotes: 'Very interested in business opportunity',
     GOStatus: '',
+    Leg: '',
+    Level: '',
   },
   {
     id: 2,
@@ -149,6 +153,8 @@ export const prospects: Prospect[] = [
     AssociateStatus: '',
     AdditionalNotes: 'Referred by existing customer',
     GOStatus: '',
+    Leg: '',
+    Level: '',
   },
   {
     id: 3,
@@ -176,6 +182,8 @@ export const prospects: Prospect[] = [
     AssociateStatus: 'Active',
     AdditionalNotes: 'Fast starter, very motivated',
     GOStatus: '',
+    Leg: '',
+    Level: '',
   },
   {
     id: 4,
@@ -203,6 +211,8 @@ export const prospects: Prospect[] = [
     AssociateStatus: '',
     AdditionalNotes: 'Busy schedule, try again later',
     GOStatus: '',
+    Leg: '',
+    Level: '',
   },
   {
     id: 5,
@@ -230,6 +240,8 @@ export const prospects: Prospect[] = [
     AssociateStatus: 'Customer',
     AdditionalNotes: 'Interested in weight management products',
     GOStatus: '',
+    Leg: '',
+    Level: '',
   },
   {
     id: 6,
@@ -257,6 +269,8 @@ export const prospects: Prospect[] = [
     AssociateStatus: 'Pending',
     AdditionalNotes: 'Ready to sign, needs sponsor approval',
     GOStatus: '',
+    Leg: '',
+    Level: '',
   },
   {
     id: 7,
@@ -284,6 +298,8 @@ export const prospects: Prospect[] = [
     AssociateStatus: '',
     AdditionalNotes: 'Facebook lead, needs qualification',
     GOStatus: '',
+    Leg: '',
+    Level: '',
   },
   {
     id: 8,
@@ -311,6 +327,8 @@ export const prospects: Prospect[] = [
     AssociateStatus: 'Customer',
     AdditionalNotes: 'Happy with initial products',
     GOStatus: '',
+    Leg: '',
+    Level: '',
   },
   {
     id: 9,
@@ -338,6 +356,8 @@ export const prospects: Prospect[] = [
     AssociateStatus: 'Pending Activation',
     AdditionalNotes: 'Experienced in network marketing',
     GOStatus: '',
+    Leg: '',
+    Level: '',
   },
   {
     id: 10,
@@ -365,6 +385,8 @@ export const prospects: Prospect[] = [
     AssociateStatus: '',
     AdditionalNotes: 'Reviewing materials',
     GOStatus: '',
+    Leg: '',
+    Level: '',
   },
   {
     id: 11,
@@ -392,6 +414,8 @@ export const prospects: Prospect[] = [
     AssociateStatus: 'Active',
     AdditionalNotes: 'Building team actively',
     GOStatus: '',
+    Leg: '',
+    Level: '',
   },
   {
     id: 12,
@@ -419,6 +443,8 @@ export const prospects: Prospect[] = [
     AssociateStatus: '',
     AdditionalNotes: 'Unresponsive to calls',
     GOStatus: '',
+    Leg: '',
+    Level: '',
   },
 ];
 
@@ -438,7 +464,9 @@ export const prospectColumns = [
   { key: 'InterestLevel', label: 'Interest', default: false },
   { key: 'FocusArea', label: 'Focus Area', default: true },
   { key: 'LeadPath', label: 'Lead Path', default: true },
-  { key: 'SponsorName', label: 'Sponsor', default: false },
+  { key: 'SponsorName', label: 'Sponsor', default: true },
+  { key: 'Leg', label: 'Leg', default: true },
+  { key: 'Level', label: 'Level', default: true },
   { key: 'AssignedTo', label: 'Assigned To', default: true },
   { key: 'ActionTaken', label: 'Action Taken', default: false },
   { key: 'NextAction', label: 'Next Action', default: true },
