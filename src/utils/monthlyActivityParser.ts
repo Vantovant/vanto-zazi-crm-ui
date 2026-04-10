@@ -23,26 +23,28 @@ export interface MonthlyActivityRow {
 }
 
 export function parseMonthlyActivityReport(text: string): MonthlyActivityRow[] {
-  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const rawLines = text.split('\n').map(l => l.trim()).filter(Boolean);
   const rows: MonthlyActivityRow[] = [];
   let currentLevel = '';
 
   const levelHeaderRe = /^level\s+(\d+)$/i;
-  // Match: 1129930(6): 2520.00 R  or  934517: 2385.00 R
-  const entryRe = /^(\d+)(?:\((\d+)\))?\s*:\s*([\d,.]+)\s*R?\s*$/i;
+  // Match: 1129930(6): 2,520.00 R  or  934517: 2385.00 R
+  const entryRe = /(\d+)(?:\((\d+)\))?\s*:\s*([\d,.]+)\s*R/gi;
 
-  for (const line of lines) {
-    const headerMatch = line.match(levelHeaderRe);
+  for (const rawLine of rawLines) {
+    const headerMatch = rawLine.match(levelHeaderRe);
     if (headerMatch) {
       currentLevel = headerMatch[1];
       continue;
     }
 
-    const entryMatch = line.match(entryRe);
-    if (entryMatch) {
-      const userId = entryMatch[1];
-      const bracketLevel = entryMatch[2] || '';
-      const amount = parseFloat(entryMatch[3].replace(/,/g, ''));
+    // Extract all entries from the line (handles comma-separated entries on one line)
+    let match: RegExpExecArray | null;
+    entryRe.lastIndex = 0;
+    while ((match = entryRe.exec(rawLine)) !== null) {
+      const userId = match[1];
+      const bracketLevel = match[2] || '';
+      const amount = parseFloat(match[3].replace(/,/g, ''));
 
       rows.push({
         userId,
