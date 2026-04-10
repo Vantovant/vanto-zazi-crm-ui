@@ -11,6 +11,7 @@ import { useContactActivities } from '@/hooks/useContactActivities';
 import { useCrm } from '@/contexts/CrmContext';
 import { mergeTemplate, mergeSubject } from '@/utils/templateMerge';
 import { recommendTemplate } from '@/utils/templateRecommender';
+import { buildWhatsAppUrl } from '@/utils/whatsappPhone';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -121,9 +122,9 @@ export function MessageTemplatePicker({ contact, channel, onClose }: MessageTemp
   }, [editedBody, editedSubject, channel]);
 
   const handleOpenWhatsApp = useCallback(() => {
-    const phone = contact.PhoneNumber.replace(/\s/g, '').replace('+', '');
-    if (phone) {
-      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(editedBody)}`, '_blank');
+    const url = buildWhatsAppUrl(contact.PhoneNumber, contact.Country, editedBody);
+    if (url) {
+      window.open(url, '_blank');
     }
   }, [contact, editedBody]);
 
@@ -135,6 +136,11 @@ export function MessageTemplatePicker({ contact, channel, onClose }: MessageTemp
   }, [contact, editedBody, editedSubject]);
 
   const handleSendAndLog = useCallback(async () => {
+    const whatsappUrl = channel === 'whatsapp'
+      ? buildWhatsAppUrl(contact.PhoneNumber, contact.Country, editedBody)
+      : null;
+    if (channel === 'whatsapp' && !whatsappUrl) return;
+
     setLogging(true);
     const isCustom = !selectedTemplate;
     const summaryText = isCustom
@@ -153,13 +159,13 @@ export function MessageTemplatePicker({ contact, channel, onClose }: MessageTemp
       ...(nextAction ? { NextAction: nextAction } : {}),
     } as any);
 
-    if (channel === 'whatsapp') handleOpenWhatsApp();
+    if (channel === 'whatsapp' && whatsappUrl) window.open(whatsappUrl, '_blank');
     else handleOpenEmail();
 
     setLogging(false);
     setLogSuccess(true);
     setTimeout(() => onClose(), 1500);
-  }, [selectedTemplate, contact, channel, editedBody, nextAction, logActivity, updateContact, handleOpenWhatsApp, handleOpenEmail, onClose]);
+  }, [selectedTemplate, contact, channel, editedBody, nextAction, logActivity, updateContact, handleOpenEmail, onClose]);
 
   /* ---------- Render ---------- */
 

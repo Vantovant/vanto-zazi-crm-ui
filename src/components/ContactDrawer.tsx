@@ -26,6 +26,7 @@ import { EditContactModal } from './EditContactModal';
 import { useCrm } from '@/contexts/CrmContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useContactActivities } from '@/hooks/useContactActivities';
+import { buildWhatsAppUrl } from '@/utils/whatsappPhone';
 
 interface ContactDrawerProps {
   prospect: Prospect;
@@ -80,8 +81,8 @@ export function ContactDrawer({ prospect: initialProspect, onClose, onOpenTempla
   }, [prospect.id, notesValue, updateContact]);
 
   const handleWhatsApp = useCallback(async (prefilledMsg?: string) => {
-    const phone = prospect.PhoneNumber.replace(/\s/g, '').replace('+', '');
-    if (phone) {
+    const url = buildWhatsAppUrl(prospect.PhoneNumber, prospect.Country, prefilledMsg);
+    if (url) {
       const msgSummary = prefilledMsg
         ? `Sent AI-suggested WhatsApp message to ${prospect.FullName}`
         : `Opened WhatsApp chat with ${prospect.FullName}`;
@@ -91,9 +92,6 @@ export function ContactDrawer({ prospect: initialProspect, onClose, onOpenTempla
         summary: msgSummary,
         notes: prefilledMsg || '',
       });
-      const url = prefilledMsg
-        ? `https://wa.me/${phone}?text=${encodeURIComponent(prefilledMsg)}`
-        : `https://wa.me/${phone}`;
       window.open(url, '_blank');
     }
   }, [prospect, logActivity]);

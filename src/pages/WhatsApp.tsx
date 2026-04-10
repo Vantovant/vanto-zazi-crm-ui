@@ -17,6 +17,7 @@ import { AddFollowUpModal } from '../components/AddFollowUpModal';
 import { useCrm } from '@/contexts/CrmContext';
 import { useContactActivities } from '@/hooks/useContactActivities';
 import { supabase } from '@/integrations/supabase/client';
+import { buildWhatsAppUrl } from '@/utils/whatsappPhone';
 
 const temperatureColors: Record<string, string> = {
   Hot: 'bg-rose-500',
@@ -56,7 +57,8 @@ export function WhatsApp() {
 
   const handleOpenWhatsApp = useCallback(async (prefilledMsg?: string) => {
     if (!selectedContact) return;
-    const phone = selectedContact.PhoneNumber.replace(/\s/g, '').replace('+', '');
+    const url = buildWhatsAppUrl(selectedContact.PhoneNumber, selectedContact.Country, prefilledMsg);
+    if (!url) return;
     
     // Log the WhatsApp activity with timestamp
     const msgSummary = prefilledMsg
@@ -68,10 +70,7 @@ export function WhatsApp() {
       summary: msgSummary,
       notes: prefilledMsg || '',
     });
-    
-    const url = prefilledMsg
-      ? `https://wa.me/${phone}?text=${encodeURIComponent(prefilledMsg)}`
-      : `https://wa.me/${phone}`;
+
     window.open(url, '_blank');
   }, [selectedContact, logActivity]);
 

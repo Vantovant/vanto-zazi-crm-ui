@@ -7,6 +7,7 @@ import {
 import aplgoLogo from '@/assets/aplgo-logo.png';
 import type { Prospect } from '@/data/mockData';
 import { generateGreeting } from '@/utils/templateMerge';
+import { buildWhatsAppUrl } from '@/utils/whatsappPhone';
 import { useContactActivities } from '@/hooks/useContactActivities';
 import { useCrm } from '@/contexts/CrmContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -121,14 +122,16 @@ export function ActivityAppreciationModal({
 
   const handleOpenWhatsApp = useCallback(() => {
     if (!entry) return;
-    const phone = entry.contact.PhoneNumber.replace(/\s/g, '').replace('+', '');
-    if (phone) {
-      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(editedMessage)}`, '_blank');
+    const url = buildWhatsAppUrl(entry.contact.PhoneNumber, entry.contact.Country, editedMessage);
+    if (url) {
+      window.open(url, '_blank');
     }
   }, [entry, editedMessage]);
 
   const handleSendAndLog = useCallback(async () => {
     if (!entry) return;
+    const whatsappUrl = buildWhatsAppUrl(entry.contact.PhoneNumber, entry.contact.Country, editedMessage);
+    if (!whatsappUrl) return;
     setLogging(true);
     await logActivity({
       contact_id: String(entry.contact.id),
@@ -139,7 +142,7 @@ export function ActivityAppreciationModal({
     await updateContact(String(entry.contact.id), {
       ActionTaken: `Activity Appreciation sent for ${entry.month} (${new Date().toLocaleDateString()})`,
     } as any);
-    handleOpenWhatsApp();
+    window.open(whatsappUrl, '_blank');
     setLogging(false);
     setLogSuccess(true);
     onAppreciated?.(String(entry.contact.id));
@@ -150,7 +153,7 @@ export function ActivityAppreciationModal({
         setCurrentIndex(i => i + 1);
       }, 1500);
     }
-  }, [entry, logActivity, updateContact, handleOpenWhatsApp, onAppreciated, isBulk, currentIndex, entries.length]);
+  }, [entry, editedMessage, logActivity, updateContact, onAppreciated, isBulk, currentIndex, entries.length]);
 
   if (!entry) return null;
 
