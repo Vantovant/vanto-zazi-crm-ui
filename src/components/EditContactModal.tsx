@@ -79,6 +79,7 @@ export function EditContactModal({ prospect, onClose, onSaved }: EditContactModa
       RegistrationStatus: 'registration_status', FocusArea: 'focus_area',
       NextAction: 'next_action', AdditionalNotes: 'additional_notes',
       GOStatus: 'go_status', SponsorName: 'sponsor_name', SalutationTitle: 'salutation_title',
+      Leg: 'leg', Level: 'level',
     };
 
     const incoming: Record<string, unknown> = {};
