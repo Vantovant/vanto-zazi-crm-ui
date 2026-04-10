@@ -457,48 +457,58 @@ export function Activities() {
           <div className="bg-slate-800/50 border border-emerald-500/20 rounded-xl overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-700 flex items-center gap-2">
               <DollarSign className="w-4 h-4 text-emerald-400" />
-              <h3 className="font-semibold text-white">Activity Paid — {latestMonth}</h3>
+              <h3 className="font-semibold text-white">
+                {latestMonth ? `Activity Paid — ${latestMonth}` : 'Activity Paid'}
+              </h3>
               <span className="ml-auto text-xs text-emerald-400 font-medium">{latestOrders.length}</span>
             </div>
-            <div className="max-h-96 overflow-y-auto divide-y divide-slate-700/50">
-              {latestOrders.map((order) => {
-                const contact = contacts.find(c => String(c.id) === order.contactId);
-                return (
-                  <div key={order.id} className="px-5 py-3 hover:bg-slate-700/30 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 cursor-pointer" onClick={() => order.contactId && setDrawerContactId(order.contactId)}>
-                        <p className="text-sm font-medium text-white">{order.contactName}</p>
-                        {contact?.APLGoID && <span className="text-xs text-slate-500 font-mono">{contact.APLGoID}</span>}
+            {latestOrders.length === 0 ? (
+              <div className="p-8 text-center">
+                <DollarSign className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+                <p className="text-sm text-slate-400 mb-1">No activity purchases imported yet.</p>
+                <p className="text-xs text-slate-500">Go to <span className="text-emerald-400 font-medium">Orders → Monthly Activity</span> to paste a report.</p>
+              </div>
+            ) : (
+              <div className="max-h-96 overflow-y-auto divide-y divide-slate-700/50">
+                {latestOrders.map((order) => {
+                  const contact = contacts.find(c => String(c.id) === order.contactId);
+                  return (
+                    <div key={order.id} className="px-5 py-3 hover:bg-slate-700/30 transition-colors">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 cursor-pointer" onClick={() => order.contactId && setDrawerContactId(order.contactId)}>
+                          <p className="text-sm font-medium text-white">{order.contactName}</p>
+                          {contact?.APLGoID && <span className="text-xs text-slate-500 font-mono">{contact.APLGoID}</span>}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold text-emerald-400">R{order.amount.toLocaleString()}</span>
+                          {contact && (
+                            <button
+                              type="button"
+                              onClick={() => setTemplatePicker({
+                                contact,
+                                channel: 'whatsapp',
+                                mergeOverrides: {
+                                  amount: String(order.amount),
+                                  month: latestMonth,
+                                },
+                              })}
+                              className="p-1.5 rounded text-green-400 hover:bg-green-500/20 transition-colors"
+                              title="Send Thank-You"
+                            >
+                              <MessageCircle className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold text-emerald-400">R{order.amount.toLocaleString()}</span>
-                        {contact && (
-                          <button
-                            type="button"
-                            onClick={() => setTemplatePicker({
-                              contact,
-                              channel: 'whatsapp',
-                              mergeOverrides: {
-                                amount: String(order.amount),
-                                month: latestMonth,
-                              },
-                            })}
-                            className="p-1.5 rounded text-green-400 hover:bg-green-500/20 transition-colors"
-                            title="Send Thank-You"
-                          >
-                            <MessageCircle className="w-4 h-4" />
-                          </button>
-                        )}
+                      <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
+                        {contact?.Level && <span>Level: {contact.Level}</span>}
+                        {contact?.Leg && <span>Leg: {contact.Leg}</span>}
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
-                      {contact?.Level && <span>Level: {contact.Level}</span>}
-                      {contact?.Leg && <span>Leg: {contact.Leg}</span>}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         );
       })()}
