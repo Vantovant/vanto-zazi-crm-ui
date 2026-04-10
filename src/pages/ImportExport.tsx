@@ -158,10 +158,18 @@ export function ImportExport() {
   const [importProgress, setImportProgress] = useState(0);
   const [importResult, setImportResult] = useState<{ success: number; failed: number; updated: number; skipped: number }>({ success: 0, failed: 0, updated: 0, skipped: 0 });
 
-  // Batch tagging
-  const [batchSponsor, setBatchSponsor] = useState('');
-  const [batchLeg, setBatchLeg] = useState('');
-  const [batchLevel, setBatchLevel] = useState('');
+  // Smart Tagging (compensation for missing columns)
+  const [smartTags, setSmartTags] = useState<Record<string, string>>({
+    sponsor_name: '',
+    leg: '',
+    level: '',
+    country: '',
+    province: '',
+    lead_type: '',
+    lead_temperature: '',
+  });
+  const updateSmartTag = (key: string, value: string) => setSmartTags(prev => ({ ...prev, [key]: value }));
+  const activeSmartTags = Object.entries(smartTags).filter(([, v]) => v.trim() !== '');
 
   // Preview duplicate detection
   const [previewDupeStatus, setPreviewDupeStatus] = useState<Record<number, 'create' | 'update'>>({});
@@ -279,9 +287,7 @@ export function ImportExport() {
     setAiSummary('');
     setAiUsed(false);
     setAiError(null);
-    setBatchSponsor('');
-    setBatchLeg('');
-    setBatchLevel('');
+    setSmartTags({ sponsor_name: '', leg: '', level: '', country: '', province: '', lead_type: '', lead_temperature: '' });
     setPreviewDupeStatus({});
   };
 
@@ -348,10 +354,16 @@ export function ImportExport() {
         if (fieldToCol[k]) dbRow[fieldToCol[k]] = v;
       }
 
-      // Apply batch tagging values (override if provided)
-      if (batchSponsor.trim()) dbRow.sponsor_name = batchSponsor.trim();
-      if (batchLeg.trim()) dbRow.leg = batchLeg.trim();
-      if (batchLevel.trim()) dbRow.level = batchLevel.trim();
+      // Apply Smart Tags (compensate for missing columns)
+      for (const [dbCol, tagVal] of Object.entries(smartTags)) {
+        if (tagVal.trim()) {
+          // Smart tag fills blank OR overrides for structural fields
+          const current = dbRow[dbCol] as string | undefined;
+          if (!current || current.trim() === '' || ['sponsor_name', 'leg', 'level'].includes(dbCol)) {
+            dbRow[dbCol] = tagVal.trim();
+          }
+        }
+      }
 
       const rawDate = (dbRow.date_captured as string) || '';
       const normalizedDate = normalizeDate(rawDate);
@@ -840,45 +852,44 @@ export function ImportExport() {
                     </div>
                   </div>
 
-                  {/* Batch Tagging UI */}
-                  <div className="mb-6 p-4 bg-slate-700/30 rounded-lg border border-slate-700">
-                    <h4 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
-                      <Users className="w-4 h-4 text-teal-400" />
-                      Batch Tagging — Apply to All Rows
+                  {/* Smart Tagging UI */}
+                  <div className="mb-6 p-4 bg-gradient-to-br from-purple-500/5 to-teal-500/5 rounded-lg border border-purple-500/20">
+                    <h4 className="text-sm font-semibold text-white mb-1 flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-purple-400" />
+                      Smart Tagging (Optional)
                     </h4>
-                    <p className="text-xs text-slate-400 mb-3">These values will be applied to every contact in this import batch. Leave blank to skip.</p>
+                    <p className="text-xs text-slate-400 mb-3">Compensate for missing columns — these values fill blanks and apply to every row in this batch.</p>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div>
-                        <label className="block text-xs text-slate-400 mb-1">Sponsor Name</label>
-                        <input
-                          type="text"
-                          value={batchSponsor}
-                          onChange={(e) => setBatchSponsor(e.target.value)}
-                          placeholder="e.g. John Smith"
-                          className="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-700 rounded-lg text-slate-300 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-slate-400 mb-1">Leg</label>
-                        <input
-                          type="text"
-                          value={batchLeg}
-                          onChange={(e) => setBatchLeg(e.target.value)}
-                          placeholder="e.g. Left, Right, Leg 1"
-                          className="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-700 rounded-lg text-slate-300 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-slate-400 mb-1">Level</label>
-                        <input
-                          type="text"
-                          value={batchLevel}
-                          onChange={(e) => setBatchLevel(e.target.value)}
-                          placeholder="e.g. Level 1, Gold"
-                          className="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-700 rounded-lg text-slate-300 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500"
-                        />
-                      </div>
+                      {([
+                        { key: 'sponsor_name', label: 'Sponsor', placeholder: 'e.g. John Smith' },
+                        { key: 'leg', label: 'Leg', placeholder: 'e.g. Left, Right, Leg 1' },
+                        { key: 'level', label: 'Level', placeholder: 'e.g. Level 1, Gold' },
+                        { key: 'country', label: 'Country', placeholder: 'e.g. South Africa' },
+                        { key: 'province', label: 'Province', placeholder: 'e.g. Gauteng' },
+                        { key: 'lead_type', label: 'Lead Type', placeholder: 'e.g. Prospect, Expired' },
+                        { key: 'lead_temperature', label: 'Temperature', placeholder: 'e.g. Hot, Warm, Cold' },
+                      ] as const).map(tag => (
+                        <div key={tag.key}>
+                          <label className="block text-xs text-slate-400 mb-1">{tag.label}</label>
+                          <input
+                            type="text"
+                            value={smartTags[tag.key]}
+                            onChange={(e) => updateSmartTag(tag.key, e.target.value)}
+                            placeholder={tag.placeholder}
+                            className="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-700 rounded-lg text-slate-300 focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500"
+                          />
+                        </div>
+                      ))}
                     </div>
+                    {activeSmartTags.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {activeSmartTags.map(([key, val]) => (
+                          <span key={key} className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                            {key.replace(/_/g, ' ')}: {val}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {(() => {
@@ -909,6 +920,21 @@ export function ImportExport() {
 
                     return (
                       <>
+                        {activeSmartTags.length > 0 && (
+                          <div className="flex items-start gap-2 p-3 mb-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+                            <Sparkles className="w-4 h-4 text-purple-400 flex-shrink-0 mt-0.5" />
+                            <div>
+                              <p className="text-xs font-medium text-purple-300">Smart Tags will be applied to all rows:</p>
+                              <div className="flex flex-wrap gap-1.5 mt-1">
+                                {activeSmartTags.map(([key, val]) => (
+                                  <span key={key} className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-purple-500/20 text-purple-300">
+                                    {key.replace(/_/g, ' ')}: {val}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        )}
                         {checkedCount > 0 && (
                           <div className="flex items-center gap-4 mb-3 text-xs">
                             <span className="text-emerald-400 font-medium">{createCount} will create</span>
@@ -1018,6 +1044,21 @@ export function ImportExport() {
                       <p className="text-xs text-slate-400">Errors</p>
                     </div>
                   </div>
+                  {activeSmartTags.length > 0 && (
+                    <div className="mb-4 p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+                      <p className="text-xs font-medium text-purple-300 mb-1 flex items-center gap-1">
+                        <Sparkles className="w-3 h-3" />
+                        Smart Tags Applied:
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {activeSmartTags.map(([key, val]) => (
+                          <span key={key} className="px-2 py-0.5 text-[10px] font-medium rounded-full bg-purple-500/20 text-purple-300">
+                            {key.replace(/_/g, ' ')}: {val}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   {aiUsed && (
                     <p className="text-xs text-purple-400 mb-4 flex items-center justify-center gap-1">
                       <Sparkles className="w-3 h-3" />
