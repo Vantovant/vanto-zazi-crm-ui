@@ -279,6 +279,10 @@ export function ImportExport() {
     setAiSummary('');
     setAiUsed(false);
     setAiError(null);
+    setBatchSponsor('');
+    setBatchLeg('');
+    setBatchLevel('');
+    setPreviewDupeStatus({});
   };
 
   const runImport = async () => {
