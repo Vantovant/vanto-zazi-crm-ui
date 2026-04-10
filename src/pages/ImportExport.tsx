@@ -34,7 +34,7 @@ const CRM_FIELDS = prospectColumns.map(col => ({ key: col.key, label: col.label 
 
 // Normalize a string for fuzzy matching
 function normalize(s: string): string {
-  return s.toLowerCase().replace(/[\s_\-\.]/g, '');
+  return s.toLowerCase().replace(/[\s_\-\.\'\"]/g, '');
 }
 
 // Fallback auto-map (used if AI is unavailable)
