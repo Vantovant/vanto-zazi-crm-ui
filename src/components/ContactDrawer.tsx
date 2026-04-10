@@ -328,6 +328,26 @@ export function ContactDrawer({ prospect: initialProspect, onClose, onOpenTempla
                   </div>
                 </div>
 
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center">
+                    <Briefcase className="w-4 h-4 text-slate-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-slate-500">Leg</p>
+                    <p className="text-sm font-medium text-slate-200">{prospect.Leg || '—'}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center">
+                    <Award className="w-4 h-4 text-slate-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-slate-500">Level</p>
+                    <p className="text-sm font-medium text-slate-200">{prospect.Level || '—'}</p>
+                  </div>
+                </div>
+
                 {prospect.GOStatus && (
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center">

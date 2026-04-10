@@ -50,7 +50,7 @@ function autoMapHeader(header: string): string {
     date: 'DateCaptured', datecaptured: 'DateCaptured', enrollmentdate: 'DateCaptured', dateofenrollment: 'DateCaptured', dateenrolled: 'DateCaptured', dateofactivation: 'DateCaptured', activationdate: 'DateCaptured',
     dateofmakinginactive: 'AdditionalNotes', datemakinginactive: 'AdditionalNotes',
     highestachievedrankqualification: 'AdditionalNotes', highestrankqualification: 'AdditionalNotes', highestrank: 'AdditionalNotes',
-    level: 'AdditionalNotes', leg: 'AdditionalNotes',
+    level: 'Level', leg: 'Leg',
     contacts: 'PhoneNumber',
     temperature: 'LeadTemperature', leadtemperature: 'LeadTemperature', leadtemp: 'LeadTemperature', temp: 'LeadTemperature',
     commstatus: 'CommunicationStatus', communicationstatus: 'CommunicationStatus',
@@ -291,7 +291,7 @@ export function ImportExport() {
       FocusArea: 'focus_area', LeadPath: 'lead_path', SponsorName: 'sponsor_name',
       AssignedTo: 'assigned_to', ActionTaken: 'action_taken', NextAction: 'next_action',
       MeetingTime: 'meeting_time', APLGoID: 'aplgo_id', AssociateStatus: 'associate_status',
-      AdditionalNotes: 'additional_notes', GOStatus: 'go_status',
+      AdditionalNotes: 'additional_notes', GOStatus: 'go_status', Leg: 'leg', Level: 'level',
     };
 
     const normalizeDate = (val: string): string => {
