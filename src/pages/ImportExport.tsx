@@ -366,6 +366,21 @@ export function ImportExport() {
         }
       }
 
+      // Parse Location field: "South AfricaMaclear" → country + city
+      const cityVal = (record.City || '').trim();
+      const knownCountries = ['South Africa', 'Botswana', 'Namibia', 'Zimbabwe', 'Mozambique', 'Lesotho', 'Eswatini', 'Swaziland'];
+      for (const country of knownCountries) {
+        if (cityVal.startsWith(country) && cityVal.length > country.length) {
+          record.Country = country;
+          record.City = cityVal.slice(country.length).trim();
+          break;
+        } else if (cityVal === country) {
+          record.Country = country;
+          record.City = '';
+          break;
+        }
+      }
+
       const dbRow: Record<string, unknown> = { user_id: user.id };
       for (const [k, v] of Object.entries(record)) {
         if (fieldToCol[k]) dbRow[fieldToCol[k]] = v;
