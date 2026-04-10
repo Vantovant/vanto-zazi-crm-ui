@@ -347,16 +347,32 @@ export function ImportExport() {
     // Detect expired member spreadsheets
     const hasInactiveDate = fileHeaders.some(h => normalize(h).includes('makinginactive'));
 
+    // Pre-build a lookup: normalized header → column index for robust matching
+    const headerIndexMap: Record<string, number> = {};
+    for (let i = 0; i < fileHeaders.length; i++) {
+      headerIndexMap[normalize(fileHeaders[i])] = i;
+      headerIndexMap[fileHeaders[i].trim().toLowerCase()] = i;
+    }
+
     for (let rowIdx = 0; rowIdx < fileRows.length; rowIdx++) {
       const row = fileRows[rowIdx];
       const record: Record<string, string> = {};
       for (const field of mappedFields) {
         const csvHeader = columnMapping[field.key];
-        const colIdx = fileHeaders.findIndex(h => h.trim().toLowerCase() === csvHeader.trim().toLowerCase());
+        // Try exact case-insensitive match first, then fuzzy normalized match
+        let colIdx = fileHeaders.findIndex(h => h.trim().toLowerCase() === csvHeader.trim().toLowerCase());
+        if (colIdx === -1) {
+          colIdx = headerIndexMap[normalize(csvHeader)] ?? -1;
+        }
         if (colIdx !== -1 && row[colIdx] != null) record[field.key] = String(row[colIdx]).trim();
       }
       const fullName = (record.FullName || '').trim();
-      if (!fullName) { failed++; setImportProgress(rowIdx + 1); continue; }
+      if (!fullName) { 
+        failed++; 
+        errorMessages.push(`Row ${rowIdx + 1}: FullName is empty — check column mapping`);
+        setImportProgress(rowIdx + 1); 
+        continue; 
+      }
       record.FullName = fullName;
 
       // Parse composite "Contacts" column
