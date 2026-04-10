@@ -30,6 +30,8 @@ const CRM_SCHEMA = {
   AssociateStatus: { label: "Associate Status", description: "Associate/distributor status", examples: ["Active", "Pending"] },
   AdditionalNotes: { label: "Notes", description: "Additional notes", examples: ["Very interested"] },
   GOStatus: { label: "GO Status", description: "APLGO GO-Status level", examples: ["Promoter", "Associate", "Builder", "Diamond"] },
+  Level: { label: "Level", description: "Network level number in the MLM tree", examples: ["1", "2", "6"] },
+  Leg: { label: "Leg", description: "Leg/branch number in the MLM binary tree", examples: ["1", "2"] },
 };
 
 serve(async (req) => {

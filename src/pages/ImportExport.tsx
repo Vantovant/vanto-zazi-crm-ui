@@ -219,13 +219,29 @@ export function ImportExport() {
           setAiSummary(data.summary || '');
           setAiUsed(true);
 
-          // Apply AI mappings to column mapping
+          // Apply AI mappings to column mapping (with fuzzy key matching)
           const mapping: Record<string, string> = {};
+          const crmKeyMap = Object.fromEntries(CRM_FIELDS.map(f => [f.key.toLowerCase(), f.key]));
           for (const m of data.mappings as AiMapping[]) {
             if (m.crmField && m.confidence >= 0.4) {
-              mapping[m.crmField] = m.spreadsheetColumn;
+              // Try exact match first, then case-insensitive
+              const exactKey = CRM_FIELDS.find(f => f.key === m.crmField)?.key;
+              const fuzzyKey = crmKeyMap[(m.crmField || '').toLowerCase()];
+              const resolvedKey = exactKey || fuzzyKey;
+              if (resolvedKey) {
+                mapping[resolvedKey] = m.spreadsheetColumn;
+              }
             }
           }
+
+          // Fill gaps with rule-based fallback for unmapped fields
+          for (const crmField of CRM_FIELDS) {
+            if (!mapping[crmField.key]) {
+              const matchIdx = headers.findIndex(h => autoMapHeader(h) === crmField.key);
+              if (matchIdx !== -1) mapping[crmField.key] = headers[matchIdx];
+            }
+          }
+
           setColumnMapping(mapping);
           setImportStep('mapping');
           return;
