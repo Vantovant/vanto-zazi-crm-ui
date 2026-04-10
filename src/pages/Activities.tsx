@@ -626,10 +626,10 @@ export function Activities() {
                             <button
                               type="button"
                               onClick={() => handleOpenSingleAppreciation(order, contact)}
-                              className="p-1.5 rounded text-emerald-400 hover:bg-emerald-500/20 transition-colors shrink-0"
-                              title="Send Activity Appreciation"
+                              className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors shrink-0"
+                              title="👑 Send Activity Appreciation"
                             >
-                              <Crown className="w-4 h-4" />
+                              <Crown className="w-5 h-5" />
                             </button>
                           )}
                         </div>
