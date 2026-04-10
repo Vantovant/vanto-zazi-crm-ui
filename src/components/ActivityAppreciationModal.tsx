@@ -157,25 +157,25 @@ export function ActivityAppreciationModal({
   return (
     <>
       <div className="fixed inset-0 bg-black/60 z-50" onClick={onClose} />
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
+        <div className="bg-slate-900 border border-slate-700 rounded-t-xl sm:rounded-xl shadow-2xl w-full max-w-2xl max-h-[95vh] sm:max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700 shrink-0">
-            <div className="flex items-center gap-3">
-              <img src={aplgoLogo} alt="APLGO" className="h-8 w-auto object-contain" />
-              <div className="h-8 w-px bg-slate-700" />
-              <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-emerald-500/20">
-                <Crown className="w-5 h-5 text-emerald-400" />
+          <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-700 shrink-0">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <img src={aplgoLogo} alt="APLGO" className="h-6 sm:h-8 w-auto object-contain shrink-0" />
+              <div className="h-6 sm:h-8 w-px bg-slate-700 shrink-0 hidden sm:block" />
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center bg-emerald-500/20 shrink-0">
+                <Crown className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" />
               </div>
-              <div>
-                <h2 className="text-lg font-semibold text-white">Activity Appreciation</h2>
-                <p className="text-xs text-slate-400">
+              <div className="min-w-0">
+                <h2 className="text-sm sm:text-lg font-semibold text-white truncate">Activity Appreciation</h2>
+                <p className="text-xs text-slate-400 truncate">
                   {isBulk ? `${currentIndex + 1} of ${entries.length} · ` : ''}
                   {entry.contact.FullName} · {entry.month}
                 </p>
               </div>
             </div>
-            <button type="button" onClick={onClose} className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors">
+            <button type="button" onClick={onClose} className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors shrink-0">
               <X className="w-5 h-5" />
             </button>
           </div>
