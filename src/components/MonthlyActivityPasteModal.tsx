@@ -46,7 +46,7 @@ export function MonthlyActivityPasteModal({ onClose, onComplete }: MonthlyActivi
 
     const parsed = parseMonthlyActivityReport(pastedText);
     if (parsed.length === 0) {
-      setError('No entries found. Make sure the format is:\nLevel 1\n1129930: 2520.00 R');
+      setError('No entries found. Make sure the format is:\nLevel 1\n1129930(6): 2,520.00 R, 934517: 2,385.00 R');
       return;
     }
 
@@ -171,7 +171,7 @@ export function MonthlyActivityPasteModal({ onClose, onComplete }: MonthlyActivi
                     <textarea
                       value={pastedText}
                       onChange={e => setPastedText(e.target.value)}
-                      placeholder={"Level 1\n1129930(6): 2520.00 R\n934517: 2385.00 R\n\nLevel 2\n879371(2): 1575.00 R"}
+                      placeholder={"Level 1\n1129930(6): 2,520.00 R, 934517: 2,385.00 R, 1230521: 1,968.00 R\n\nLevel 2\n879371(2): 1,575.00 R, 586154: 1,500.00 R"}
                       rows={12}
                       className="w-full px-4 py-3 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 placeholder:text-slate-500 font-mono resize-none"
                     />
@@ -185,7 +185,7 @@ export function MonthlyActivityPasteModal({ onClose, onComplete }: MonthlyActivi
                     )}
                   </div>
                   <p className="text-xs text-slate-500 mt-1.5">
-                    Format: Level headers followed by entries like <code className="text-slate-400">1129930(6): 2520.00 R</code>
+                    Format: Level headers followed by comma-separated entries like <code className="text-slate-400">1129930(6): 2,520.00 R, 934517: 2,385.00 R</code>
                   </p>
                 </div>
               </>
