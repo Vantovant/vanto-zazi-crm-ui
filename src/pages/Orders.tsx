@@ -12,6 +12,7 @@ import { DataStatusBanner } from '../components/DataStatusBanner';
 import { useCrm } from '@/contexts/CrmContext';
 import { AddOrderModal } from '@/components/AddOrderModal';
 import { SmartPasteOrdersModal } from '@/components/SmartPasteOrdersModal';
+import { MonthlyActivityPasteModal } from '@/components/MonthlyActivityPasteModal';
 
 const statusColors: Record<string, string> = {
   Pending: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
@@ -41,6 +42,7 @@ export function Orders() {
   const [dateRange, setDateRange] = useState({ from: '', to: '' });
   const [showAddOrder, setShowAddOrder] = useState(false);
   const [showSmartPaste, setShowSmartPaste] = useState(false);
+  const [showMonthlyPaste, setShowMonthlyPaste] = useState(false);
 
   const uniqueContacts = useMemo(() => {
     return [...new Set(orders.map(o => o.contactName))];
