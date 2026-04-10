@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import {
   Plus,
   Clock,
@@ -16,11 +16,15 @@ import {
   Settings,
   Target,
   DollarSign,
+  Crown,
+  Filter,
+  Users,
 } from 'lucide-react';
 import { LogActivityModal } from '../components/LogActivityModal';
 import { ActivityGoalsModal } from '../components/ActivityGoalsModal';
 import { ContactDrawer } from '../components/ContactDrawer';
 import { MessageTemplatePicker } from '../components/MessageTemplatePicker';
+import { ActivityAppreciationModal } from '../components/ActivityAppreciationModal';
 import { useCrm } from '@/contexts/CrmContext';
 import { useContactActivities } from '@/hooks/useContactActivities';
 import { useActivityGoals } from '@/hooks/useActivityGoals';
