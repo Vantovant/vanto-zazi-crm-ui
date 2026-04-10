@@ -178,6 +178,8 @@ export function useContacts() {
     if (updates.DateCaptured !== undefined) dbUpdates.date_captured = updates.DateCaptured;
     if (updates.GOStatus !== undefined) dbUpdates.go_status = updates.GOStatus;
     if ((updates as any).SalutationTitle !== undefined) dbUpdates.salutation_title = (updates as any).SalutationTitle;
+    if ((updates as any).Leg !== undefined) dbUpdates.leg = (updates as any).Leg;
+    if ((updates as any).Level !== undefined) dbUpdates.level = (updates as any).Level;
 
     const { error } = await supabase.from('contacts').update(dbUpdates).eq('id', id);
     if (error) {
