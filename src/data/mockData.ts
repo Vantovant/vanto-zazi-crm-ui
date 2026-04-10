@@ -93,6 +93,8 @@ export interface Prospect {
   AdditionalNotes: string;
   GOStatus: string;
   SalutationTitle?: string;
+  Leg: string;
+  Level: string;
 }
 
 export const prospects: Prospect[] = [
@@ -438,7 +440,9 @@ export const prospectColumns = [
   { key: 'InterestLevel', label: 'Interest', default: false },
   { key: 'FocusArea', label: 'Focus Area', default: true },
   { key: 'LeadPath', label: 'Lead Path', default: true },
-  { key: 'SponsorName', label: 'Sponsor', default: false },
+  { key: 'SponsorName', label: 'Sponsor', default: true },
+  { key: 'Leg', label: 'Leg', default: true },
+  { key: 'Level', label: 'Level', default: true },
   { key: 'AssignedTo', label: 'Assigned To', default: true },
   { key: 'ActionTaken', label: 'Action Taken', default: false },
   { key: 'NextAction', label: 'Next Action', default: true },
