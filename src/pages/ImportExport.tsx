@@ -389,7 +389,6 @@ export function ImportExport() {
       // Apply Smart Tags (compensate for missing columns)
       for (const [dbCol, tagVal] of Object.entries(smartTags)) {
         if (tagVal.trim()) {
-          // Smart tag fills blank OR overrides for structural fields
           const current = dbRow[dbCol] as string | undefined;
           if (!current || current.trim() === '' || ['sponsor_name', 'leg', 'level'].includes(dbCol)) {
             dbRow[dbCol] = tagVal.trim();
@@ -416,6 +415,23 @@ export function ImportExport() {
         }
       }
 
+      // Sanitize enum fields to prevent validation trigger rejection
+      const enumRules: Record<string, { allowed: string[]; fallback: string }> = {
+        lead_temperature: { allowed: ['Hot', 'Warm', 'Cold', ''], fallback: 'Warm' },
+        communication_status: { allowed: ['New', 'In Progress', 'Pending', 'Completed', 'Unsubscribed', 'Active', 'Contacted', ''], fallback: 'New' },
+        lead_type: { allowed: ['Prospect', 'Registered_Nopurchase', 'Purchase_Nostatus', 'Purchase_Status', 'Expired', 'Customer', 'Distributor', ''], fallback: 'Prospect' },
+        interest_level: { allowed: ['High', 'Medium', 'Low', ''], fallback: 'Medium' },
+        registration_status: { allowed: ['Not Registered', 'Registered', 'Activated', ''], fallback: 'Not Registered' },
+        lead_path: { allowed: ['Customer', 'Distributor', 'Not sure yet', 'Direct Registration', ''], fallback: 'Not sure yet' },
+        focus_area: { allowed: ['Health Transformation', 'Business Opportunity', 'Both', ''], fallback: 'Health Transformation' },
+      };
+      for (const [col, rule] of Object.entries(enumRules)) {
+        const val = (dbRow[col] as string | undefined);
+        if (val !== undefined && !rule.allowed.includes(val)) {
+          console.warn(`Sanitized ${col}: "${val}" → "${rule.fallback}" for row ${rowIdx}`);
+          dbRow[col] = rule.fallback;
+        }
+      }
       // UPSERT: Check for existing contact by normalized phone/email
       const normPhone = normalizePhone(dbRow.phone_number as string);
       const normEmail = normalizeEmail(dbRow.email_address as string);
