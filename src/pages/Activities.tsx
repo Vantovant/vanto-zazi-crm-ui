@@ -82,7 +82,23 @@ export function Activities() {
   const [activityPaidFilter, setActivityPaidFilter] = useState<'all' | 'not_appreciated' | 'appreciated'>('all');
   const [selectedActivityRows, setSelectedActivityRows] = useState<Set<string>>(new Set());
 
-  // Lead type sort order (mirrors lifecycle progression)
+  // Detect appreciated contacts from activity log
+  const appreciatedFromLog = useMemo(() => {
+    const ids = new Set<string>();
+    for (const a of activities) {
+      if (a.activity_type === 'whatsapp' && a.summary?.includes('activity appreciation')) {
+        if (a.contact_id) ids.add(a.contact_id);
+      }
+    }
+    return ids;
+  }, [activities]);
+
+  const allAppreciatedIds = useMemo(() => {
+    const combined = new Set(appreciatedFromLog);
+    appreciatedIds.forEach(id => combined.add(id));
+    return combined;
+  }, [appreciatedFromLog, appreciatedIds]);
+
   const LEAD_TYPE_ORDER = ['Prospect', 'Registered_Nopurchase', 'Purchase_Nostatus', 'Purchase_Status', 'Expired', 'Customer', 'Distributor'] as const;
   const LEAD_TYPE_LABELS: Record<string, string> = {
     Prospect: 'Prospects',
