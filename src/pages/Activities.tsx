@@ -714,6 +714,15 @@ export function Activities() {
           onClose={() => setTemplatePicker(null)}
         />
       )}
+
+      {appreciationEntries && appreciationEntries.length > 0 && (
+        <ActivityAppreciationModal
+          entries={appreciationEntries}
+          initialIndex={appreciationIndex}
+          onClose={() => { setAppreciationEntries(null); setSelectedActivityRows(new Set()); }}
+          onAppreciated={(contactId) => setAppreciatedIds(prev => new Set(prev).add(contactId))}
+        />
+      )}
     </div>
   );
 }
