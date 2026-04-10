@@ -344,6 +344,11 @@ export function ImportExport() {
         if (fieldToCol[k]) dbRow[fieldToCol[k]] = v;
       }
 
+      // Apply batch tagging values (override if provided)
+      if (batchSponsor.trim()) dbRow.sponsor_name = batchSponsor.trim();
+      if (batchLeg.trim()) dbRow.leg = batchLeg.trim();
+      if (batchLevel.trim()) dbRow.level = batchLevel.trim();
+
       const rawDate = (dbRow.date_captured as string) || '';
       const normalizedDate = normalizeDate(rawDate);
       dbRow.date_captured = normalizedDate || new Date().toISOString().split('T')[0];
