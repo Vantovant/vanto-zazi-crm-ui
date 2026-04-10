@@ -1029,6 +1029,21 @@ export function ImportExport() {
                       <p className="text-xs text-slate-400">Errors</p>
                     </div>
                   </div>
+                  {activeSmartTags.length > 0 && (
+                    <div className="mb-4 p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+                      <p className="text-xs font-medium text-purple-300 mb-1 flex items-center gap-1">
+                        <Sparkles className="w-3 h-3" />
+                        Smart Tags Applied:
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {activeSmartTags.map(([key, val]) => (
+                          <span key={key} className="px-2 py-0.5 text-[10px] font-medium rounded-full bg-purple-500/20 text-purple-300">
+                            {key.replace(/_/g, ' ')}: {val}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   {aiUsed && (
                     <p className="text-xs text-purple-400 mb-4 flex items-center justify-center gap-1">
                       <Sparkles className="w-3 h-3" />
