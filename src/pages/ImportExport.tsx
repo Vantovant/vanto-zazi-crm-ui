@@ -158,6 +158,7 @@ export function ImportExport() {
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
   const [importResult, setImportResult] = useState<{ success: number; failed: number; updated: number; skipped: number }>({ success: 0, failed: 0, updated: 0, skipped: 0 });
+  const [importErrors, setImportErrors] = useState<string[]>([]);
 
   // Smart Tagging (compensation for missing columns)
   const [smartTags, setSmartTags] = useState<Record<string, string>>({
@@ -299,6 +300,7 @@ export function ImportExport() {
     setHeaderError(null);
     setImporting(false);
     setImportResult({ success: 0, failed: 0, updated: 0, skipped: 0 });
+    setImportErrors([]);
     setImportProgress(0);
     setAiMappings([]);
     setAiSummary('');
@@ -312,9 +314,11 @@ export function ImportExport() {
     if (!user) return;
     setImporting(true);
     setImportProgress(0);
+    setImportErrors([]);
     let inserted = 0;
     let updated = 0;
     let failed = 0;
+    const errorMessages: string[] = [];
     const mappedFields = CRM_FIELDS.filter(f => columnMapping[f.key]);
 
     const fieldToCol: Record<string, string> = {
@@ -389,7 +393,6 @@ export function ImportExport() {
       // Apply Smart Tags (compensate for missing columns)
       for (const [dbCol, tagVal] of Object.entries(smartTags)) {
         if (tagVal.trim()) {
-          // Smart tag fills blank OR overrides for structural fields
           const current = dbRow[dbCol] as string | undefined;
           if (!current || current.trim() === '' || ['sponsor_name', 'leg', 'level'].includes(dbCol)) {
             dbRow[dbCol] = tagVal.trim();
@@ -416,6 +419,23 @@ export function ImportExport() {
         }
       }
 
+      // Sanitize enum fields to prevent validation trigger rejection
+      const enumRules: Record<string, { allowed: string[]; fallback: string }> = {
+        lead_temperature: { allowed: ['Hot', 'Warm', 'Cold', ''], fallback: 'Warm' },
+        communication_status: { allowed: ['New', 'In Progress', 'Pending', 'Completed', 'Unsubscribed', 'Active', 'Contacted', ''], fallback: 'New' },
+        lead_type: { allowed: ['Prospect', 'Registered_Nopurchase', 'Purchase_Nostatus', 'Purchase_Status', 'Expired', 'Customer', 'Distributor', ''], fallback: 'Prospect' },
+        interest_level: { allowed: ['High', 'Medium', 'Low', ''], fallback: 'Medium' },
+        registration_status: { allowed: ['Not Registered', 'Registered', 'Activated', ''], fallback: 'Not Registered' },
+        lead_path: { allowed: ['Customer', 'Distributor', 'Not sure yet', 'Direct Registration', ''], fallback: 'Not sure yet' },
+        focus_area: { allowed: ['Health Transformation', 'Business Opportunity', 'Both', ''], fallback: 'Health Transformation' },
+      };
+      for (const [col, rule] of Object.entries(enumRules)) {
+        const val = (dbRow[col] as string | undefined);
+        if (val !== undefined && !rule.allowed.includes(val)) {
+          console.warn(`Sanitized ${col}: "${val}" → "${rule.fallback}" for row ${rowIdx}`);
+          dbRow[col] = rule.fallback;
+        }
+      }
       // UPSERT: Check for existing contact by normalized phone/email
       const normPhone = normalizePhone(dbRow.phone_number as string);
       const normEmail = normalizeEmail(dbRow.email_address as string);
@@ -447,23 +467,28 @@ export function ImportExport() {
           delete merged.id;
           if (Object.keys(merged).length > 0) {
             const { error } = await supabase.from('contacts').update(merged).eq('id', existingId);
-            if (error) { console.error(`Import update error row ${rowIdx}:`, error.message, error.code, 'id:', existingId); failed++; }
+            if (error) { 
+              console.error(`Import update error row ${rowIdx}:`, error.message, error.code, 'id:', existingId);
+              errorMessages.push(`Row ${rowIdx + 1} (${fullName}): ${error.message}`);
+              failed++; 
+            }
             else { updated++; }
           } else {
             updated++; // No changes needed
           }
         } else {
           failed++;
+          errorMessages.push(`Row ${rowIdx + 1} (${fullName}): Could not fetch existing contact`);
         }
       } else {
         // INSERT new
         const { error } = await supabase.from('contacts').insert(dbRow as any);
         if (error) {
-          console.error(`Import insert error row ${rowIdx}:`, error.message, error.code, 'fullName:', fullName, 'date:', dbRow.date_captured);
+          console.error(`Import insert error row ${rowIdx}:`, error.message, error.code, 'fullName:', fullName, 'date:', dbRow.date_captured, 'dbRow:', JSON.stringify(dbRow));
           if (error.code === '23505') {
-            // Unique violation - try update instead
             updated++;
           } else {
+            errorMessages.push(`Row ${rowIdx + 1} (${fullName}): ${error.message}`);
             failed++;
           }
         } else {
@@ -472,11 +497,11 @@ export function ImportExport() {
       }
 
       setImportProgress(rowIdx + 1);
-      // Yield to UI every 10 rows
       if (rowIdx % 10 === 0) await new Promise(r => setTimeout(r, 10));
     }
 
     setImportResult({ success: inserted, failed, updated, skipped: 0 });
+    setImportErrors(errorMessages.slice(0, 10)); // Keep first 10 errors for display
     await refetchContacts();
     setImporting(false);
     setImportStep('complete');
@@ -1076,6 +1101,14 @@ export function ImportExport() {
                       <p className="text-xs text-slate-400">Errors</p>
                     </div>
                   </div>
+                  {importErrors.length > 0 && (
+                    <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/20 rounded-lg text-left max-h-40 overflow-y-auto">
+                      <p className="text-xs font-medium text-rose-300 mb-1">Error details:</p>
+                      {importErrors.map((e, i) => (
+                        <p key={i} className="text-[10px] text-rose-400/80 font-mono">{e}</p>
+                      ))}
+                    </div>
+                  )}
                   {activeSmartTags.length > 0 && (
                     <div className="mb-4 p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
                       <p className="text-xs font-medium text-purple-300 mb-1 flex items-center gap-1">
