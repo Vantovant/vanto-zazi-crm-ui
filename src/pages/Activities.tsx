@@ -256,7 +256,7 @@ export function Activities() {
       const entries: { contact: Prospect; order: typeof latestOrders[0]; month: string }[] = [];
       for (const order of filteredOrders) {
         const contact = contacts.find(c => String(c.id) === order.contactId);
-        const fallback: Prospect = contact || { id: order.id, FullName: order.contactName, PhoneNumber: '', LeadTemperature: '', LeadType: '', AssignedTo: '' } as Prospect;
+        const fallback = { id: order.id, FullName: order.contactName, PhoneNumber: '', LeadTemperature: '', LeadType: '', AssignedTo: '' } as unknown as Prospect;
         if (!selectedActivityRows.size || selectedActivityRows.has(String(order.id))) {
           entries.push({ contact: fallback, order, month: latestMonth });
         }
