@@ -356,10 +356,16 @@ export function ImportExport() {
         if (fieldToCol[k]) dbRow[fieldToCol[k]] = v;
       }
 
-      // Apply batch tagging values (override if provided)
-      if (batchSponsor.trim()) dbRow.sponsor_name = batchSponsor.trim();
-      if (batchLeg.trim()) dbRow.leg = batchLeg.trim();
-      if (batchLevel.trim()) dbRow.level = batchLevel.trim();
+      // Apply Smart Tags (compensate for missing columns)
+      for (const [dbCol, tagVal] of Object.entries(smartTags)) {
+        if (tagVal.trim()) {
+          // Smart tag fills blank OR overrides for structural fields
+          const current = dbRow[dbCol] as string | undefined;
+          if (!current || current.trim() === '' || ['sponsor_name', 'leg', 'level'].includes(dbCol)) {
+            dbRow[dbCol] = tagVal.trim();
+          }
+        }
+      }
 
       const rawDate = (dbRow.date_captured as string) || '';
       const normalizedDate = normalizeDate(rawDate);
