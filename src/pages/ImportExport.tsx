@@ -113,8 +113,10 @@ async function parseSpreadsheet(file: File): Promise<{ headers: string[]; rows: 
   const sheet = workbook.Sheets[sheetNames[0]];
   const json: string[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
   if (json.length === 0) return { headers: [], rows: [], sheetNames };
-  const headers = json[0].map(String);
-  const rows = json.slice(1).map(r => r.map(String));
+  // Clean non-breaking spaces (\u00a0) from all cell values
+  const cleanStr = (v: unknown) => String(v).replace(/\u00a0/g, ' ').trim();
+  const headers = json[0].map(cleanStr);
+  const rows = json.slice(1).map(r => r.map(cleanStr));
   return { headers, rows, sheetNames };
 }
 
