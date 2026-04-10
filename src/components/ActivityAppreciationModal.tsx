@@ -157,36 +157,36 @@ export function ActivityAppreciationModal({
   return (
     <>
       <div className="fixed inset-0 bg-black/60 z-50" onClick={onClose} />
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
+        <div className="bg-slate-900 border border-slate-700 rounded-t-xl sm:rounded-xl shadow-2xl w-full max-w-2xl max-h-[95vh] sm:max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700 shrink-0">
-            <div className="flex items-center gap-3">
-              <img src={aplgoLogo} alt="APLGO" className="h-8 w-auto object-contain" />
-              <div className="h-8 w-px bg-slate-700" />
-              <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-emerald-500/20">
-                <Crown className="w-5 h-5 text-emerald-400" />
+          <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-700 shrink-0">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <img src={aplgoLogo} alt="APLGO" className="h-6 sm:h-8 w-auto object-contain shrink-0" />
+              <div className="h-6 sm:h-8 w-px bg-slate-700 shrink-0 hidden sm:block" />
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center bg-emerald-500/20 shrink-0">
+                <Crown className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" />
               </div>
-              <div>
-                <h2 className="text-lg font-semibold text-white">Activity Appreciation</h2>
-                <p className="text-xs text-slate-400">
+              <div className="min-w-0">
+                <h2 className="text-sm sm:text-lg font-semibold text-white truncate">Activity Appreciation</h2>
+                <p className="text-xs text-slate-400 truncate">
                   {isBulk ? `${currentIndex + 1} of ${entries.length} · ` : ''}
                   {entry.contact.FullName} · {entry.month}
                 </p>
               </div>
             </div>
-            <button type="button" onClick={onClose} className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors">
+            <button type="button" onClick={onClose} className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors shrink-0">
               <X className="w-5 h-5" />
             </button>
           </div>
 
           {/* Contact Info Bar */}
-          <div className="px-6 py-3 bg-emerald-500/5 border-b border-slate-700/50">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-              <div><span className="text-slate-500">Name</span><p className="text-white font-medium mt-0.5">{entry.contact.FullName}</p></div>
+          <div className="px-4 sm:px-6 py-2.5 sm:py-3 bg-emerald-500/5 border-b border-slate-700/50">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 text-xs">
+              <div><span className="text-slate-500">Name</span><p className="text-white font-medium mt-0.5 truncate">{entry.contact.FullName}</p></div>
               <div><span className="text-slate-500">Amount</span><p className="text-emerald-400 font-bold mt-0.5">R{entry.order.amount.toLocaleString()}</p></div>
               <div><span className="text-slate-500">Month</span><p className="text-white font-medium mt-0.5">{entry.month}</p></div>
-              <div><span className="text-slate-500">User ID</span><p className="text-white font-medium mt-0.5 font-mono">{entry.contact.APLGoID || '—'}</p></div>
+              <div><span className="text-slate-500">User ID</span><p className="text-white font-medium mt-0.5 font-mono text-[11px] truncate">{entry.contact.APLGoID || '—'}</p></div>
               {entry.contact.Level && (
                 <div><span className="text-slate-500">Level</span><p className="text-white font-medium mt-0.5">{entry.contact.Level}</p></div>
               )}
@@ -197,19 +197,19 @@ export function ActivityAppreciationModal({
           </div>
 
           {logSuccess ? (
-            <div className="p-12 text-center">
-              <Check className="w-12 h-12 text-emerald-400 mx-auto mb-3" />
-              <p className="text-white font-medium">Appreciation sent & logged!</p>
+            <div className="p-8 sm:p-12 text-center">
+              <Check className="w-10 h-10 sm:w-12 sm:h-12 text-emerald-400 mx-auto mb-3" />
+              <p className="text-white font-medium text-sm sm:text-base">Appreciation sent & logged!</p>
               {isBulk && currentIndex < entries.length - 1 && (
                 <p className="text-xs text-slate-400 mt-2">Moving to next person...</p>
               )}
             </div>
           ) : (
-            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-3 sm:space-y-4">
               {/* Tone Selector */}
               <div>
                 <label className="block text-xs font-medium text-slate-400 mb-2">Message Tone</label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
                   {(Object.entries(TONE_CONFIG) as [AppreciationTone, typeof TONE_CONFIG['warm']][]).map(([key, cfg]) => {
                     const Icon = cfg.icon;
                     const isActive = tone === key;
@@ -218,13 +218,13 @@ export function ActivityAppreciationModal({
                         key={key}
                         type="button"
                         onClick={() => setTone(key)}
-                        className={`flex flex-col items-center gap-1 p-3 rounded-lg border text-xs font-medium transition-colors ${
+                        className={`flex flex-col items-center gap-0.5 sm:gap-1 p-2 sm:p-3 rounded-lg border text-[10px] sm:text-xs font-medium transition-colors ${
                           isActive
                             ? 'border-emerald-500/50 bg-emerald-500/10 text-white'
                             : 'border-slate-700 bg-slate-800/50 text-slate-400 hover:bg-slate-700/50'
                         }`}
                       >
-                        <Icon className={`w-4 h-4 ${isActive ? cfg.color : 'text-slate-500'}`} />
+                        <Icon className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${isActive ? cfg.color : 'text-slate-500'}`} />
                         {cfg.label}
                       </button>
                     );
@@ -238,27 +238,27 @@ export function ActivityAppreciationModal({
                 <textarea
                   value={editedMessage}
                   onChange={e => setEditedMessage(e.target.value)}
-                  rows={10}
-                  className="w-full px-3 py-2.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 resize-y"
+                  rows={6}
+                  className="w-full px-3 py-2.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 resize-y sm:rows-10"
                 />
               </div>
 
               {/* Action Buttons */}
-              <div className="flex flex-wrap gap-2 pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 sm:pt-2">
                 <button type="button" onClick={handleCopy}
-                  className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition-colors">
+                  className="flex items-center justify-center gap-1.5 px-4 py-2.5 text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition-colors">
                   {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-                  {copied ? 'Copied!' : 'Copy Message'}
+                  {copied ? 'Copied!' : 'Copy'}
                 </button>
                 <button type="button" onClick={handleOpenWhatsApp}
-                  className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors">
+                  className="flex items-center justify-center gap-1.5 px-4 py-2.5 text-sm font-medium bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors">
                   <ExternalLink className="w-4 h-4" />
-                  Open in WhatsApp
+                  WhatsApp
                 </button>
                 <button type="button" onClick={handleSendAndLog} disabled={logging}
-                  className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white rounded-lg transition-colors">
+                  className="flex items-center justify-center gap-1.5 px-4 py-2.5 text-sm font-medium bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white rounded-lg transition-colors">
                   {logging ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                  Send & Log Appreciation
+                  Send & Log
                 </button>
               </div>
             </div>
@@ -266,11 +266,11 @@ export function ActivityAppreciationModal({
 
           {/* Bulk Navigation Footer */}
           {isBulk && (
-            <div className="px-6 py-3 border-t border-slate-700 flex items-center justify-between shrink-0">
+            <div className="px-4 sm:px-6 py-2.5 sm:py-3 border-t border-slate-700 flex items-center justify-between shrink-0">
               <button type="button" disabled={currentIndex === 0}
                 onClick={() => setCurrentIndex(i => i - 1)}
-                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-slate-700 hover:bg-slate-600 disabled:opacity-30 text-slate-200 rounded-lg transition-colors">
-                <ChevronLeft className="w-3.5 h-3.5" /> Previous
+                className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 text-xs font-medium bg-slate-700 hover:bg-slate-600 disabled:opacity-30 text-slate-200 rounded-lg transition-colors">
+                <ChevronLeft className="w-3.5 h-3.5" /> Prev
               </button>
               <div className="flex items-center gap-2 text-xs text-slate-400">
                 <Users className="w-3.5 h-3.5" />
@@ -278,7 +278,7 @@ export function ActivityAppreciationModal({
               </div>
               <button type="button" disabled={currentIndex >= entries.length - 1}
                 onClick={() => setCurrentIndex(i => i + 1)}
-                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-slate-700 hover:bg-slate-600 disabled:opacity-30 text-slate-200 rounded-lg transition-colors">
+                className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 text-xs font-medium bg-slate-700 hover:bg-slate-600 disabled:opacity-30 text-slate-200 rounded-lg transition-colors">
                 Next <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
