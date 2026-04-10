@@ -423,7 +423,7 @@ export function ImportExport() {
       if (rowIdx % 10 === 0) await new Promise(r => setTimeout(r, 10));
     }
 
-    setImportResult({ success: inserted, failed, updated });
+    setImportResult({ success: inserted, failed, updated, skipped: 0 });
     await refetchContacts();
     setImporting(false);
     setImportStep('complete');
