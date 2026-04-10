@@ -75,6 +75,13 @@ export function Activities() {
   const [aiLoading, setAiLoading] = useState(false);
   const [goalsPeriod, setGoalsPeriod] = useState<'today' | 'week'>('today');
 
+  // Activity Appreciation state
+  const [appreciationEntries, setAppreciationEntries] = useState<{ contact: Prospect; order: any; month: string }[] | null>(null);
+  const [appreciationIndex, setAppreciationIndex] = useState(0);
+  const [appreciatedIds, setAppreciatedIds] = useState<Set<string>>(new Set());
+  const [activityPaidFilter, setActivityPaidFilter] = useState<'all' | 'not_appreciated' | 'appreciated'>('all');
+  const [selectedActivityRows, setSelectedActivityRows] = useState<Set<string>>(new Set());
+
   // Lead type sort order (mirrors lifecycle progression)
   const LEAD_TYPE_ORDER = ['Prospect', 'Registered_Nopurchase', 'Purchase_Nostatus', 'Purchase_Status', 'Expired', 'Customer', 'Distributor'] as const;
   const LEAD_TYPE_LABELS: Record<string, string> = {
