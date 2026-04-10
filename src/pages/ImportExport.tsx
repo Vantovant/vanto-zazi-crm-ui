@@ -156,8 +156,15 @@ export function ImportExport() {
   const [headerError, setHeaderError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
-  const [importResult, setImportResult] = useState<{ success: number; failed: number; updated?: number }>({ success: 0, failed: 0, updated: 0 });
+  const [importResult, setImportResult] = useState<{ success: number; failed: number; updated: number; skipped: number }>({ success: 0, failed: 0, updated: 0, skipped: 0 });
 
+  // Batch tagging
+  const [batchSponsor, setBatchSponsor] = useState('');
+  const [batchLeg, setBatchLeg] = useState('');
+  const [batchLevel, setBatchLevel] = useState('');
+
+  // Preview duplicate detection
+  const [previewDupeStatus, setPreviewDupeStatus] = useState<Record<number, 'create' | 'update'>>({});
   // AI mapping state
   const [aiMappings, setAiMappings] = useState<AiMapping[]>([]);
   const [aiSummary, setAiSummary] = useState('');
