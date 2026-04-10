@@ -15,6 +15,7 @@ import {
   Mail,
   Settings,
   Target,
+  DollarSign,
 } from 'lucide-react';
 import { LogActivityModal } from '../components/LogActivityModal';
 import { ActivityGoalsModal } from '../components/ActivityGoalsModal';
