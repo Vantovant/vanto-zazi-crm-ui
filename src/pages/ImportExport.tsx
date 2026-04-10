@@ -300,6 +300,7 @@ export function ImportExport() {
     setHeaderError(null);
     setImporting(false);
     setImportResult({ success: 0, failed: 0, updated: 0, skipped: 0 });
+    setImportErrors([]);
     setImportProgress(0);
     setAiMappings([]);
     setAiSummary('');
