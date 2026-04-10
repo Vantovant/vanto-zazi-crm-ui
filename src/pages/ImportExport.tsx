@@ -313,9 +313,11 @@ export function ImportExport() {
     if (!user) return;
     setImporting(true);
     setImportProgress(0);
+    setImportErrors([]);
     let inserted = 0;
     let updated = 0;
     let failed = 0;
+    const errorMessages: string[] = [];
     const mappedFields = CRM_FIELDS.filter(f => columnMapping[f.key]);
 
     const fieldToCol: Record<string, string> = {
