@@ -1,0 +1,2 @@
+ALTER TABLE public.contacts ADD COLUMN IF NOT EXISTS leg text NOT NULL DEFAULT '';
+ALTER TABLE public.contacts ADD COLUMN IF NOT EXISTS level text NOT NULL DEFAULT '';

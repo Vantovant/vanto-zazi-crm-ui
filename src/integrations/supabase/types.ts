@@ -193,6 +193,8 @@ export type Database = {
           lead_path: string
           lead_temperature: string
           lead_type: string
+          leg: string
+          level: string
           meeting_time: string
           next_action: string
           phone_normalized: string | null
@@ -226,6 +228,8 @@ export type Database = {
           lead_path?: string
           lead_temperature?: string
           lead_type?: string
+          leg?: string
+          level?: string
           meeting_time?: string
           next_action?: string
           phone_normalized?: string | null
@@ -259,6 +263,8 @@ export type Database = {
           lead_path?: string
           lead_temperature?: string
           lead_type?: string
+          leg?: string
+          level?: string
           meeting_time?: string
           next_action?: string
           phone_normalized?: string | null
