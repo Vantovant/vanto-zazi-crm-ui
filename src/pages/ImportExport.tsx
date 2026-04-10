@@ -785,7 +785,34 @@ export function ImportExport() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setImportStep('preview')}
+                      onClick={async () => {
+                        setImportStep('preview');
+                        // Run preview duplicate detection for first 10 rows
+                        const mappedFields = CRM_FIELDS.filter(f => columnMapping[f.key]);
+                        const dupeStatus: Record<number, 'create' | 'update'> = {};
+                        for (let idx = 0; idx < Math.min(fileRows.length, 10); idx++) {
+                          const row = fileRows[idx];
+                          const record: Record<string, string> = {};
+                          for (const field of mappedFields) {
+                            const csvHeader = columnMapping[field.key];
+                            const colIdx = fileHeaders.findIndex(h => h.trim().toLowerCase() === csvHeader.trim().toLowerCase());
+                            if (colIdx !== -1 && row[colIdx] != null) record[field.key] = String(row[colIdx]).trim();
+                          }
+                          const phone = normalizePhone(record.PhoneNumber);
+                          const email = normalizeEmail(record.EmailAddress);
+                          let found = false;
+                          if (phone) {
+                            const { data } = await supabase.from('contacts').select('id').eq('phone_normalized', phone).limit(1);
+                            if (data && data.length > 0) found = true;
+                          }
+                          if (!found && email) {
+                            const { data } = await supabase.from('contacts').select('id').eq('email_normalized', email).limit(1);
+                            if (data && data.length > 0) found = true;
+                          }
+                          dupeStatus[idx] = found ? 'update' : 'create';
+                        }
+                        setPreviewDupeStatus(dupeStatus);
+                      }}
                       disabled={!columnMapping['FullName']}
                       className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg transition-colors ${
                         columnMapping['FullName']
