@@ -920,6 +920,21 @@ export function ImportExport() {
 
                     return (
                       <>
+                        {activeSmartTags.length > 0 && (
+                          <div className="flex items-start gap-2 p-3 mb-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+                            <Sparkles className="w-4 h-4 text-purple-400 flex-shrink-0 mt-0.5" />
+                            <div>
+                              <p className="text-xs font-medium text-purple-300">Smart Tags will be applied to all rows:</p>
+                              <div className="flex flex-wrap gap-1.5 mt-1">
+                                {activeSmartTags.map(([key, val]) => (
+                                  <span key={key} className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-purple-500/20 text-purple-300">
+                                    {key.replace(/_/g, ' ')}: {val}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        )}
                         {checkedCount > 0 && (
                           <div className="flex items-center gap-4 mb-3 text-xs">
                             <span className="text-emerald-400 font-medium">{createCount} will create</span>
