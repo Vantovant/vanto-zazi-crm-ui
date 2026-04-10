@@ -124,6 +124,8 @@ export const prospects: Prospect[] = [
     AssociateStatus: 'Pending',
     AdditionalNotes: 'Very interested in business opportunity',
     GOStatus: '',
+    Leg: '',
+    Level: '',
   },
   {
     id: 2,
@@ -151,6 +153,8 @@ export const prospects: Prospect[] = [
     AssociateStatus: '',
     AdditionalNotes: 'Referred by existing customer',
     GOStatus: '',
+    Leg: '',
+    Level: '',
   },
   {
     id: 3,
@@ -178,6 +182,8 @@ export const prospects: Prospect[] = [
     AssociateStatus: 'Active',
     AdditionalNotes: 'Fast starter, very motivated',
     GOStatus: '',
+    Leg: '',
+    Level: '',
   },
   {
     id: 4,
@@ -205,6 +211,8 @@ export const prospects: Prospect[] = [
     AssociateStatus: '',
     AdditionalNotes: 'Busy schedule, try again later',
     GOStatus: '',
+    Leg: '',
+    Level: '',
   },
   {
     id: 5,
@@ -232,6 +240,8 @@ export const prospects: Prospect[] = [
     AssociateStatus: 'Customer',
     AdditionalNotes: 'Interested in weight management products',
     GOStatus: '',
+    Leg: '',
+    Level: '',
   },
   {
     id: 6,
@@ -259,6 +269,8 @@ export const prospects: Prospect[] = [
     AssociateStatus: 'Pending',
     AdditionalNotes: 'Ready to sign, needs sponsor approval',
     GOStatus: '',
+    Leg: '',
+    Level: '',
   },
   {
     id: 7,
@@ -286,6 +298,8 @@ export const prospects: Prospect[] = [
     AssociateStatus: '',
     AdditionalNotes: 'Facebook lead, needs qualification',
     GOStatus: '',
+    Leg: '',
+    Level: '',
   },
   {
     id: 8,
@@ -313,6 +327,8 @@ export const prospects: Prospect[] = [
     AssociateStatus: 'Customer',
     AdditionalNotes: 'Happy with initial products',
     GOStatus: '',
+    Leg: '',
+    Level: '',
   },
   {
     id: 9,
@@ -340,6 +356,8 @@ export const prospects: Prospect[] = [
     AssociateStatus: 'Pending Activation',
     AdditionalNotes: 'Experienced in network marketing',
     GOStatus: '',
+    Leg: '',
+    Level: '',
   },
   {
     id: 10,
@@ -367,6 +385,8 @@ export const prospects: Prospect[] = [
     AssociateStatus: '',
     AdditionalNotes: 'Reviewing materials',
     GOStatus: '',
+    Leg: '',
+    Level: '',
   },
   {
     id: 11,
@@ -394,6 +414,8 @@ export const prospects: Prospect[] = [
     AssociateStatus: 'Active',
     AdditionalNotes: 'Building team actively',
     GOStatus: '',
+    Leg: '',
+    Level: '',
   },
   {
     id: 12,
@@ -421,6 +443,8 @@ export const prospects: Prospect[] = [
     AssociateStatus: '',
     AdditionalNotes: 'Unresponsive to calls',
     GOStatus: '',
+    Leg: '',
+    Level: '',
   },
 ];
 
