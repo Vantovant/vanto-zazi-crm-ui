@@ -258,7 +258,7 @@ export function Activities() {
         const contact = contacts.find(c => String(c.id) === order.contactId);
         const fallback = { id: order.id, FullName: order.contactName, PhoneNumber: '', LeadTemperature: '', LeadType: '', AssignedTo: '' } as unknown as Prospect;
         if (!selectedActivityRows.size || selectedActivityRows.has(String(order.id))) {
-          entries.push({ contact: fallback, order, month: latestMonth });
+          entries.push({ contact: contact || fallback, order, month: latestMonth });
         }
       }
       if (entries.length > 0) {
