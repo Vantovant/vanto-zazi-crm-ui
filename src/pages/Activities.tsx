@@ -222,6 +222,188 @@ export function Activities() {
     setAiLoading(false);
   };
 
+  // --- Activity Paid Section (reusable for mobile + desktop) ---
+  const renderActivityPaidSection = () => {
+    const activityOrders = orders.filter(o => o.source === 'monthly-activity-paste');
+    const monthGroups = new Map<string, typeof activityOrders>();
+    for (const o of activityOrders) {
+      const month = o.product.replace('Monthly Activity - ', '') || 'Unknown';
+      const arr = monthGroups.get(month) || [];
+      arr.push(o);
+      monthGroups.set(month, arr);
+    }
+    const latestMonth = Array.from(monthGroups.keys()).pop() || '';
+    const latestOrders = monthGroups.get(latestMonth) || [];
+
+    const filteredOrders = latestOrders.filter(order => {
+      const cId = order.contactId;
+      if (!cId) return activityPaidFilter === 'all';
+      const isAppreciated = allAppreciatedIds.has(cId);
+      if (activityPaidFilter === 'appreciated') return isAppreciated;
+      if (activityPaidFilter === 'not_appreciated') return !isAppreciated;
+      return true;
+    });
+
+    const appreciatedCount = latestOrders.filter(o => o.contactId && allAppreciatedIds.has(o.contactId)).length;
+    const notAppreciatedCount = latestOrders.length - appreciatedCount;
+
+    const handleOpenSingleAppreciation = (order: typeof latestOrders[0], contactOrFallback: Prospect) => {
+      setAppreciationEntries([{ contact: contactOrFallback, order, month: latestMonth }]);
+      setAppreciationIndex(0);
+    };
+
+    const handleBulkAppreciation = () => {
+      const entries: { contact: Prospect; order: typeof latestOrders[0]; month: string }[] = [];
+      for (const order of filteredOrders) {
+        const contact = contacts.find(c => String(c.id) === order.contactId);
+        const fallback = { id: order.id, FullName: order.contactName, PhoneNumber: '', LeadTemperature: '', LeadType: '', AssignedTo: '' } as unknown as Prospect;
+        if (!selectedActivityRows.size || selectedActivityRows.has(String(order.id))) {
+          entries.push({ contact: contact || fallback, order, month: latestMonth });
+        }
+      }
+      if (entries.length > 0) {
+        setAppreciationEntries(entries);
+        setAppreciationIndex(0);
+      }
+    };
+
+    const toggleSelect = (id: string) => {
+      setSelectedActivityRows(prev => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+    };
+
+    const toggleSelectAll = () => {
+      if (selectedActivityRows.size === filteredOrders.length) {
+        setSelectedActivityRows(new Set());
+      } else {
+        setSelectedActivityRows(new Set(filteredOrders.map(o => String(o.id))));
+      }
+    };
+
+    return (
+      <div className="bg-slate-800/50 border border-emerald-500/20 rounded-xl overflow-hidden">
+        <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-slate-700">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <Crown className="w-4 h-4 text-emerald-400" />
+              <h3 className="font-semibold text-white text-sm sm:text-base">
+                {latestMonth ? `Activity Paid — ${latestMonth}` : 'Activity Paid'}
+              </h3>
+              <span className="text-xs text-emerald-400 font-medium">{latestOrders.length}</span>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex bg-slate-900 rounded-lg p-0.5 text-[10px]">
+                <button type="button" onClick={() => { setActivityPaidFilter('all'); setSelectedActivityRows(new Set()); }}
+                  className={`px-2 py-1 rounded-md font-medium transition-colors ${activityPaidFilter === 'all' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}>
+                  All ({latestOrders.length})
+                </button>
+                <button type="button" onClick={() => { setActivityPaidFilter('not_appreciated'); setSelectedActivityRows(new Set()); }}
+                  className={`px-2 py-1 rounded-md font-medium transition-colors ${activityPaidFilter === 'not_appreciated' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white'}`}>
+                  Not Yet ({notAppreciatedCount})
+                </button>
+                <button type="button" onClick={() => { setActivityPaidFilter('appreciated'); setSelectedActivityRows(new Set()); }}
+                  className={`px-2 py-1 rounded-md font-medium transition-colors ${activityPaidFilter === 'appreciated' ? 'bg-teal-600 text-white' : 'text-slate-400 hover:text-white'}`}>
+                  Done ({appreciatedCount})
+                </button>
+              </div>
+              {filteredOrders.length > 0 && (
+                <button type="button" onClick={handleBulkAppreciation}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors">
+                  <Users className="w-3 h-3" />
+                  {selectedActivityRows.size > 0
+                    ? `Appreciate ${selectedActivityRows.size} Selected`
+                    : `Appreciate All ${filteredOrders.length}`}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+        {latestOrders.length === 0 ? (
+          <div className="p-6 sm:p-8 text-center">
+            <DollarSign className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+            <p className="text-sm text-slate-400 mb-1">No activity purchases imported yet.</p>
+            <p className="text-xs text-slate-500">Go to <span className="text-emerald-400 font-medium">Orders → Monthly Activity</span> to paste a report.</p>
+          </div>
+        ) : filteredOrders.length === 0 ? (
+          <div className="p-6 sm:p-8 text-center">
+            <CheckCircle className="w-10 h-10 text-emerald-500 mx-auto mb-3" />
+            <p className="text-sm text-slate-400">
+              {activityPaidFilter === 'appreciated' ? 'No appreciated contacts yet.' : 'All contacts have been appreciated! 🎉'}
+            </p>
+          </div>
+        ) : (
+          <div className="max-h-[28rem] overflow-y-auto">
+            <div className="px-3 sm:px-5 py-2 bg-slate-700/30 border-b border-slate-700/50 flex items-center gap-2 sm:gap-3 text-xs sticky top-0 z-10">
+              <input type="checkbox" checked={selectedActivityRows.size === filteredOrders.length && filteredOrders.length > 0}
+                onChange={toggleSelectAll}
+                className="rounded border-slate-600 bg-slate-800 text-emerald-500 focus:ring-emerald-500/40 w-3.5 h-3.5" />
+              <span className="text-slate-400">Select all</span>
+              <span className="ml-auto text-slate-500 hidden sm:inline">Name</span>
+              <span className="w-20 text-right text-slate-500 hidden sm:inline">Amount</span>
+              <span className="w-16 text-center text-slate-500 hidden sm:inline">Status</span>
+              <span className="w-8 hidden sm:inline" />
+            </div>
+            <div className="divide-y divide-slate-700/50">
+              {filteredOrders.map((order) => {
+                const contact = contacts.find(c => String(c.id) === order.contactId);
+                const isAppreciated = order.contactId ? allAppreciatedIds.has(order.contactId) : false;
+                // Build fallback contact for appreciation when no linked contact
+                const fallbackContact = (contact || {
+                  id: order.id,
+                  FullName: order.contactName,
+                  PhoneNumber: '',
+                  LeadTemperature: '',
+                  LeadType: '',
+                  AssignedTo: '',
+                } as unknown) as Prospect;
+
+                return (
+                  <div key={order.id} className="px-3 sm:px-5 py-3 hover:bg-slate-700/30 transition-colors">
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      <input type="checkbox" checked={selectedActivityRows.has(String(order.id))}
+                        onChange={() => toggleSelect(String(order.id))}
+                        className="rounded border-slate-600 bg-slate-800 text-emerald-500 focus:ring-emerald-500/40 w-3.5 h-3.5 shrink-0" />
+                      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => order.contactId && setDrawerContactId(order.contactId)}>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium text-white truncate">{order.contactName}</p>
+                          {contact?.APLGoID && <span className="text-[10px] text-slate-500 font-mono hidden sm:inline">{contact.APLGoID}</span>}
+                        </div>
+                        <div className="flex items-center gap-3 mt-0.5 text-[10px] text-slate-500">
+                          {contact?.Level && <span>Level: {contact.Level}</span>}
+                          {contact?.Leg && <span>Leg: {contact.Leg}</span>}
+                        </div>
+                      </div>
+                      <span className="text-sm font-semibold text-emerald-400 shrink-0">R{order.amount.toLocaleString()}</span>
+                      <span className={`hidden sm:inline shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        isAppreciated ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
+                      }`}>
+                        {isAppreciated ? '✓ Done' : 'Pending'}
+                      </span>
+                      {/* Crown button — ALWAYS visible */}
+                      <button
+                        type="button"
+                        onClick={() => handleOpenSingleAppreciation(order, fallbackContact)}
+                        className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors shrink-0"
+                        title="👑 Send Activity Appreciation"
+                      >
+                        <Crown className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -297,6 +479,11 @@ export function Activities() {
           )}
         </div>
       )}
+
+      {/* Activity Paid This Month — MOBILE: show before grid for visibility */}
+      <div className="block lg:hidden">
+        {renderActivityPaidSection()}
+      </div>
 
       {/* Mobile: Activity Goals First | Desktop: 3-column grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -466,182 +653,10 @@ export function Activities() {
         </div>
       </div>
 
-      {/* Activity Paid This Month — Dedicated Appreciation Engine */}
-      {(() => {
-        const activityOrders = orders.filter(o => o.source === 'monthly-activity-paste');
-        const monthGroups = new Map<string, typeof activityOrders>();
-        for (const o of activityOrders) {
-          const month = o.product.replace('Monthly Activity - ', '') || 'Unknown';
-          const arr = monthGroups.get(month) || [];
-          arr.push(o);
-          monthGroups.set(month, arr);
-        }
-        const latestMonth = Array.from(monthGroups.keys()).pop() || '';
-        const latestOrders = monthGroups.get(latestMonth) || [];
-
-        // Filter by appreciation status
-        const filteredOrders = latestOrders.filter(order => {
-          const cId = order.contactId;
-          if (!cId) return activityPaidFilter === 'all';
-          const isAppreciated = allAppreciatedIds.has(cId);
-          if (activityPaidFilter === 'appreciated') return isAppreciated;
-          if (activityPaidFilter === 'not_appreciated') return !isAppreciated;
-          return true;
-        });
-
-        const appreciatedCount = latestOrders.filter(o => o.contactId && allAppreciatedIds.has(o.contactId)).length;
-        const notAppreciatedCount = latestOrders.length - appreciatedCount;
-
-        const handleOpenSingleAppreciation = (order: typeof latestOrders[0], contact: Prospect) => {
-          setAppreciationEntries([{ contact, order, month: latestMonth }]);
-          setAppreciationIndex(0);
-        };
-
-        const handleBulkAppreciation = () => {
-          const entries: { contact: Prospect; order: typeof latestOrders[0]; month: string }[] = [];
-          for (const order of filteredOrders) {
-            const contact = contacts.find(c => String(c.id) === order.contactId);
-            if (contact && (!selectedActivityRows.size || selectedActivityRows.has(String(order.id)))) {
-              entries.push({ contact, order, month: latestMonth });
-            }
-          }
-          if (entries.length > 0) {
-            setAppreciationEntries(entries);
-            setAppreciationIndex(0);
-          }
-        };
-
-        const toggleSelect = (id: string) => {
-          setSelectedActivityRows(prev => {
-            const next = new Set(prev);
-            if (next.has(id)) next.delete(id);
-            else next.add(id);
-            return next;
-          });
-        };
-
-        const toggleSelectAll = () => {
-          if (selectedActivityRows.size === filteredOrders.length) {
-            setSelectedActivityRows(new Set());
-          } else {
-            setSelectedActivityRows(new Set(filteredOrders.map(o => String(o.id))));
-          }
-        };
-
-        return (
-          <div className="bg-slate-800/50 border border-emerald-500/20 rounded-xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-700">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <div className="flex items-center gap-2">
-                  <Crown className="w-4 h-4 text-emerald-400" />
-                  <h3 className="font-semibold text-white">
-                    {latestMonth ? `Activity Paid — ${latestMonth}` : 'Activity Paid'}
-                  </h3>
-                  <span className="text-xs text-emerald-400 font-medium">{latestOrders.length}</span>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  {/* Filter */}
-                  <div className="flex bg-slate-900 rounded-lg p-0.5 text-[10px]">
-                    <button type="button" onClick={() => { setActivityPaidFilter('all'); setSelectedActivityRows(new Set()); }}
-                      className={`px-2 py-1 rounded-md font-medium transition-colors ${activityPaidFilter === 'all' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}>
-                      All ({latestOrders.length})
-                    </button>
-                    <button type="button" onClick={() => { setActivityPaidFilter('not_appreciated'); setSelectedActivityRows(new Set()); }}
-                      className={`px-2 py-1 rounded-md font-medium transition-colors ${activityPaidFilter === 'not_appreciated' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white'}`}>
-                      Not Yet ({notAppreciatedCount})
-                    </button>
-                    <button type="button" onClick={() => { setActivityPaidFilter('appreciated'); setSelectedActivityRows(new Set()); }}
-                      className={`px-2 py-1 rounded-md font-medium transition-colors ${activityPaidFilter === 'appreciated' ? 'bg-teal-600 text-white' : 'text-slate-400 hover:text-white'}`}>
-                      Done ({appreciatedCount})
-                    </button>
-                  </div>
-                  {/* Bulk */}
-                  {filteredOrders.length > 0 && (
-                    <button type="button" onClick={handleBulkAppreciation}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors">
-                      <Users className="w-3 h-3" />
-                      {selectedActivityRows.size > 0
-                        ? `Appreciate ${selectedActivityRows.size} Selected`
-                        : `Appreciate All ${filteredOrders.length}`}
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-            {latestOrders.length === 0 ? (
-              <div className="p-8 text-center">
-                <DollarSign className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-                <p className="text-sm text-slate-400 mb-1">No activity purchases imported yet.</p>
-                <p className="text-xs text-slate-500">Go to <span className="text-emerald-400 font-medium">Orders → Monthly Activity</span> to paste a report.</p>
-              </div>
-            ) : filteredOrders.length === 0 ? (
-              <div className="p-8 text-center">
-                <CheckCircle className="w-10 h-10 text-emerald-500 mx-auto mb-3" />
-                <p className="text-sm text-slate-400">
-                  {activityPaidFilter === 'appreciated' ? 'No appreciated contacts yet.' : 'All contacts have been appreciated! 🎉'}
-                </p>
-              </div>
-            ) : (
-              <div className="max-h-[28rem] overflow-y-auto">
-                {/* Select All Row */}
-                <div className="px-5 py-2 bg-slate-700/30 border-b border-slate-700/50 flex items-center gap-3 text-xs sticky top-0 z-10">
-                  <input type="checkbox" checked={selectedActivityRows.size === filteredOrders.length && filteredOrders.length > 0}
-                    onChange={toggleSelectAll}
-                    className="rounded border-slate-600 bg-slate-800 text-emerald-500 focus:ring-emerald-500/40 w-3.5 h-3.5" />
-                  <span className="text-slate-400">Select all</span>
-                  <span className="ml-auto text-slate-500">Name</span>
-                  <span className="w-20 text-right text-slate-500">Amount</span>
-                  <span className="w-16 text-center text-slate-500">Status</span>
-                  <span className="w-8" />
-                </div>
-                <div className="divide-y divide-slate-700/50">
-                  {filteredOrders.map((order) => {
-                    const contact = contacts.find(c => String(c.id) === order.contactId);
-                    const isAppreciated = order.contactId ? allAppreciatedIds.has(order.contactId) : false;
-                    return (
-                      <div key={order.id} className="px-5 py-3 hover:bg-slate-700/30 transition-colors">
-                        <div className="flex items-center gap-3">
-                          <input type="checkbox" checked={selectedActivityRows.has(String(order.id))}
-                            onChange={() => toggleSelect(String(order.id))}
-                            className="rounded border-slate-600 bg-slate-800 text-emerald-500 focus:ring-emerald-500/40 w-3.5 h-3.5 shrink-0" />
-                          <div className="flex-1 min-w-0 cursor-pointer" onClick={() => order.contactId && setDrawerContactId(order.contactId)}>
-                            <div className="flex items-center gap-2">
-                              <p className="text-sm font-medium text-white truncate">{order.contactName}</p>
-                              {contact?.APLGoID && <span className="text-[10px] text-slate-500 font-mono">{contact.APLGoID}</span>}
-                            </div>
-                            <div className="flex items-center gap-3 mt-0.5 text-[10px] text-slate-500">
-                              {contact?.Level && <span>Level: {contact.Level}</span>}
-                              {contact?.Leg && <span>Leg: {contact.Leg}</span>}
-                            </div>
-                          </div>
-                          <span className="text-sm font-semibold text-emerald-400 w-20 text-right shrink-0">R{order.amount.toLocaleString()}</span>
-                          <span className={`w-16 text-center shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                            isAppreciated
-                              ? 'bg-emerald-500/20 text-emerald-400'
-                              : 'bg-amber-500/20 text-amber-400'
-                          }`}>
-                            {isAppreciated ? '✓ Done' : 'Pending'}
-                          </span>
-                          {contact && (
-                            <button
-                              type="button"
-                              onClick={() => handleOpenSingleAppreciation(order, contact)}
-                              className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors shrink-0"
-                              title="👑 Send Activity Appreciation"
-                            >
-                              <Crown className="w-5 h-5" />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      })()}
+      {/* Activity Paid — Desktop only (mobile shown above) */}
+      <div className="hidden lg:block">
+        {renderActivityPaidSection()}
+      </div>
 
       <div className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden">
         <div className="px-5 py-4 border-b border-slate-700">
