@@ -352,14 +352,14 @@ export function Activities() {
                 const contact = contacts.find(c => String(c.id) === order.contactId);
                 const isAppreciated = order.contactId ? allAppreciatedIds.has(order.contactId) : false;
                 // Build fallback contact for appreciation when no linked contact
-                const fallbackContact: Prospect = contact || {
+                const fallbackContact = (contact || {
                   id: order.id,
                   FullName: order.contactName,
                   PhoneNumber: '',
                   LeadTemperature: '',
                   LeadType: '',
                   AssignedTo: '',
-                } as Prospect;
+                } as unknown) as Prospect;
 
                 return (
                   <div key={order.id} className="px-3 sm:px-5 py-3 hover:bg-slate-700/30 transition-colors">
