@@ -287,9 +287,7 @@ export function ImportExport() {
     setAiSummary('');
     setAiUsed(false);
     setAiError(null);
-    setBatchSponsor('');
-    setBatchLeg('');
-    setBatchLevel('');
+    setSmartTags({ sponsor_name: '', leg: '', level: '', country: '', province: '', lead_type: '', lead_temperature: '' });
     setPreviewDupeStatus({});
   };
 
