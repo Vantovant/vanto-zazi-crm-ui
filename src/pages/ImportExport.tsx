@@ -158,10 +158,18 @@ export function ImportExport() {
   const [importProgress, setImportProgress] = useState(0);
   const [importResult, setImportResult] = useState<{ success: number; failed: number; updated: number; skipped: number }>({ success: 0, failed: 0, updated: 0, skipped: 0 });
 
-  // Batch tagging
-  const [batchSponsor, setBatchSponsor] = useState('');
-  const [batchLeg, setBatchLeg] = useState('');
-  const [batchLevel, setBatchLevel] = useState('');
+  // Smart Tagging (compensation for missing columns)
+  const [smartTags, setSmartTags] = useState<Record<string, string>>({
+    sponsor_name: '',
+    leg: '',
+    level: '',
+    country: '',
+    province: '',
+    lead_type: '',
+    lead_temperature: '',
+  });
+  const updateSmartTag = (key: string, value: string) => setSmartTags(prev => ({ ...prev, [key]: value }));
+  const activeSmartTags = Object.entries(smartTags).filter(([, v]) => v.trim() !== '');
 
   // Preview duplicate detection
   const [previewDupeStatus, setPreviewDupeStatus] = useState<Record<number, 'create' | 'update'>>({});
