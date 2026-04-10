@@ -466,23 +466,28 @@ export function ImportExport() {
           delete merged.id;
           if (Object.keys(merged).length > 0) {
             const { error } = await supabase.from('contacts').update(merged).eq('id', existingId);
-            if (error) { console.error(`Import update error row ${rowIdx}:`, error.message, error.code, 'id:', existingId); failed++; }
+            if (error) { 
+              console.error(`Import update error row ${rowIdx}:`, error.message, error.code, 'id:', existingId);
+              errorMessages.push(`Row ${rowIdx + 1} (${fullName}): ${error.message}`);
+              failed++; 
+            }
             else { updated++; }
           } else {
             updated++; // No changes needed
           }
         } else {
           failed++;
+          errorMessages.push(`Row ${rowIdx + 1} (${fullName}): Could not fetch existing contact`);
         }
       } else {
         // INSERT new
         const { error } = await supabase.from('contacts').insert(dbRow as any);
         if (error) {
-          console.error(`Import insert error row ${rowIdx}:`, error.message, error.code, 'fullName:', fullName, 'date:', dbRow.date_captured);
+          console.error(`Import insert error row ${rowIdx}:`, error.message, error.code, 'fullName:', fullName, 'date:', dbRow.date_captured, 'dbRow:', JSON.stringify(dbRow));
           if (error.code === '23505') {
-            // Unique violation - try update instead
             updated++;
           } else {
+            errorMessages.push(`Row ${rowIdx + 1} (${fullName}): ${error.message}`);
             failed++;
           }
         } else {
@@ -491,11 +496,11 @@ export function ImportExport() {
       }
 
       setImportProgress(rowIdx + 1);
-      // Yield to UI every 10 rows
       if (rowIdx % 10 === 0) await new Promise(r => setTimeout(r, 10));
     }
 
     setImportResult({ success: inserted, failed, updated, skipped: 0 });
+    setImportErrors(errorMessages.slice(0, 10)); // Keep first 10 errors for display
     await refetchContacts();
     setImporting(false);
     setImportStep('complete');
