@@ -34,7 +34,7 @@ const CRM_FIELDS = prospectColumns.map(col => ({ key: col.key, label: col.label 
 
 // Normalize a string for fuzzy matching
 function normalize(s: string): string {
-  return s.toLowerCase().replace(/[\s_\-\.]/g, '');
+  return s.toLowerCase().replace(/[\s_\-\.\'\"]/g, '');
 }
 
 // Fallback auto-map (used if AI is unavailable)
@@ -47,9 +47,10 @@ function autoMapHeader(header: string): string {
     name: 'FullName', fullname: 'FullName', nameandsurname: 'FullName', namesurname: 'FullName', surname: 'FullName', firstname: 'FullName', lastname: 'FullName',
     phone: 'PhoneNumber', phonenumber: 'PhoneNumber', mobile: 'PhoneNumber', cell: 'PhoneNumber', tel: 'PhoneNumber', telephone: 'PhoneNumber', cellphone: 'PhoneNumber', contactnumber: 'PhoneNumber',
     email: 'EmailAddress', emailaddress: 'EmailAddress', emailid: 'EmailAddress',
-    date: 'DateCaptured', datecaptured: 'DateCaptured', enrollmentdate: 'DateCaptured', dateofenrollment: 'DateCaptured', dateenrolled: 'DateCaptured', dateofactivation: 'DateCaptured', activationdate: 'DateCaptured',
+    date: 'DateCaptured', datecaptured: 'DateCaptured', enrollmentdate: 'DateCaptured', dateofenrollment: 'DateCaptured', dateenrolled: 'DateCaptured', dateofactivation: 'DateCaptured', activationdate: 'DateCaptured', dateofbirth: 'AdditionalNotes',
     dateofmakinginactive: 'AdditionalNotes', datemakinginactive: 'AdditionalNotes',
     highestachievedrankqualification: 'AdditionalNotes', highestrankqualification: 'AdditionalNotes', highestrank: 'AdditionalNotes',
+    activesmartshippv: 'AdditionalNotes', binaryandsummaryinformation: 'AdditionalNotes',
     level: 'Level', leg: 'Leg',
     contacts: 'PhoneNumber',
     temperature: 'LeadTemperature', leadtemperature: 'LeadTemperature', leadtemp: 'LeadTemperature', temp: 'LeadTemperature',
