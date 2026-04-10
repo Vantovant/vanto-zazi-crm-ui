@@ -181,12 +181,12 @@ export function ActivityAppreciationModal({
           </div>
 
           {/* Contact Info Bar */}
-          <div className="px-6 py-3 bg-emerald-500/5 border-b border-slate-700/50">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-              <div><span className="text-slate-500">Name</span><p className="text-white font-medium mt-0.5">{entry.contact.FullName}</p></div>
+          <div className="px-4 sm:px-6 py-2.5 sm:py-3 bg-emerald-500/5 border-b border-slate-700/50">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 text-xs">
+              <div><span className="text-slate-500">Name</span><p className="text-white font-medium mt-0.5 truncate">{entry.contact.FullName}</p></div>
               <div><span className="text-slate-500">Amount</span><p className="text-emerald-400 font-bold mt-0.5">R{entry.order.amount.toLocaleString()}</p></div>
               <div><span className="text-slate-500">Month</span><p className="text-white font-medium mt-0.5">{entry.month}</p></div>
-              <div><span className="text-slate-500">User ID</span><p className="text-white font-medium mt-0.5 font-mono">{entry.contact.APLGoID || '—'}</p></div>
+              <div><span className="text-slate-500">User ID</span><p className="text-white font-medium mt-0.5 font-mono text-[11px] truncate">{entry.contact.APLGoID || '—'}</p></div>
               {entry.contact.Level && (
                 <div><span className="text-slate-500">Level</span><p className="text-white font-medium mt-0.5">{entry.contact.Level}</p></div>
               )}
