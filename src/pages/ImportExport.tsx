@@ -156,8 +156,15 @@ export function ImportExport() {
   const [headerError, setHeaderError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
-  const [importResult, setImportResult] = useState<{ success: number; failed: number; updated?: number }>({ success: 0, failed: 0, updated: 0 });
+  const [importResult, setImportResult] = useState<{ success: number; failed: number; updated: number; skipped: number }>({ success: 0, failed: 0, updated: 0, skipped: 0 });
 
+  // Batch tagging
+  const [batchSponsor, setBatchSponsor] = useState('');
+  const [batchLeg, setBatchLeg] = useState('');
+  const [batchLevel, setBatchLevel] = useState('');
+
+  // Preview duplicate detection
+  const [previewDupeStatus, setPreviewDupeStatus] = useState<Record<number, 'create' | 'update'>>({});
   // AI mapping state
   const [aiMappings, setAiMappings] = useState<AiMapping[]>([]);
   const [aiSummary, setAiSummary] = useState('');
@@ -266,12 +273,16 @@ export function ImportExport() {
     setColumnMapping({});
     setHeaderError(null);
     setImporting(false);
-    setImportResult({ success: 0, failed: 0, updated: 0 });
+    setImportResult({ success: 0, failed: 0, updated: 0, skipped: 0 });
     setImportProgress(0);
     setAiMappings([]);
     setAiSummary('');
     setAiUsed(false);
     setAiError(null);
+    setBatchSponsor('');
+    setBatchLeg('');
+    setBatchLevel('');
+    setPreviewDupeStatus({});
   };
 
   const runImport = async () => {
@@ -336,6 +347,11 @@ export function ImportExport() {
       for (const [k, v] of Object.entries(record)) {
         if (fieldToCol[k]) dbRow[fieldToCol[k]] = v;
       }
+
+      // Apply batch tagging values (override if provided)
+      if (batchSponsor.trim()) dbRow.sponsor_name = batchSponsor.trim();
+      if (batchLeg.trim()) dbRow.leg = batchLeg.trim();
+      if (batchLevel.trim()) dbRow.level = batchLevel.trim();
 
       const rawDate = (dbRow.date_captured as string) || '';
       const normalizedDate = normalizeDate(rawDate);
@@ -416,7 +432,7 @@ export function ImportExport() {
       if (rowIdx % 10 === 0) await new Promise(r => setTimeout(r, 10));
     }
 
-    setImportResult({ success: inserted, failed, updated });
+    setImportResult({ success: inserted, failed, updated, skipped: 0 });
     await refetchContacts();
     setImporting(false);
     setImportStep('complete');
@@ -769,7 +785,34 @@ export function ImportExport() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setImportStep('preview')}
+                      onClick={async () => {
+                        setImportStep('preview');
+                        // Run preview duplicate detection for first 10 rows
+                        const mappedFields = CRM_FIELDS.filter(f => columnMapping[f.key]);
+                        const dupeStatus: Record<number, 'create' | 'update'> = {};
+                        for (let idx = 0; idx < Math.min(fileRows.length, 10); idx++) {
+                          const row = fileRows[idx];
+                          const record: Record<string, string> = {};
+                          for (const field of mappedFields) {
+                            const csvHeader = columnMapping[field.key];
+                            const colIdx = fileHeaders.findIndex(h => h.trim().toLowerCase() === csvHeader.trim().toLowerCase());
+                            if (colIdx !== -1 && row[colIdx] != null) record[field.key] = String(row[colIdx]).trim();
+                          }
+                          const phone = normalizePhone(record.PhoneNumber);
+                          const email = normalizeEmail(record.EmailAddress);
+                          let found = false;
+                          if (phone) {
+                            const { data } = await supabase.from('contacts').select('id').eq('phone_normalized', phone).limit(1);
+                            if (data && data.length > 0) found = true;
+                          }
+                          if (!found && email) {
+                            const { data } = await supabase.from('contacts').select('id').eq('email_normalized', email).limit(1);
+                            if (data && data.length > 0) found = true;
+                          }
+                          dupeStatus[idx] = found ? 'update' : 'create';
+                        }
+                        setPreviewDupeStatus(dupeStatus);
+                      }}
                       disabled={!columnMapping['FullName']}
                       className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg transition-colors ${
                         columnMapping['FullName']
@@ -792,7 +835,48 @@ export function ImportExport() {
                       <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0" />
                       <div>
                         <p className="text-sm font-medium text-amber-400">Preview Mode</p>
-                        <p className="text-xs text-amber-400/70">Review your data before importing. This action cannot be undone.</p>
+                        <p className="text-xs text-amber-400/70">Review your data before importing. Existing contacts matched by phone or email will be updated, not duplicated.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Batch Tagging UI */}
+                  <div className="mb-6 p-4 bg-slate-700/30 rounded-lg border border-slate-700">
+                    <h4 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                      <Users className="w-4 h-4 text-teal-400" />
+                      Batch Tagging — Apply to All Rows
+                    </h4>
+                    <p className="text-xs text-slate-400 mb-3">These values will be applied to every contact in this import batch. Leave blank to skip.</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1">Sponsor Name</label>
+                        <input
+                          type="text"
+                          value={batchSponsor}
+                          onChange={(e) => setBatchSponsor(e.target.value)}
+                          placeholder="e.g. John Smith"
+                          className="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-700 rounded-lg text-slate-300 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1">Leg</label>
+                        <input
+                          type="text"
+                          value={batchLeg}
+                          onChange={(e) => setBatchLeg(e.target.value)}
+                          placeholder="e.g. Left, Right, Leg 1"
+                          className="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-700 rounded-lg text-slate-300 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1">Level</label>
+                        <input
+                          type="text"
+                          value={batchLevel}
+                          onChange={(e) => setBatchLevel(e.target.value)}
+                          placeholder="e.g. Level 1, Gold"
+                          className="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-700 rounded-lg text-slate-300 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500"
+                        />
                       </div>
                     </div>
                   </div>
@@ -819,37 +903,58 @@ export function ImportExport() {
                     }
 
                     const displayFields = mappedFields.slice(0, 5);
+                    const createCount = Object.values(previewDupeStatus).filter(s => s === 'create').length;
+                    const updateCount = Object.values(previewDupeStatus).filter(s => s === 'update').length;
+                    const checkedCount = Object.keys(previewDupeStatus).length;
 
                     return (
-                      <div className="bg-slate-900 rounded-lg border border-slate-700 overflow-hidden mb-6">
-                        <div className="overflow-x-auto">
-                          <table className="w-full">
-                            <thead>
-                              <tr className="bg-slate-800">
-                                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-400">#</th>
-                                {displayFields.map(f => (
-                                  <th key={f.key} className="text-left px-4 py-3 text-xs font-semibold text-slate-400">{f.label}</th>
-                                ))}
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-700">
-                              {previewRows.slice(0, 10).map((record, idx) => (
-                                <tr key={idx}>
-                                  <td className="px-4 py-3 text-xs text-slate-500">{idx + 1}</td>
-                                  {displayFields.map(f => (
-                                    <td key={f.key} className="px-4 py-3 text-sm text-slate-300">{record[f.key] || '—'}</td>
-                                  ))}
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                        {previewRows.length > 10 && (
-                          <div className="px-4 py-2 bg-slate-800/50 text-xs text-slate-500 text-center">
-                            Showing 10 of {previewRows.length} rows
+                      <>
+                        {checkedCount > 0 && (
+                          <div className="flex items-center gap-4 mb-3 text-xs">
+                            <span className="text-emerald-400 font-medium">{createCount} will create</span>
+                            <span className="text-amber-400 font-medium">{updateCount} will update</span>
                           </div>
                         )}
-                      </div>
+                        <div className="bg-slate-900 rounded-lg border border-slate-700 overflow-hidden mb-6">
+                          <div className="overflow-x-auto">
+                            <table className="w-full">
+                              <thead>
+                                <tr className="bg-slate-800">
+                                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-400">#</th>
+                                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-400">Status</th>
+                                  {displayFields.map(f => (
+                                    <th key={f.key} className="text-left px-4 py-3 text-xs font-semibold text-slate-400">{f.label}</th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-700">
+                                {previewRows.slice(0, 10).map((record, idx) => (
+                                  <tr key={idx}>
+                                    <td className="px-4 py-3 text-xs text-slate-500">{idx + 1}</td>
+                                    <td className="px-4 py-3">
+                                      {previewDupeStatus[idx] === 'update' ? (
+                                        <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-amber-500/20 text-amber-400">UPDATE</span>
+                                      ) : previewDupeStatus[idx] === 'create' ? (
+                                        <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-emerald-500/20 text-emerald-400">CREATE</span>
+                                      ) : (
+                                        <span className="px-1.5 py-0.5 text-[10px] rounded bg-slate-700 text-slate-500">—</span>
+                                      )}
+                                    </td>
+                                    {displayFields.map(f => (
+                                      <td key={f.key} className="px-4 py-3 text-sm text-slate-300">{record[f.key] || '—'}</td>
+                                    ))}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                          {previewRows.length > 10 && (
+                            <div className="px-4 py-2 bg-slate-800/50 text-xs text-slate-500 text-center">
+                              Showing 10 of {previewRows.length} rows
+                            </div>
+                          )}
+                        </div>
+                      </>
                     );
                   })()}
 
@@ -898,20 +1003,20 @@ export function ImportExport() {
                   <div className="flex justify-center gap-6 mb-4">
                     <div className="text-center">
                       <p className="text-2xl font-bold text-emerald-400">{importResult.success}</p>
-                      <p className="text-xs text-slate-400">Inserted</p>
+                      <p className="text-xs text-slate-400">Created</p>
                     </div>
-                    {(importResult.updated ?? 0) > 0 && (
-                      <div className="text-center">
-                        <p className="text-2xl font-bold text-amber-400">{importResult.updated}</p>
-                        <p className="text-xs text-slate-400">Updated</p>
-                      </div>
-                    )}
-                    {importResult.failed > 0 && (
-                      <div className="text-center">
-                        <p className="text-2xl font-bold text-rose-400">{importResult.failed}</p>
-                        <p className="text-xs text-slate-400">Failed</p>
-                      </div>
-                    )}
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-amber-400">{importResult.updated}</p>
+                      <p className="text-xs text-slate-400">Updated</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-slate-400">{importResult.skipped}</p>
+                      <p className="text-xs text-slate-400">Skipped</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-rose-400">{importResult.failed}</p>
+                      <p className="text-xs text-slate-400">Errors</p>
+                    </div>
                   </div>
                   {aiUsed && (
                     <p className="text-xs text-purple-400 mb-4 flex items-center justify-center gap-1">
