@@ -266,11 +266,11 @@ export function ActivityAppreciationModal({
 
           {/* Bulk Navigation Footer */}
           {isBulk && (
-            <div className="px-6 py-3 border-t border-slate-700 flex items-center justify-between shrink-0">
+            <div className="px-4 sm:px-6 py-2.5 sm:py-3 border-t border-slate-700 flex items-center justify-between shrink-0">
               <button type="button" disabled={currentIndex === 0}
                 onClick={() => setCurrentIndex(i => i - 1)}
-                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-slate-700 hover:bg-slate-600 disabled:opacity-30 text-slate-200 rounded-lg transition-colors">
-                <ChevronLeft className="w-3.5 h-3.5" /> Previous
+                className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 text-xs font-medium bg-slate-700 hover:bg-slate-600 disabled:opacity-30 text-slate-200 rounded-lg transition-colors">
+                <ChevronLeft className="w-3.5 h-3.5" /> Prev
               </button>
               <div className="flex items-center gap-2 text-xs text-slate-400">
                 <Users className="w-3.5 h-3.5" />
@@ -278,7 +278,7 @@ export function ActivityAppreciationModal({
               </div>
               <button type="button" disabled={currentIndex >= entries.length - 1}
                 onClick={() => setCurrentIndex(i => i + 1)}
-                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-slate-700 hover:bg-slate-600 disabled:opacity-30 text-slate-200 rounded-lg transition-colors">
+                className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 text-xs font-medium bg-slate-700 hover:bg-slate-600 disabled:opacity-30 text-slate-200 rounded-lg transition-colors">
                 Next <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
