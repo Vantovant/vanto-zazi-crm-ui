@@ -171,6 +171,50 @@ export type Database = {
           },
         ]
       }
+      contact_waiting_room: {
+        Row: {
+          contact_id: string
+          created_at: string
+          id: string
+          issue_note: string
+          issue_type: string
+          priority: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          contact_id: string
+          created_at?: string
+          id?: string
+          issue_note?: string
+          issue_type?: string
+          priority?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          contact_id?: string
+          created_at?: string
+          id?: string
+          issue_note?: string
+          issue_type?: string
+          priority?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_waiting_room_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contacts: {
         Row: {
           action_taken: string
