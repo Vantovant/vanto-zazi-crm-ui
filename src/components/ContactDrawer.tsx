@@ -261,6 +261,36 @@ export function ContactDrawer({ prospect: initialProspect, onClose, onOpenTempla
               )}
             </div>
 
+            {/* Waiting Room Status / Action */}
+            <div className="px-4 pb-3">
+              {waitingRoomEntry ? (
+                <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-1.5">
+                      <AlertCircle className="w-3.5 h-3.5 text-amber-400" />
+                      <span className="text-xs font-semibold text-amber-300">In Waiting Room</span>
+                    </div>
+                    <button type="button" onClick={() => removeEntry(waitingRoomEntry.id)}
+                      className="text-[10px] text-rose-400 hover:text-rose-300 font-medium">Remove</button>
+                  </div>
+                  <p className="text-[11px] text-slate-400">{ISSUE_TYPE_LABELS[waitingRoomEntry.issue_type] || waitingRoomEntry.issue_type}</p>
+                  {waitingRoomEntry.issue_note && <p className="text-[10px] text-slate-500 mt-0.5">{waitingRoomEntry.issue_note}</p>}
+                  <div className="flex gap-2 mt-2">
+                    <button type="button" onClick={() => updateEntry(waitingRoomEntry.id, { status: 'resolved' })}
+                      className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium bg-emerald-600 hover:bg-emerald-500 text-white rounded transition-colors">
+                      <CheckCircle className="w-3 h-3" /> Mark Resolved
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button type="button" onClick={() => setShowWaitingRoomModal(true)}
+                  className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-amber-500/5 border border-amber-500/20 hover:bg-amber-500/15 text-amber-400 transition-colors text-xs font-medium">
+                  <AlertCircle className="w-3.5 h-3.5" />
+                  Send to Waiting Room
+                </button>
+              )}
+            </div>
+
             {/* Contact Information */}
             <div className="p-4 space-y-4">
               <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Contact Info</h4>
