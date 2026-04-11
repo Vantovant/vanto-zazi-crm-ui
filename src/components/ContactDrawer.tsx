@@ -553,6 +553,28 @@ export function ContactDrawer({ prospect: initialProspect, onClose, onOpenTempla
           onSaved={() => {}}
         />
       )}
+
+      {showWaitingRoomModal && (
+        <AddToWaitingRoomModal
+          contactName={prospect.FullName}
+          onClose={() => setShowWaitingRoomModal(false)}
+          onSubmit={async (data) => {
+            const ok = await addToWaitingRoom({
+              contact_id: String(prospect.id),
+              ...data,
+            });
+            if (ok) {
+              await logActivity({
+                contact_id: String(prospect.id),
+                activity_type: 'note',
+                summary: `Added to waiting room: ${ISSUE_TYPE_LABELS[data.issue_type] || data.issue_type}`,
+                notes: data.issue_note,
+              });
+            }
+            setShowWaitingRoomModal(false);
+          }}
+        />
+      )}
     </>
   );
 }
