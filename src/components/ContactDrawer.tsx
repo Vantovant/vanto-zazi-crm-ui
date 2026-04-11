@@ -23,9 +23,11 @@ import {
 } from 'lucide-react';
 import type { Prospect } from '../data/mockData';
 import { EditContactModal } from './EditContactModal';
+import { AddToWaitingRoomModal } from './AddToWaitingRoomModal';
 import { useCrm } from '@/contexts/CrmContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useContactActivities } from '@/hooks/useContactActivities';
+import { useWaitingRoom, ISSUE_TYPE_LABELS } from '@/hooks/useWaitingRoom';
 import { buildWhatsAppUrl } from '@/utils/whatsappPhone';
 
 interface ContactDrawerProps {
