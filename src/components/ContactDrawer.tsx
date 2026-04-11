@@ -59,7 +59,9 @@ const regStatusColors: Record<string, string> = {
 export function ContactDrawer({ prospect: initialProspect, onClose, onOpenTemplatePicker }: ContactDrawerProps) {
   const { contacts, updateContact } = useCrm();
   const { logActivity, getContactActivities } = useContactActivities();
+  const { getEntryForContact, addToWaitingRoom, updateEntry, removeEntry } = useWaitingRoom();
   const [showEdit, setShowEdit] = useState(false);
+  const [showWaitingRoomModal, setShowWaitingRoomModal] = useState(false);
   const [notesValue, setNotesValue] = useState('');
   const [notesSaving, setNotesSaving] = useState(false);
   const [suggestedMsg, setSuggestedMsg] = useState('');
@@ -68,6 +70,7 @@ export function ContactDrawer({ prospect: initialProspect, onClose, onOpenTempla
 
   // Always use latest contact data from context
   const prospect = contacts.find(c => String(c.id) === String(initialProspect.id)) || initialProspect;
+  const waitingRoomEntry = getEntryForContact(String(prospect.id));
 
   const initials = prospect.FullName.split(' ').map(n => n[0]).join('');
   const contactActivities = getContactActivities(String(prospect.id));
