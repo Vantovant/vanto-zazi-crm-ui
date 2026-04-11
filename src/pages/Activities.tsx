@@ -74,9 +74,11 @@ export function Activities() {
   
   const { activities, loading, getNeglectedContacts, getActivitiesToday, getActivitiesThisWeek } = useContactActivities();
   const { goals } = useActivityGoals();
+  const { openEntries: waitingRoomOpen, resolvedEntries: waitingRoomResolved, highPriorityEntries: waitingRoomHigh, updateEntry, removeEntry, loading: wrLoading } = useWaitingRoom();
   const [aiInsight, setAiInsight] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [goalsPeriod, setGoalsPeriod] = useState<'today' | 'week'>('today');
+  const [wrFilter, setWrFilter] = useState<'all' | 'high' | 'resolved'>('all');
 
   // Activity Appreciation state
   const [appreciationEntries, setAppreciationEntries] = useState<{ contact: Prospect; order: any; month: string }[] | null>(null);
