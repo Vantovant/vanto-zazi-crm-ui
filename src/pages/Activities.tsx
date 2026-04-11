@@ -19,6 +19,8 @@ import {
   Crown,
   Filter,
   Users,
+  AlertCircle,
+  Trash2,
 } from 'lucide-react';
 import { LogActivityModal } from '../components/LogActivityModal';
 import { ActivityGoalsModal } from '../components/ActivityGoalsModal';
@@ -28,6 +30,7 @@ import { ActivityAppreciationModal } from '../components/ActivityAppreciationMod
 import { useCrm } from '@/contexts/CrmContext';
 import { useContactActivities } from '@/hooks/useContactActivities';
 import { useActivityGoals } from '@/hooks/useActivityGoals';
+import { useWaitingRoom, ISSUE_TYPE_LABELS } from '@/hooks/useWaitingRoom';
 import { supabase } from '@/integrations/supabase/client';
 import ReactMarkdown from 'react-markdown';
 import type { Prospect } from '@/data/mockData';
@@ -71,9 +74,11 @@ export function Activities() {
   
   const { activities, loading, getNeglectedContacts, getActivitiesToday, getActivitiesThisWeek } = useContactActivities();
   const { goals } = useActivityGoals();
+  const { openEntries: waitingRoomOpen, resolvedEntries: waitingRoomResolved, highPriorityEntries: waitingRoomHigh, updateEntry, removeEntry, loading: wrLoading } = useWaitingRoom();
   const [aiInsight, setAiInsight] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [goalsPeriod, setGoalsPeriod] = useState<'today' | 'week'>('today');
+  const [wrFilter, setWrFilter] = useState<'all' | 'high' | 'resolved'>('all');
 
   // Activity Appreciation state
   const [appreciationEntries, setAppreciationEntries] = useState<{ contact: Prospect; order: any; month: string }[] | null>(null);
@@ -484,6 +489,102 @@ export function Activities() {
       <div className="block lg:hidden">
         {renderActivityPaidSection()}
       </div>
+
+      {/* ── Waiting Room / To-Do List ── */}
+      {(() => {
+        const wrItems = wrFilter === 'resolved' ? waitingRoomResolved
+          : wrFilter === 'high' ? waitingRoomHigh
+          : waitingRoomOpen;
+        const priorityColors: Record<string, string> = {
+          high: 'bg-rose-500/20 text-rose-400',
+          medium: 'bg-amber-500/20 text-amber-400',
+          low: 'bg-slate-600/30 text-slate-400',
+        };
+        return (
+          <div className="bg-slate-800/50 border border-amber-500/20 rounded-xl overflow-hidden">
+            <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-slate-700">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-amber-400" />
+                  <h3 className="font-semibold text-white text-sm sm:text-base">To-Do Waiting Room</h3>
+                  {waitingRoomOpen.length > 0 && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400">
+                      {waitingRoomOpen.length}
+                    </span>
+                  )}
+                </div>
+                <div className="flex bg-slate-900 rounded-lg p-0.5 text-[10px]">
+                  <button type="button" onClick={() => setWrFilter('all')}
+                    className={`px-2 py-1 rounded-md font-medium transition-colors ${wrFilter === 'all' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white'}`}>
+                    Open ({waitingRoomOpen.length})
+                  </button>
+                  <button type="button" onClick={() => setWrFilter('high')}
+                    className={`px-2 py-1 rounded-md font-medium transition-colors ${wrFilter === 'high' ? 'bg-rose-600 text-white' : 'text-slate-400 hover:text-white'}`}>
+                    High ({waitingRoomHigh.length})
+                  </button>
+                  <button type="button" onClick={() => setWrFilter('resolved')}
+                    className={`px-2 py-1 rounded-md font-medium transition-colors ${wrFilter === 'resolved' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}>
+                    Resolved ({waitingRoomResolved.length})
+                  </button>
+                </div>
+              </div>
+            </div>
+            {wrLoading ? (
+              <div className="p-6 text-center"><Loader2 className="w-6 h-6 text-slate-500 mx-auto animate-spin" /></div>
+            ) : wrItems.length === 0 ? (
+              <div className="p-6 sm:p-8 text-center">
+                <CheckCircle className="w-10 h-10 text-emerald-500 mx-auto mb-3" />
+                <p className="text-sm text-slate-400">
+                  {wrFilter === 'resolved' ? 'No resolved items yet.' : 'No contacts in the waiting room. 🎉'}
+                </p>
+              </div>
+            ) : (
+              <div className="max-h-[24rem] overflow-y-auto divide-y divide-slate-700/50">
+                {wrItems.map(entry => {
+                  const contact = contacts.find(c => String(c.id) === entry.contact_id);
+                  return (
+                    <div key={entry.id} className="px-3 sm:px-5 py-3 hover:bg-slate-700/30 transition-colors">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setDrawerContactId(entry.contact_id)}>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-sm font-medium text-white truncate">{contact?.FullName || 'Unknown'}</p>
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${priorityColors[entry.priority] || priorityColors.medium}`}>
+                              {entry.priority}
+                            </span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700 text-slate-300">
+                              {ISSUE_TYPE_LABELS[entry.issue_type] || entry.issue_type}
+                            </span>
+                          </div>
+                          {entry.issue_note && (
+                            <p className="text-xs text-slate-500 mt-0.5 truncate">{entry.issue_note}</p>
+                          )}
+                          <div className="flex items-center gap-3 mt-0.5 text-[10px] text-slate-600">
+                            {contact?.PhoneNumber && <span>📞 {contact.PhoneNumber}</span>}
+                            {contact?.EmailAddress && <span>✉️ {contact.EmailAddress}</span>}
+                            <span>{new Date(entry.created_at).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                        {entry.status !== 'resolved' && (
+                          <button type="button" onClick={() => updateEntry(entry.id, { status: 'resolved' })}
+                            className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors shrink-0"
+                            title="Mark Resolved">
+                            <CheckCircle className="w-4 h-4" />
+                          </button>
+                        )}
+                        <button type="button" onClick={() => removeEntry(entry.id)}
+                          className="p-1.5 rounded-lg bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 transition-colors shrink-0"
+                          title="Remove">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Mobile: Activity Goals First | Desktop: 3-column grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
