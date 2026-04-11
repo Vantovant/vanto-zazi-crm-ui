@@ -19,6 +19,8 @@ import {
   Crown,
   Filter,
   Users,
+  AlertCircle,
+  Trash2,
 } from 'lucide-react';
 import { LogActivityModal } from '../components/LogActivityModal';
 import { ActivityGoalsModal } from '../components/ActivityGoalsModal';
@@ -28,6 +30,7 @@ import { ActivityAppreciationModal } from '../components/ActivityAppreciationMod
 import { useCrm } from '@/contexts/CrmContext';
 import { useContactActivities } from '@/hooks/useContactActivities';
 import { useActivityGoals } from '@/hooks/useActivityGoals';
+import { useWaitingRoom, ISSUE_TYPE_LABELS } from '@/hooks/useWaitingRoom';
 import { supabase } from '@/integrations/supabase/client';
 import ReactMarkdown from 'react-markdown';
 import type { Prospect } from '@/data/mockData';
