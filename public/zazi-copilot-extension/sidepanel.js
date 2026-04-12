@@ -12,7 +12,7 @@ const lastKnownByChannel = {
   gmail: null,
 };
 const MAX_CONTEXT_AGE_MS = 120000;
-const REFRESH_GRACE_MS = 30000; // Reduced from 45s
+const REFRESH_GRACE_MS = 3000; // Aggressive — no 30-second ghosts
 const CONTEXT_STORAGE_KEYS = [
   'current_channel',
   'current_context',
@@ -146,6 +146,13 @@ function showDefaultEmptyState() {
   $('timelineSection').classList.add('hidden');
 }
 
+function showLoadingState() {
+  $('noContext').classList.remove('hidden');
+  $('groupChatNotice').classList.add('hidden');
+  $('activeContext').classList.add('hidden');
+  $('timelineSection').classList.add('hidden');
+}
+
 async function pollContext() {
   // GUARD: If user is editing, skip ALL rendering updates
   if (isEditing) return;
@@ -162,7 +169,15 @@ async function pollContext() {
   }
 
   if (isExplicitClear(ctx)) {
-    // STRICT CHANNEL ISOLATION: Only fall back to same-channel context
+    // INSTANT CLEAR for chat_switched — NEVER fall back to old state
+    if (ctx.clearReason === 'chat_switched') {
+      currentContext = null;
+      lastKnownByChannel.whatsapp = null;
+      showLoadingState();
+      return;
+    }
+
+    // For other clear reasons, try short fallback
     const fallback = currentChannel ? lastKnownByChannel[currentChannel] : null;
     if (fallback && isContextPayloadValid(fallback) && Date.now() - (fallback.timestamp || 0) <= REFRESH_GRACE_MS) {
       if (!currentContext || currentContext.timestamp !== fallback.timestamp) {

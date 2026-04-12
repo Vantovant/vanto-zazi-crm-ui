@@ -28,7 +28,7 @@
   let noChatSince = null;
   let lastRefreshLogAt = 0;
   const MAX_NO_CHAT_MISSES_BEFORE_CLEAR = 3;
-  const MIN_NO_CHAT_DURATION_MS = 8000; // Reduced from 12s for faster clearing
+  const MIN_NO_CHAT_DURATION_MS = 5000;
   const REFRESH_LOG_INTERVAL_MS = 10000;
 
   // ===== MINIMAL FLOATING LAUNCHER =====
@@ -90,15 +90,37 @@
     if (launcher) launcher.classList.toggle('has-context', active);
   }
 
-  // ===== GROUP DETECTION =====
+  // ===== ROBUST GROUP DETECTION =====
   function isGroupChat() {
+    // Check 1: Group icon in header
     if ($(SEL.groupMeta)) return true;
+
+    // Check 2: "participants" or "members" text
     if ($(SEL.participantCount)) return true;
-    const subtitleEl = document.querySelector('#main header span[title]:nth-child(2)');
+
+    // Check 3: Subtitle with comma-separated participant names
+    // WhatsApp groups show "Name1, Name2, Name3, ..." or "You, Name1, Name2"
+    const subtitleEl = document.querySelector('#main header span[dir="auto"]:not(:first-child)') ||
+                       document.querySelector('#main header [title]:nth-of-type(2)');
     if (subtitleEl) {
-      const text = subtitleEl.getAttribute('title') || '';
-      if (text.includes(',') && !text.includes('+')) return true;
+      const text = (subtitleEl.getAttribute('title') || subtitleEl.textContent || '').trim();
+      // A comma-separated list with 2+ names is a strong group signal
+      if (text.includes(',')) {
+        const parts = text.split(',').map(p => p.trim()).filter(Boolean);
+        if (parts.length >= 2) {
+          // Exclude phone-number-only lists (e.g. "+27..., +27...")
+          const hasNonPhonePart = parts.some(p => !/^\+?\d[\d\s\-()]{6,}$/.test(p));
+          if (hasNonPhonePart || parts.length >= 3) return true;
+        }
+      }
+      // "click here for group info" or "tap here"
+      if (/click here|tap here|group info/i.test(text)) return true;
     }
+
+    // Check 4: data-icon attributes for community/group
+    const communityIcon = document.querySelector('#main header span[data-icon*="community"], #main header span[data-icon*="group"]');
+    if (communityIcon) return true;
+
     return false;
   }
 
@@ -111,13 +133,11 @@
 
     let phone = '';
 
-    // Strategy 1: Header phone element with "+" in title
     const phoneEl = $(SEL.phoneFromHeader);
     if (phoneEl) {
       phone = phoneEl.getAttribute('title') || phoneEl.textContent || '';
     }
 
-    // Strategy 2: Check all spans in header for phone-like patterns
     if (!phone) {
       const headerSpans = $$('#main header span[title]');
       for (const span of headerSpans) {
@@ -129,12 +149,10 @@
       }
     }
 
-    // Strategy 3: If the contact name itself looks like a phone number
     if (!phone && /^\+?\d[\d\s\-()]{6,}$/.test(name)) {
       phone = name;
     }
 
-    // Strategy 4: Check drawer/info panel for phone
     if (!phone) {
       const drawerPhone = document.querySelector('[data-testid="phone-number"] span, .copyable-text[data-tab] span[title*="+"]');
       if (drawerPhone) {
@@ -142,7 +160,6 @@
       }
     }
 
-    // Strategy 5: Extract from data-id attributes on messages
     if (!phone) {
       const msgEl = document.querySelector('#main [data-id*="@"]');
       if (msgEl) {
@@ -201,6 +218,19 @@
     return (contactInfo?.phone || contactInfo?.name || '').trim().toLowerCase();
   }
 
+  // ===== INSTANT CLEAR on chat switch =====
+  async function signalChatSwitched() {
+    try {
+      await chrome.runtime.sendMessage({
+        type: 'CONTEXT_CLEAR_REQUEST',
+        channel: 'whatsapp',
+        reason: 'chat_switched',
+      });
+    } catch (err) {
+      console.warn('[Zazi WA] Failed to signal chat switch:', err);
+    }
+  }
+
   async function requestContextClear(reason, extra = {}) {
     try {
       await chrome.runtime.sendMessage({
@@ -226,6 +256,34 @@
   // ===== CHAT CONTEXT DETECTION =====
   async function processActiveChat() {
     try {
+      // STEP 1: Check for group BEFORE extracting contact identity
+      if (isGroupChat()) {
+        // If we were previously on a 1:1 chat, clear that state
+        if (lastContactName) {
+          lastContactName = '';
+          lastMessageHash = '';
+          hasContext = false;
+          updateLauncherBadge(false);
+        }
+
+        // Send group context — side panel shows "Group chat detected" warning
+        const headerEl = $(SEL.contactInfo);
+        const groupName = headerEl?.getAttribute('title') || headerEl?.textContent?.trim() || 'Group';
+
+        await chrome.storage.local.set({
+          current_channel: 'whatsapp',
+          current_context: {
+            channel: 'whatsapp',
+            isGroup: true,
+            contactIdentifier: groupName,
+            conversationKey: `whatsapp:group:${groupName.toLowerCase()}`,
+            timestamp: Date.now(),
+          }
+        });
+        return;
+      }
+
+      // STEP 2: Not a group — extract contact
       const contactInfo = getActiveContact();
       if (!contactInfo || !contactInfo.name) {
         if (document.visibilityState === 'hidden') return;
@@ -257,31 +315,13 @@
       consecutiveNoChatReads = 0;
       noChatSince = null;
 
-      // Detect and skip group chats
-      if (isGroupChat()) {
-        if (lastContactName !== contactInfo.name) {
-          lastContactName = contactInfo.name;
-          lastMessageHash = '';
-          await chrome.storage.local.set({
-            current_context: {
-              channel: 'whatsapp',
-              isGroup: true,
-              contactIdentifier: contactInfo.name,
-              conversationKey: `whatsapp:group:${getConversationKey(contactInfo)}`,
-              timestamp: Date.now(),
-            }
-          });
-        }
-        return;
-      }
-
       const messages = readVisibleMessages();
       const msgHash = computeMessageHash(messages);
 
       const isSameContact = contactInfo.name === lastContactName;
       const isSameMessages = msgHash === lastMessageHash;
 
-      // CRITICAL: If contact changed, send update IMMEDIATELY — no debounce
+      // CRITICAL: If contact changed, send update IMMEDIATELY
       if (!isSameContact) {
         console.log('[Zazi WA] Chat switched:', { from: lastContactName, to: contactInfo.name, phone: contactInfo.phone || '(none)' });
         lastContactName = contactInfo.name;
@@ -331,18 +371,15 @@
 
   // ===== HEADER-SPECIFIC OBSERVER — instant chat switch detection =====
   function startHeaderObserver() {
-    // Watch #main header specifically for title changes (chat switches)
     const checkHeader = () => {
       const headerEl = document.querySelector('#main header span[title]');
       if (!headerEl) return;
 
       const observer = new MutationObserver(() => {
-        // Header changed — likely a chat switch, fire immediately
         processActiveChat();
       });
       observer.observe(headerEl, { attributes: true, attributeFilter: ['title'] });
 
-      // Also watch the parent for child swaps (when header element is replaced)
       const headerParent = headerEl.closest('header');
       if (headerParent) {
         const parentObs = new MutationObserver(() => {
@@ -352,7 +389,6 @@
       }
     };
 
-    // Retry until header is available
     const headerInterval = setInterval(() => {
       if (document.querySelector('#main header span[title]')) {
         clearInterval(headerInterval);
@@ -363,17 +399,18 @@
 
   // ===== CHAT LIST CLICK — instant switch on click =====
   function startChatListClickListener() {
-    // WhatsApp chat list items — clicking one switches the chat
     document.addEventListener('click', (e) => {
       const chatRow = e.target.closest('[data-testid="cell-frame-container"], [data-testid="list-item"], div[tabindex="-1"][role="listitem"], #pane-side [role="row"], #pane-side div[tabindex]');
       if (chatRow) {
-        // Chat row clicked — fire context check after a tiny DOM settle
+        // INSTANT: Signal chat_switched to kill the old state immediately
+        signalChatSwitched();
+        // Then fire context check after DOM settles
         setTimeout(processActiveChat, 80);
       }
-    }, true); // capture phase for speed
+    }, true);
   }
 
-  // ===== GENERAL MUTATION OBSERVER — reduced debounce =====
+  // ===== GENERAL MUTATION OBSERVER =====
   function startObserver() {
     const target = document.getElementById('app') || document.body;
     const observer = new MutationObserver(() => {
@@ -381,7 +418,7 @@
       startObserver._timer = setTimeout(() => {
         ensureLauncher();
         processActiveChat();
-      }, 400); // General mutations can be slower — header observer handles fast switches
+      }, 400);
     });
     observer.observe(target, { childList: true, subtree: true });
   }
@@ -410,7 +447,6 @@
     startObserver();
     startHeaderObserver();
     startChatListClickListener();
-    // Polling as safety net only — fast detection via header observer + click listener
     setInterval(processActiveChat, 4000);
     setTimeout(processActiveChat, 500);
   }

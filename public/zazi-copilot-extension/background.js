@@ -16,7 +16,7 @@ const CONTEXT_KEYS = [
   'contact_mappings',
 ];
 const MIN_CLEAR_MISSES = 3;
-const CLEAR_GRACE_MS = 10000; // Reduced from 15s for faster clearing
+const CLEAR_GRACE_MS = 3000; // Fast clearing — no ghosts
 const CHANNEL_HOSTS = {
   whatsapp: 'web.whatsapp.com',
   gmail: 'mail.google.com',
@@ -247,6 +247,22 @@ async function handleMessage(msg, sender) {
           });
         }
         return { success: true, ignored: true, reason: 'non_active_channel_clear_blocked' };
+      }
+
+      // INSTANT CLEAR for chat_switched — no grace period, no fallback
+      if (reason === 'chat_switched') {
+        console.log('[Zazi BG] INSTANT clear: chat_switched', { channel: effectiveChannel });
+        await chrome.storage.local.set({
+          current_channel: effectiveChannel || null,
+          current_context: {
+            cleared: true,
+            clearReason: 'chat_switched',
+            channel: effectiveChannel || null,
+            timestamp: Date.now(),
+          },
+          [getLastKnownContextKey(effectiveChannel)]: null,
+        });
+        return { success: true, cleared: true };
       }
 
       if (
