@@ -146,6 +146,13 @@ function showDefaultEmptyState() {
   $('timelineSection').classList.add('hidden');
 }
 
+function showLoadingState() {
+  $('noContext').classList.remove('hidden');
+  $('groupChatNotice').classList.add('hidden');
+  $('activeContext').classList.add('hidden');
+  $('timelineSection').classList.add('hidden');
+}
+
 async function pollContext() {
   // GUARD: If user is editing, skip ALL rendering updates
   if (isEditing) return;
