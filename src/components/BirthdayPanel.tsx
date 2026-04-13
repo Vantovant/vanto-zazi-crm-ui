@@ -207,6 +207,9 @@ export function BirthdayPanel() {
                         <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
                           <span>🎂 {b.birth_date_text || '—'}</span>
                           {b.associate_id && <span className="font-mono">ID: {b.associate_id}</span>}
+                          {(b as any).original_congratulate_by_date && (
+                            <span className="text-purple-400 font-medium">🧪 Test Mode</span>
+                          )}
                           {days !== null && (
                             <span className={`${timing === 'today' ? 'text-rose-400 font-medium' : timing === 'tomorrow' ? 'text-amber-400' : 'text-slate-500'}`}>
                               {timing === 'today' ? '🎉 Today!' : timing === 'tomorrow' ? 'Tomorrow' : days > 0 ? `In ${days}d` : days < 0 ? `${Math.abs(days)}d ago` : ''}
