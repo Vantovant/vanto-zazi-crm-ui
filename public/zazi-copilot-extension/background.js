@@ -1,6 +1,6 @@
 /**
  * Zazi Follow-Up Copilot — Background Service Worker
- * Orchestrates tab events, alarms, storage, sync jobs, and CRM lookups.
+ * v2.0 — Simplified state machine, triple phone normalization.
  */
 
 importScripts('lib/config.js', 'lib/supabase-client.js', 'lib/followup-engine.js', 'lib/message-suggestions.js');
@@ -15,14 +15,19 @@ const CONTEXT_KEYS = [
   'last_known_good_gmail_context',
   'contact_mappings',
 ];
-const MIN_CLEAR_MISSES = 3;
-const CLEAR_GRACE_MS = 3000; // Fast clearing — no ghosts
+
 const CHANNEL_HOSTS = {
   whatsapp: 'web.whatsapp.com',
   gmail: 'mail.google.com',
 };
 
 const LEAD_TYPES = ['Prospect', 'Registered_Nopurchase', 'Purchase_Nostatus', 'Purchase_Status', 'Expired', 'Customer', 'Distributor'];
+
+/** Strip non-digits — background-level phone normalization */
+function normalizePhone(raw) {
+  if (!raw) return '';
+  return raw.replace(/[^0-9]/g, '');
+}
 
 function getLastKnownContextKey(channel) {
   return channel === 'gmail' ? 'last_known_good_gmail_context' : 'last_known_good_whatsapp_context';
@@ -71,7 +76,6 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
     const stored = await getStoredContexts();
     if (stored.current_channel === newChannel) return;
 
-    // Switch to the last-known-good context for this channel
     const lastKnownKey = getLastKnownContextKey(newChannel);
     const lastKnown = stored[lastKnownKey];
 
@@ -82,7 +86,6 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
         current_context: { ...lastKnown, timestamp: Date.now() },
       });
     } else {
-      // No cached context — just switch channel, adapters will send fresh data
       await chrome.storage.local.set({
         current_channel: newChannel,
         current_context: {
@@ -220,69 +223,36 @@ async function handleMessage(msg, sender) {
       }
     }
 
+    // ===== SIMPLIFIED CONTEXT CLEAR (single source of truth) =====
     case 'CONTEXT_CLEAR_REQUEST': {
       const reason = msg.reason || 'unknown';
       const allowedReasons = new Set(['confirmed_no_active_chat', 'chat_switched', 'tab_unloaded', 'explicit_reset']);
-      const misses = Number(msg.consecutiveMisses || 0);
-      const stored = await getStoredContexts();
-      const currentContext = stored.current_context;
-      const currentChannel = stored.current_channel || currentContext?.channel || null;
-      const requestedChannel = msg.channel || null;
-      const effectiveChannel = requestedChannel || currentChannel;
-      const lastKnownForChannel = effectiveChannel ? stored[getLastKnownContextKey(effectiveChannel)] : null;
 
       if (!allowedReasons.has(reason)) {
         return { success: false, blocked: true };
       }
 
-      if (reason === 'confirmed_no_active_chat' && misses < MIN_CLEAR_MISSES) {
-        return { success: false, blocked: true };
-      }
+      const stored = await getStoredContexts();
+      const currentChannel = stored.current_channel || stored.current_context?.channel || null;
+      const requestedChannel = msg.channel || null;
+      const effectiveChannel = requestedChannel || currentChannel;
 
       // Don't let a non-active channel clear the active channel's context
       if (effectiveChannel && currentChannel && effectiveChannel !== currentChannel) {
-        if (effectiveChannel) {
-          await chrome.storage.local.set({
-            [getLastKnownContextKey(effectiveChannel)]: null,
-          });
-        }
         return { success: true, ignored: true, reason: 'non_active_channel_clear_blocked' };
       }
 
-      // INSTANT CLEAR for chat_switched — no grace period, no fallback
-      if (reason === 'chat_switched') {
-        console.log('[Zazi BG] INSTANT clear: chat_switched', { channel: effectiveChannel });
-        await chrome.storage.local.set({
-          current_channel: effectiveChannel || null,
-          current_context: {
-            cleared: true,
-            clearReason: 'chat_switched',
-            channel: effectiveChannel || null,
-            timestamp: Date.now(),
-          },
-          [getLastKnownContextKey(effectiveChannel)]: null,
-        });
-        return { success: true, cleared: true };
-      }
-
-      if (
-        reason === 'confirmed_no_active_chat' &&
-        lastKnownForChannel?.timestamp &&
-        Date.now() - lastKnownForChannel.timestamp <= CLEAR_GRACE_MS
-      ) {
-        return { success: true, ignored: true, reason: 'clear_grace_window' };
-      }
-
+      // INSTANT CLEAR — no grace period fallback, no side-panel contradictions
       console.log('[Zazi BG] State cleared:', reason, { channel: effectiveChannel });
-
       await chrome.storage.local.set({
-        current_channel: null,
+        current_channel: effectiveChannel || null,
         current_context: {
           cleared: true,
           clearReason: reason,
           channel: effectiveChannel || null,
           timestamp: Date.now(),
         },
+        [getLastKnownContextKey(effectiveChannel)]: null,
       });
 
       return { success: true, cleared: true };
@@ -311,7 +281,7 @@ async function handleMessage(msg, sender) {
         return { success: true, ignored: true, reason: 'weak_payload_no_state' };
       }
 
-      // ---- Contact matching ----
+      // ---- Contact matching (with triple phone normalization) ----
       let contact = null;
       let candidateMatches = [];
       const contactMappings = await getContactMappings();
@@ -319,9 +289,9 @@ async function handleMessage(msg, sender) {
       console.log('[Zazi BG] CRM search started', { channel, contactIdentifier, contactName: contactInfo?.name });
 
       if (channel === 'whatsapp') {
-        // Try phone first
+        // Try phone first — normalize at BG level too
         if (contactIdentifier) {
-          const phoneDigits = contactIdentifier.replace(/[^0-9]/g, '');
+          const phoneDigits = normalizePhone(contactIdentifier);
           if (phoneDigits.length >= 7) {
             contact = await SupabaseClient.findContactByPhone(phoneDigits);
             if (contact) console.log('[Zazi BG] CRM matched by phone:', contact.full_name);
@@ -330,7 +300,7 @@ async function handleMessage(msg, sender) {
 
         // Try name-as-phone
         if (!contact && contactInfo?.name) {
-          const nameDigits = contactInfo.name.replace(/[^0-9]/g, '');
+          const nameDigits = normalizePhone(contactInfo.name);
           if (nameDigits.length >= 7) {
             contact = await SupabaseClient.findContactByPhone(nameDigits);
             if (contact) console.log('[Zazi BG] CRM matched by name-as-phone:', contact.full_name);
@@ -342,7 +312,7 @@ async function handleMessage(msg, sender) {
           const mapKeys = [
             `whatsapp:${(contactIdentifier || '').trim().toLowerCase()}`,
             `whatsapp:${(contactInfo?.name || '').trim().toLowerCase()}`,
-            `whatsapp:${(contactInfo?.phone || '').trim().toLowerCase()}`,
+            `whatsapp:${normalizePhone(contactInfo?.phone || '')}`,
           ].filter(k => k !== 'whatsapp:');
 
           for (const mapKey of mapKeys) {
@@ -507,7 +477,7 @@ async function handleMessage(msg, sender) {
         timestamp: Date.now(),
       };
 
-      // Always update the channel's last-known-good + promote to current
+      // Single source of truth — write to storage, side panel listens via onChanged
       await chrome.storage.local.set({
         current_channel: channel,
         current_context: contextPayload,

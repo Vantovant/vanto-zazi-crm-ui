@@ -1,24 +1,15 @@
 /**
  * Zazi Follow-Up Copilot — Side Panel Controller
+ * v2.0 — Event-driven rendering via chrome.storage.onChanged,
+ *         auto-cancel edit on contact change, simplified state.
  */
 
 const $ = (id) => document.getElementById(id);
 
 let currentContext = null;
 let currentChannel = null;
-let isEditing = false; // GUARD: block background refreshes during inline edits
-const lastKnownByChannel = {
-  whatsapp: null,
-  gmail: null,
-};
-const MAX_CONTEXT_AGE_MS = 120000;
-const REFRESH_GRACE_MS = 3000; // Aggressive — no 30-second ghosts
-const CONTEXT_STORAGE_KEYS = [
-  'current_channel',
-  'current_context',
-  'last_known_good_whatsapp_context',
-  'last_known_good_gmail_context',
-];
+let isEditing = false;
+let editingContactId = null; // Track WHICH contact is being edited
 
 const LEAD_TYPE_INTEL = {
   'Prospect': { icon: '🎯', label: 'Prospect', color: '#6b7280', hint: 'Prospecting / conversion path' },
@@ -32,91 +23,6 @@ const LEAD_TYPE_INTEL = {
 
 function getLastKnownContextKey(channel) {
   return channel === 'gmail' ? 'last_known_good_gmail_context' : 'last_known_good_whatsapp_context';
-}
-
-function rememberLastKnownContext(ctx) {
-  if (!ctx?.channel || !isContextPayloadValid(ctx)) return;
-  lastKnownByChannel[ctx.channel] = ctx;
-}
-
-function hydrateLastKnownContexts(data) {
-  if (isContextPayloadValid(data.last_known_good_whatsapp_context)) {
-    lastKnownByChannel.whatsapp = data.last_known_good_whatsapp_context;
-  }
-  if (isContextPayloadValid(data.last_known_good_gmail_context)) {
-    lastKnownByChannel.gmail = data.last_known_good_gmail_context;
-  }
-}
-
-// ===== INIT =====
-async function init() {
-  console.log('[Zazi SP] Side panel initializing');
-
-  try {
-    const remembered = await chrome.runtime.sendMessage({ type: 'GET_REMEMBERED_EMAIL' });
-    if (remembered?.email) {
-      $('email').value = remembered.email;
-    }
-  } catch (e) { /* ignore */ }
-
-  const res = await chrome.runtime.sendMessage({ type: 'AUTH_STATUS' });
-  if (res.authenticated) {
-    showConnected(res.email);
-    startContextPolling();
-  }
-}
-
-// ===== AUTH =====
-$('loginBtn').addEventListener('click', async () => {
-  const email = $('email').value.trim();
-  const password = $('password').value.trim();
-  if (!email || !password) return;
-
-  $('loginBtn').disabled = true;
-  $('loginBtn').textContent = 'Connecting...';
-  $('loginError').classList.add('hidden');
-
-  const res = await chrome.runtime.sendMessage({ type: 'AUTH_LOGIN', email, password });
-
-  if (res.success) {
-    showConnected(email);
-    startContextPolling();
-  } else {
-    $('loginError').textContent = res.error || 'Login failed';
-    $('loginError').classList.remove('hidden');
-  }
-
-  $('loginBtn').disabled = false;
-  $('loginBtn').textContent = 'Connect';
-});
-
-$('logoutBtn').addEventListener('click', async () => {
-  await chrome.runtime.sendMessage({ type: 'AUTH_LOGOUT' });
-  await chrome.storage.local.remove(CONTEXT_STORAGE_KEYS);
-  $('loginSection').classList.remove('hidden');
-  $('connectedSection').classList.add('hidden');
-  $('logoutBtn').classList.add('hidden');
-  $('statusBadge').textContent = 'Not Connected';
-  $('statusBadge').className = 'status-badge disconnected';
-  currentContext = null;
-  currentChannel = null;
-  lastKnownByChannel.whatsapp = null;
-  lastKnownByChannel.gmail = null;
-});
-
-function showConnected(email) {
-  $('loginSection').classList.add('hidden');
-  $('connectedSection').classList.remove('hidden');
-  $('logoutBtn').classList.remove('hidden');
-  $('userEmail').textContent = email;
-  $('statusBadge').textContent = 'Connected';
-  $('statusBadge').className = 'status-badge connected';
-}
-
-// ===== CONTEXT POLLING =====
-function startContextPolling() {
-  pollContext();
-  setInterval(pollContext, 1500); // Reduced from 2s
 }
 
 function isExplicitClear(ctx) {
@@ -134,107 +40,138 @@ function isContextPayloadValid(ctx) {
   );
 }
 
-function isFreshEnough(ctx) {
-  if (!ctx?.timestamp) return false;
-  return Date.now() - ctx.timestamp <= MAX_CONTEXT_AGE_MS;
+// ===== INIT =====
+async function init() {
+  console.log('[Zazi SP] Side panel initializing v2.0');
+
+  try {
+    const remembered = await chrome.runtime.sendMessage({ type: 'GET_REMEMBERED_EMAIL' });
+    if (remembered?.email) {
+      $('email').value = remembered.email;
+    }
+  } catch (e) { /* ignore */ }
+
+  const res = await chrome.runtime.sendMessage({ type: 'AUTH_STATUS' });
+  if (res.authenticated) {
+    showConnected(res.email);
+    startEventDrivenRendering();
+    // Also do an initial read
+    loadCurrentContext();
+  }
 }
 
-function showDefaultEmptyState() {
-  $('noContext').classList.remove('hidden');
-  $('groupChatNotice').classList.add('hidden');
-  $('activeContext').classList.add('hidden');
-  $('timelineSection').classList.add('hidden');
-}
+// ===== AUTH =====
+$('loginBtn').addEventListener('click', async () => {
+  const email = $('email').value.trim();
+  const password = $('password').value.trim();
+  if (!email || !password) return;
 
-function showLoadingState() {
-  $('noContext').classList.remove('hidden');
-  $('groupChatNotice').classList.add('hidden');
-  $('activeContext').classList.add('hidden');
-  $('timelineSection').classList.add('hidden');
-}
+  $('loginBtn').disabled = true;
+  $('loginBtn').textContent = 'Connecting...';
+  $('loginError').classList.add('hidden');
 
-async function pollContext() {
-  // GUARD: If user is editing, skip ALL rendering updates
-  if (isEditing) return;
+  const res = await chrome.runtime.sendMessage({ type: 'AUTH_LOGIN', email, password });
 
-  const data = await chrome.storage.local.get(CONTEXT_STORAGE_KEYS);
-  const ctx = data.current_context;
-  const storedChannel = data.current_channel;
-
-  hydrateLastKnownContexts(data);
-
-  // STRICT: Always use stored channel as truth
-  if (storedChannel) {
-    currentChannel = storedChannel;
+  if (res.success) {
+    showConnected(email);
+    startEventDrivenRendering();
+    loadCurrentContext();
+  } else {
+    $('loginError').textContent = res.error || 'Login failed';
+    $('loginError').classList.remove('hidden');
   }
 
-  if (isExplicitClear(ctx)) {
-    // INSTANT CLEAR for chat_switched — NEVER fall back to old state
-    if (ctx.clearReason === 'chat_switched') {
-      currentContext = null;
-      lastKnownByChannel.whatsapp = null;
-      showLoadingState();
-      return;
-    }
+  $('loginBtn').disabled = false;
+  $('loginBtn').textContent = 'Connect';
+});
 
-    // For other clear reasons, try short fallback
-    const fallback = currentChannel ? lastKnownByChannel[currentChannel] : null;
-    if (fallback && isContextPayloadValid(fallback) && Date.now() - (fallback.timestamp || 0) <= REFRESH_GRACE_MS) {
-      if (!currentContext || currentContext.timestamp !== fallback.timestamp) {
-        currentContext = fallback;
-        renderContext(fallback);
-      }
-      return;
+$('logoutBtn').addEventListener('click', async () => {
+  await chrome.runtime.sendMessage({ type: 'AUTH_LOGOUT' });
+  await chrome.storage.local.remove([
+    'current_channel', 'current_context',
+    'last_known_good_whatsapp_context', 'last_known_good_gmail_context',
+  ]);
+  $('loginSection').classList.remove('hidden');
+  $('connectedSection').classList.add('hidden');
+  $('logoutBtn').classList.add('hidden');
+  $('statusBadge').textContent = 'Not Connected';
+  $('statusBadge').className = 'status-badge disconnected';
+  currentContext = null;
+  currentChannel = null;
+});
+
+function showConnected(email) {
+  $('loginSection').classList.add('hidden');
+  $('connectedSection').classList.remove('hidden');
+  $('logoutBtn').classList.remove('hidden');
+  $('userEmail').textContent = email;
+  $('statusBadge').textContent = 'Connected';
+  $('statusBadge').className = 'status-badge connected';
+}
+
+// ===== EVENT-DRIVEN RENDERING (replaces polling) =====
+function startEventDrivenRendering() {
+  // PRIMARY: Listen for storage changes — instant rendering, zero latency
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local') return;
+    if (changes.current_context || changes.current_channel) {
+      const newCtx = changes.current_context?.newValue;
+      const newChannel = changes.current_channel?.newValue;
+
+      if (newChannel) currentChannel = newChannel;
+
+      handleContextUpdate(newCtx);
     }
+  });
+
+  // FALLBACK: 3s polling as safety net (not primary path)
+  setInterval(loadCurrentContext, 3000);
+}
+
+async function loadCurrentContext() {
+  const data = await chrome.storage.local.get(['current_channel', 'current_context']);
+  const ctx = data.current_context;
+  if (data.current_channel) currentChannel = data.current_channel;
+  handleContextUpdate(ctx);
+}
+
+function handleContextUpdate(ctx) {
+  // AUTO-CANCEL edit if contact changed
+  if (isEditing && editingContactId) {
+    const newContactId = ctx?.contact?.id;
+    if (newContactId && newContactId !== editingContactId) {
+      console.log('[Zazi SP] Contact changed during edit — auto-cancelling');
+      isEditing = false;
+      editingContactId = null;
+      $('inlineEditForm')?.classList.add('hidden');
+      $('inlineCreateForm')?.classList.add('hidden');
+    }
+  }
+
+  // If still editing same contact, skip rendering
+  if (isEditing) return;
+
+  if (isExplicitClear(ctx)) {
     currentContext = null;
     showDefaultEmptyState();
     return;
   }
 
   if (!isContextPayloadValid(ctx)) {
-    // STRICT: Only use fallback from current channel
-    const fallback = currentChannel ? lastKnownByChannel[currentChannel] : null;
-    if (fallback && isContextPayloadValid(fallback)) {
-      if (!currentContext || currentContext.timestamp !== fallback.timestamp) {
-        currentContext = fallback;
-        currentChannel = fallback.channel || currentChannel;
-        renderContext(fallback);
-      }
-      return;
-    }
-    showDefaultEmptyState();
+    if (!currentContext) showDefaultEmptyState();
     return;
   }
 
-  if (!isFreshEnough(ctx)) {
-    const fallback = currentChannel ? lastKnownByChannel[currentChannel] : null;
-    if (fallback && isContextPayloadValid(fallback) && fallback.timestamp !== ctx.timestamp) {
-      if (!currentContext || currentContext.timestamp !== fallback.timestamp) {
-        currentContext = fallback;
-        renderContext(fallback);
-      }
-      return;
-    }
-  }
-
-  // ABSOLUTE CHANNEL ISOLATION: If ctx is from a different channel than current, NEVER render it
+  // Channel isolation
   if (currentChannel && ctx.channel && ctx.channel !== currentChannel) {
-    // Store it for its own channel only — absolutely block rendering
-    rememberLastKnownContext(ctx);
-    console.log('[Zazi SP] BLOCKED cross-channel render:', ctx.channel, 'while active channel is', currentChannel);
     return;
   }
 
-  // DOUBLE-CHECK: Even if channels match, verify the context channel matches currentChannel
-  if (ctx.channel && currentChannel && ctx.channel !== currentChannel) {
-    return;
-  }
-
+  // Skip if same timestamp (no change)
   if (currentContext && currentContext.timestamp === ctx.timestamp) return;
 
   currentContext = ctx;
   currentChannel = ctx.channel || currentChannel;
-  rememberLastKnownContext(ctx);
 
   if (ctx.isGroup) {
     $('noContext').classList.add('hidden');
@@ -249,6 +186,13 @@ async function pollContext() {
   $('activeContext').classList.remove('hidden');
 
   renderContext(ctx);
+}
+
+function showDefaultEmptyState() {
+  $('noContext').classList.remove('hidden');
+  $('groupChatNotice').classList.add('hidden');
+  $('activeContext').classList.add('hidden');
+  $('timelineSection').classList.add('hidden');
 }
 
 // ===== RENDER =====
@@ -400,7 +344,6 @@ async function selectCandidate(contact) {
     });
   }
 
-  rememberLastKnownContext(currentContext);
   renderContext(currentContext);
 
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -524,7 +467,6 @@ $('aiSuggestBtn').addEventListener('click', async () => {
       $('suggestionText').textContent = res.text;
       $('aiIndicator').classList.remove('hidden');
     } else {
-      // Fallback to rule-based
       console.warn('[Zazi SP] AI failed, falling back to rules:', res.error);
       $('regenerateBtn').click();
       flashButton('aiSuggestBtn', '⚠️', '🤖 AI', 2000);
@@ -616,7 +558,8 @@ $('logDraftBtn').addEventListener('click', async () => {
 // ===== INLINE EDIT CONTACT =====
 $('editContactBtn')?.addEventListener('click', () => {
   if (!currentContext?.contact) return;
-  isEditing = true; // BLOCK background refreshes
+  isEditing = true;
+  editingContactId = currentContext.contact.id; // Track which contact
   const c = currentContext.contact;
   $('editName').value = c.full_name || '';
   $('editPhone').value = c.phone_number || '';
@@ -626,7 +569,8 @@ $('editContactBtn')?.addEventListener('click', () => {
 });
 
 $('cancelEditBtn')?.addEventListener('click', () => {
-  isEditing = false; // RESUME background refreshes
+  isEditing = false;
+  editingContactId = null;
   $('inlineEditForm').classList.add('hidden');
 });
 
@@ -659,39 +603,17 @@ $('submitEditBtn')?.addEventListener('click', async () => {
     });
 
     if (res.success && res.contact) {
-      // Update in-memory context immediately
       currentContext.contact = res.contact;
       currentContext.timestamp = Date.now();
 
-      // Recalculate recommendation with new lead type
-      const newRec = FollowUpEngine.evaluate({
-        ...currentContext,
-        leadType: res.contact.lead_type,
-        leadTemperature: res.contact.lead_temperature,
-        registrationStatus: res.contact.registration_status,
-      });
-      currentContext.recommendation = newRec;
-
-      // Regenerate suggestion with new context
-      const newSugg = MessageSuggestions.generate({
-        contactName: res.contact.full_name,
-        objective: newRec.suggestedObjective,
-        tone: newRec.suggestedTone,
-        channel: currentContext.channel,
-        leadType: res.contact.lead_type,
-        hasPurchased: currentContext.recommendation?.hasPurchased || false,
-      });
-      currentContext.suggestion = newSugg;
-
-      // Persist
       const channelKey = getLastKnownContextKey(currentContext.channel || 'whatsapp');
       await chrome.storage.local.set({
         current_context: currentContext,
         [channelKey]: currentContext,
       });
-      rememberLastKnownContext(currentContext);
 
-      isEditing = false; // RESUME background refreshes after save
+      isEditing = false;
+      editingContactId = null;
       $('inlineEditForm').classList.add('hidden');
       renderContext(currentContext);
     } else {
@@ -709,7 +631,8 @@ $('submitEditBtn')?.addEventListener('click', async () => {
 
 // ===== INLINE CREATE CONTACT =====
 $('createContactBtn')?.addEventListener('click', () => {
-  isEditing = true; // BLOCK background refreshes during create too
+  isEditing = true;
+  editingContactId = '__creating__';
   $('noContactMatch').classList.add('hidden');
   $('inlineCreateForm').classList.remove('hidden');
   $('createError').classList.add('hidden');
@@ -724,7 +647,8 @@ $('createContactBtn')?.addEventListener('click', () => {
 });
 
 $('cancelCreateBtn')?.addEventListener('click', () => {
-  isEditing = false; // RESUME background refreshes
+  isEditing = false;
+  editingContactId = null;
   $('inlineCreateForm').classList.add('hidden');
   $('noContactMatch').classList.remove('hidden');
 });
@@ -777,8 +701,8 @@ $('submitCreateBtn')?.addEventListener('click', async () => {
           });
         }
 
-        rememberLastKnownContext(currentContext);
-        isEditing = false; // RESUME background refreshes after create
+        isEditing = false;
+        editingContactId = null;
         $('inlineCreateForm').classList.add('hidden');
         renderContext(currentContext);
 
