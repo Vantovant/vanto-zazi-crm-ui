@@ -16,6 +16,7 @@ import {
   Sparkles,
   Loader2,
   RefreshCw,
+  Cake,
 } from 'lucide-react';
 import { DataStatusBanner } from '../components/DataStatusBanner';
 import { ContactDrawer } from '../components/ContactDrawer';
@@ -23,6 +24,7 @@ import { useCrm } from '@/contexts/CrmContext';
 import { useNavigate } from 'react-router-dom';
 import { useMemo, useState, useCallback } from 'react';
 import { useContactActivities } from '@/hooks/useContactActivities';
+import { useBirthdayCounts } from '@/hooks/useBirthdayCounts';
 import { supabase } from '@/integrations/supabase/client';
 import ReactMarkdown from 'react-markdown';
 
@@ -44,6 +46,7 @@ export function Dashboard() {
   const navigate = useNavigate();
   const { contacts: prospects, orders, dbActive, contactsLoading, ordersLoading } = useCrm();
   const { activities, getNeglectedContacts } = useContactActivities();
+  const { counts: bdCounts } = useBirthdayCounts();
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [newsContent, setNewsContent] = useState('');
   const [newsLoading, setNewsLoading] = useState(false);
@@ -306,6 +309,43 @@ Keep it punchy, motivational, and formatted with emojis and headers. Max 300 wor
           <p className="text-xl font-bold text-violet-300">{orderStats.upgradePV.toLocaleString()}</p>
         </div>
       </div>
+
+      {/* Birthday Notification Widget */}
+      {bdCounts.pending > 0 && (
+        <div className="bg-gradient-to-r from-pink-500/10 to-rose-500/10 border border-pink-500/20 rounded-xl p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-pink-500/20">
+                <Cake className="w-5 h-5 text-pink-400" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-white">Birthday Reminders</h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {bdCounts.pending} birthday{bdCounts.pending !== 1 ? 's' : ''} need{bdCounts.pending === 1 ? 's' : ''} attention
+                </p>
+              </div>
+            </div>
+            <button type="button" onClick={() => navigate('/whatsapp')}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-pink-600 hover:bg-pink-500 text-white rounded-lg transition-colors">
+              <Cake className="w-3.5 h-3.5" />
+              Open Birthdays
+            </button>
+          </div>
+          <div className="grid grid-cols-4 gap-3 mt-3">
+            {[
+              { label: '🎉 Today', count: bdCounts.today, color: 'text-rose-400' },
+              { label: '⏰ Tomorrow', count: bdCounts.tomorrow, color: 'text-amber-400' },
+              { label: '📅 This Week', count: bdCounts.thisWeek, color: 'text-blue-400' },
+              { label: '⚠️ Overdue', count: bdCounts.overdue, color: 'text-red-400' },
+            ].map(n => (
+              <div key={n.label} className="text-center">
+                <p className={`text-lg font-bold ${n.color}`}>{n.count}</p>
+                <p className="text-xs text-slate-500">{n.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ZAZI Mail — AI News Briefing */}
       <div className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden">

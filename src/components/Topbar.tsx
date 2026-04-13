@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Bell, UserPlus, ClipboardList, LogOut, Lock, X, Menu, Cpu } from 'lucide-react';
+import { Search, Bell, UserPlus, ClipboardList, LogOut, Lock, X, Menu, Cpu, Cake } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCrm } from '@/contexts/CrmContext';
+import { useBirthdayCounts } from '@/hooks/useBirthdayCounts';
 import { ChangePasswordModal } from './ChangePasswordModal';
 import { AddContactModal } from './AddContactModal';
 import { AISettingsModal } from './AISettingsModal';
@@ -32,6 +33,8 @@ export function Topbar({ onMenuToggle }: { onMenuToggle: () => void }) {
   const searchRef = useRef<HTMLDivElement>(null);
 
   const search = useSearch(contacts);
+  const { counts: bdCounts } = useBirthdayCounts();
+  const bdTotal = bdCounts.today + bdCounts.overdue;
 
   const displayEmail = user?.email ?? '';
   const initials = displayEmail.slice(0, 2).toUpperCase();
@@ -178,6 +181,21 @@ export function Topbar({ onMenuToggle }: { onMenuToggle: () => void }) {
               </div>
             )}
           </div>
+
+          {/* Birthday Badge */}
+          {bdTotal > 0 && (
+            <button
+              type="button"
+              onClick={() => navigate('/whatsapp')}
+              className="relative p-2 rounded-lg text-pink-400 hover:bg-pink-500/10 transition-colors"
+              title={`${bdCounts.today} birthdays today${bdCounts.overdue ? `, ${bdCounts.overdue} overdue` : ''}`}
+            >
+              <Cake className="w-5 h-5" />
+              <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center bg-pink-500 text-white text-[10px] font-bold rounded-full px-1">
+                {bdTotal}
+              </span>
+            </button>
+          )}
 
           {/* AI Settings */}
           <button
