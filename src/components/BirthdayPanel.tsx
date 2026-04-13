@@ -34,7 +34,7 @@ export function BirthdayPanel() {
   const counts = useMemo(() => {
     const c = { today: 0, tomorrow: 0, this_week: 0, upcoming: 0, congratulated: 0, not_congratulated: 0, unmatched: 0 };
     birthdays.forEach(b => {
-      const timing = classifyBirthday(b.congratulate_by_date ? new Date(b.congratulate_by_date) : b.birth_date ? new Date(b.birth_date) : null);
+      const timing = classifyBirthday(b.congratulate_by_date || b.birth_date || null);
       if (timing === 'today') c.today++;
       else if (timing === 'tomorrow') c.tomorrow++;
       else if (timing === 'this_week') c.this_week++;
@@ -50,7 +50,7 @@ export function BirthdayPanel() {
     let list = birthdays;
     if (filter === 'today' || filter === 'tomorrow' || filter === 'this_week' || filter === 'upcoming') {
       list = list.filter(b => {
-        const d = b.congratulate_by_date ? new Date(b.congratulate_by_date) : b.birth_date ? new Date(b.birth_date) : null;
+        const d = b.congratulate_by_date || b.birth_date || null;
         return classifyBirthday(d) === filter;
       });
     } else if (filter === 'congratulated') {
@@ -185,7 +185,7 @@ export function BirthdayPanel() {
             ) : (
               <div className="space-y-1 max-h-80 overflow-y-auto">
                 {filtered.map((b, idx) => {
-                  const d = b.congratulate_by_date ? new Date(b.congratulate_by_date) : b.birth_date ? new Date(b.birth_date) : null;
+                  const d = b.congratulate_by_date || b.birth_date || null;
                   const days = daysUntil(d);
                   const timing = classifyBirthday(d);
                   const isSelected = selectedIds.has(b.id);
