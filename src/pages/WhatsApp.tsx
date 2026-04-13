@@ -11,7 +11,9 @@ import {
   Sparkles,
   Loader2,
   Send,
+  Cake,
 } from 'lucide-react';
+import { BirthdayPanel } from '@/components/BirthdayPanel';
 import { LogActivityModal } from '../components/LogActivityModal';
 import { AddFollowUpModal } from '../components/AddFollowUpModal';
 import { useCrm } from '@/contexts/CrmContext';
