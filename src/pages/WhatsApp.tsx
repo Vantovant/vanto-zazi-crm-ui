@@ -30,6 +30,7 @@ const temperatureColors: Record<string, string> = {
 export function WhatsApp() {
   const { contacts } = useCrm();
   const { logActivity } = useContactActivities();
+  const [activeTab, setActiveTab] = useState<'contacts' | 'birthdays'>('contacts');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [showLogActivity, setShowLogActivity] = useState(false);
