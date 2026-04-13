@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback } from 'react';
 import {
   Cake, ClipboardPaste, Search, ExternalLink, Check,
   ChevronDown, ChevronUp, MessageCircle, Trash2, Filter, PartyPopper, Play,
+  FlaskConical, Undo2,
 } from 'lucide-react';
 import { classifyBirthday, daysUntil } from '@/utils/birthdayParser';
 import { useBirthdays, type BirthdayEntry } from '@/hooks/useBirthdays';
