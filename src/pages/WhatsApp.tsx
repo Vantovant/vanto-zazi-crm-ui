@@ -326,6 +326,62 @@ export function WhatsApp() {
           <div className="flex-1 overflow-y-auto">
             <div className="p-4 space-y-4 max-w-2xl">
 
+              {/* === QUICK ACTIONS === */}
+              <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <button type="button" onClick={() => handleOpenWhatsApp()}
+                    className="flex flex-col items-center gap-1.5 px-5 py-3 rounded-xl bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 text-green-400 transition-colors">
+                    <MessageCircle className="w-5 h-5" />
+                    <span className="text-[11px] font-medium">WhatsApp</span>
+                  </button>
+                  <button type="button" onClick={async () => {
+                    if (!selectedContact) return;
+                    window.open(`tel:${selectedContact.PhoneNumber}`, '_blank');
+                    await logActivity({
+                      contact_id: String(selectedContact.id),
+                      activity_type: 'call',
+                      summary: `Called ${selectedContact.FullName}`,
+                    });
+                  }}
+                    className="flex flex-col items-center gap-1.5 px-5 py-3 rounded-xl bg-violet-500/10 hover:bg-violet-500/20 border border-violet-500/30 text-violet-400 transition-colors">
+                    <Phone className="w-5 h-5" />
+                    <span className="text-[11px] font-medium">Call</span>
+                  </button>
+                  <button type="button" onClick={async () => {
+                    if (!selectedContact?.EmailAddress) return;
+                    window.open(`mailto:${selectedContact.EmailAddress}`, '_blank');
+                    await logActivity({
+                      contact_id: String(selectedContact.id),
+                      activity_type: 'email',
+                      summary: `Emailed ${selectedContact.FullName}`,
+                    });
+                  }}
+                    className={`flex flex-col items-center gap-1.5 px-5 py-3 rounded-xl border transition-colors ${
+                      selectedContact.EmailAddress
+                        ? 'bg-sky-500/10 hover:bg-sky-500/20 border-sky-500/30 text-sky-400'
+                        : 'bg-slate-700/30 border-slate-600/30 text-slate-600 cursor-not-allowed'
+                    }`}>
+                    <Mail className="w-5 h-5" />
+                    <span className="text-[11px] font-medium">Email</span>
+                  </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button type="button" onClick={() => setShowTemplatePicker(true)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-700/50 hover:bg-slate-700 border border-slate-600/50 text-green-400 text-xs font-medium transition-colors">
+                    <MessageCircle className="w-3.5 h-3.5" />
+                    WhatsApp Template
+                  </button>
+                  <button type="button" onClick={() => {
+                    // For email templates, open template picker with email channel
+                    setShowTemplatePicker(true);
+                  }}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-700/50 hover:bg-slate-700 border border-slate-600/50 text-sky-400 text-xs font-medium transition-colors">
+                    <Mail className="w-3.5 h-3.5" />
+                    Email Template
+                  </button>
+                </div>
+              </div>
+
               {/* === MESSAGING WORKBENCH === */}
               <div className="bg-slate-800/60 border border-slate-700 rounded-xl overflow-hidden">
                 {/* Messaging Tabs */}
@@ -335,10 +391,6 @@ export function WhatsApp() {
                       msgMode === 'ai' ? 'bg-violet-500/15 text-violet-300 border-b-2 border-violet-500' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
                     }`}>
                     <Sparkles className="w-3.5 h-3.5" /> AI Message
-                  </button>
-                  <button type="button" onClick={() => setShowTemplatePicker(true)}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 transition-colors">
-                    <BookOpen className="w-3.5 h-3.5" /> Templates
                   </button>
                   <button type="button" onClick={() => setMsgMode('manual')}
                     className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-medium transition-colors ${
