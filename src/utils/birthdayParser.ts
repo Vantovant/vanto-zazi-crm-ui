@@ -219,7 +219,7 @@ function parseLocalDate(d: Date | string | null): Date | null {
 /**
  * Classify a birthday relative to today (using local timezone).
  */
-export function classifyBirthday(date: Date | null): 'today' | 'tomorrow' | 'this_week' | 'upcoming' | 'past' {
+export function classifyBirthday(date: Date | string | null): 'today' | 'tomorrow' | 'this_week' | 'upcoming' | 'past' {
   if (!date) return 'upcoming';
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -237,7 +237,7 @@ export function classifyBirthday(date: Date | null): 'today' | 'tomorrow' | 'thi
   return 'upcoming';
 }
 
-export function daysUntil(date: Date | null): number | null {
+export function daysUntil(date: Date | string | null): number | null {
   if (!date) return null;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
