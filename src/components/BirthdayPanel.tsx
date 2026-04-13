@@ -1,12 +1,13 @@
 import { useState, useMemo, useCallback } from 'react';
 import {
   Cake, ClipboardPaste, Search, ExternalLink, Check,
-  ChevronDown, ChevronUp, MessageCircle, Trash2, Filter, PartyPopper,
+  ChevronDown, ChevronUp, MessageCircle, Trash2, Filter, PartyPopper, Play,
 } from 'lucide-react';
 import { classifyBirthday, daysUntil } from '@/utils/birthdayParser';
 import { useBirthdays, type BirthdayEntry } from '@/hooks/useBirthdays';
 import { BirthdaySmartPasteModal } from './BirthdaySmartPasteModal';
 import { BirthdayComposerModal } from './BirthdayComposerModal';
+import { BirthdaySessionModal } from './BirthdaySessionModal';
 
 type FilterType = 'all' | 'today' | 'tomorrow' | 'this_week' | 'upcoming' | 'congratulated' | 'not_congratulated' | 'unmatched';
 
@@ -26,6 +27,7 @@ export function BirthdayPanel() {
   const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState(true);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showSession, setShowSession] = useState(false);
 
   // Counts
   const counts = useMemo(() => {
@@ -129,6 +131,13 @@ export function BirthdayPanel() {
                 <ClipboardPaste className="w-3 h-3" />
                 Smart Paste
               </button>
+              {birthdays.filter(b => b.status !== 'congratulated').length > 0 && (
+                <button type="button" onClick={() => setShowSession(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors">
+                  <Play className="w-3 h-3" />
+                  Start Session
+                </button>
+              )}
               {selectedIds.size > 0 && (
                 <button type="button" onClick={openBulkComposer}
                   className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors">
@@ -240,6 +249,13 @@ export function BirthdayPanel() {
           initialIndex={composerIndex}
           onClose={() => setComposerEntries(null)}
           onCongratulated={handleCongratulated}
+        />
+      )}
+      {showSession && (
+        <BirthdaySessionModal
+          birthdays={birthdays}
+          onClose={() => setShowSession(false)}
+          onCongratulated={async (id) => { await markCongratulated(id); }}
         />
       )}
     </>
