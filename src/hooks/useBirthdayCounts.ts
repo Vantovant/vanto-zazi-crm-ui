@@ -34,7 +34,9 @@ export function useBirthdayCounts() {
     for (const b of data) {
       const raw = b.congratulate_by_date || b.birth_date;
       if (!raw) continue;
-      const d = new Date(raw);
+      // Parse as local date to avoid UTC timezone shift
+      const parts = (raw as string).split('T')[0].split('-');
+      const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
       d.setHours(0, 0, 0, 0);
       const diff = Math.round((d.getTime() - now.getTime()) / 86400000);
 
