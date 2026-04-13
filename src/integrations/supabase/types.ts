@@ -171,6 +171,74 @@ export type Database = {
           },
         ]
       }
+      contact_birthdays: {
+        Row: {
+          associate_id: string
+          birth_date: string | null
+          birth_date_text: string
+          congratulate_by_date: string | null
+          congratulated_at: string | null
+          contact_id: string | null
+          created_at: string
+          cycle_year: number
+          first_name: string
+          full_name: string
+          id: string
+          level: string
+          message_style: string
+          status: string
+          updated_at: string
+          user_id: string
+          when_to_congratulate: string
+        }
+        Insert: {
+          associate_id?: string
+          birth_date?: string | null
+          birth_date_text?: string
+          congratulate_by_date?: string | null
+          congratulated_at?: string | null
+          contact_id?: string | null
+          created_at?: string
+          cycle_year?: number
+          first_name?: string
+          full_name?: string
+          id?: string
+          level?: string
+          message_style?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+          when_to_congratulate?: string
+        }
+        Update: {
+          associate_id?: string
+          birth_date?: string | null
+          birth_date_text?: string
+          congratulate_by_date?: string | null
+          congratulated_at?: string | null
+          contact_id?: string | null
+          created_at?: string
+          cycle_year?: number
+          first_name?: string
+          full_name?: string
+          id?: string
+          level?: string
+          message_style?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+          when_to_congratulate?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_birthdays_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contact_waiting_room: {
         Row: {
           contact_id: string
