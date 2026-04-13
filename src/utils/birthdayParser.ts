@@ -203,13 +203,28 @@ export function parseBirthdayReport(text: string): BirthdayRow[] {
 }
 
 /**
- * Classify a birthday relative to today.
+ * Parse a date string (YYYY-MM-DD) as LOCAL midnight to avoid UTC timezone shifts.
  */
-export function classifyBirthday(date: Date | null): 'today' | 'tomorrow' | 'this_week' | 'upcoming' | 'past' {
+function parseLocalDate(d: Date | string | null): Date | null {
+  if (!d) return null;
+  if (typeof d === 'string') {
+    const parts = d.split('T')[0].split('-');
+    if (parts.length === 3) {
+      return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    }
+  }
+  return new Date(d);
+}
+
+/**
+ * Classify a birthday relative to today (using local timezone).
+ */
+export function classifyBirthday(date: Date | string | null): 'today' | 'tomorrow' | 'this_week' | 'upcoming' | 'past' {
   if (!date) return 'upcoming';
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const target = new Date(date);
+  const target = parseLocalDate(date as any);
+  if (!target) return 'upcoming';
   target.setHours(0, 0, 0, 0);
 
   const diffMs = target.getTime() - today.getTime();
@@ -222,11 +237,12 @@ export function classifyBirthday(date: Date | null): 'today' | 'tomorrow' | 'thi
   return 'upcoming';
 }
 
-export function daysUntil(date: Date | null): number | null {
+export function daysUntil(date: Date | string | null): number | null {
   if (!date) return null;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const target = new Date(date);
+  const target = parseLocalDate(date as any);
+  if (!target) return null;
   target.setHours(0, 0, 0, 0);
   return Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 }

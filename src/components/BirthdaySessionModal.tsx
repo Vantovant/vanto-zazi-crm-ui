@@ -24,7 +24,7 @@ export function BirthdaySessionModal({ birthdays, onClose, onCongratulated }: Pr
 
     return birthdays.filter(b => {
       if (b.status === 'congratulated') return false;
-      const d = b.congratulate_by_date ? new Date(b.congratulate_by_date) : b.birth_date ? new Date(b.birth_date) : null;
+      const d = b.congratulate_by_date || b.birth_date || null;
       const cls = classifyBirthday(d);
       return scopes.includes(cls as Scope) || cls === 'past'; // include overdue
     });
@@ -52,9 +52,9 @@ export function BirthdaySessionModal({ birthdays, onClose, onCongratulated }: Pr
   }
 
   const scopeOptions: { key: Scope; label: string; count: number }[] = [
-    { key: 'today', label: 'Today Only', count: birthdays.filter(b => { const d = b.congratulate_by_date ? new Date(b.congratulate_by_date) : b.birth_date ? new Date(b.birth_date) : null; return classifyBirthday(d) === 'today' && b.status !== 'congratulated'; }).length },
-    { key: 'tomorrow', label: 'Today + Tomorrow', count: birthdays.filter(b => { const d = b.congratulate_by_date ? new Date(b.congratulate_by_date) : b.birth_date ? new Date(b.birth_date) : null; const c = classifyBirthday(d); return (c === 'today' || c === 'tomorrow') && b.status !== 'congratulated'; }).length },
-    { key: 'this_week', label: 'This Week', count: birthdays.filter(b => { const d = b.congratulate_by_date ? new Date(b.congratulate_by_date) : b.birth_date ? new Date(b.birth_date) : null; const c = classifyBirthday(d); return (c === 'today' || c === 'tomorrow' || c === 'this_week') && b.status !== 'congratulated'; }).length },
+    { key: 'today', label: 'Today Only', count: birthdays.filter(b => { const d = b.congratulate_by_date || b.birth_date || null; return classifyBirthday(d) === 'today' && b.status !== 'congratulated'; }).length },
+    { key: 'tomorrow', label: 'Today + Tomorrow', count: birthdays.filter(b => { const d = b.congratulate_by_date || b.birth_date || null; const c = classifyBirthday(d); return (c === 'today' || c === 'tomorrow') && b.status !== 'congratulated'; }).length },
+    { key: 'this_week', label: 'This Week', count: birthdays.filter(b => { const d = b.congratulate_by_date || b.birth_date || null; const c = classifyBirthday(d); return (c === 'today' || c === 'tomorrow' || c === 'this_week') && b.status !== 'congratulated'; }).length },
   ];
 
   return (
@@ -112,7 +112,7 @@ export function BirthdaySessionModal({ birthdays, onClose, onCongratulated }: Pr
 
               {/* Overdue warning */}
               {birthdays.some(b => {
-                const d = b.congratulate_by_date ? new Date(b.congratulate_by_date) : b.birth_date ? new Date(b.birth_date) : null;
+                const d = b.congratulate_by_date || b.birth_date || null;
                 return classifyBirthday(d) === 'past' && b.status !== 'congratulated';
               }) && (
                 <div className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
