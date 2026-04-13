@@ -136,7 +136,31 @@ export function WhatsApp() {
   }, [selectedContact]);
 
   return (
-    <div className="h-[calc(100vh-56px-48px)] flex rounded-xl overflow-hidden border border-slate-700 bg-slate-800/30">
+    <div className="h-[calc(100vh-56px-48px)] flex flex-col">
+      {/* Tab bar */}
+      <div className="flex items-center gap-1 mb-2 px-1">
+        <button type="button" onClick={() => setActiveTab('contacts')}
+          className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+            activeTab === 'contacts' ? 'bg-green-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+          }`}>
+          <MessageCircle className="w-4 h-4" />
+          Contacts
+        </button>
+        <button type="button" onClick={() => setActiveTab('birthdays')}
+          className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+            activeTab === 'birthdays' ? 'bg-pink-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+          }`}>
+          <Cake className="w-4 h-4" />
+          Birthdays
+        </button>
+      </div>
+
+      {activeTab === 'birthdays' ? (
+        <div className="flex-1 overflow-y-auto px-1">
+          <BirthdayPanel />
+        </div>
+      ) : (
+    <div className="flex-1 flex rounded-xl overflow-hidden border border-slate-700 bg-slate-800/30">
       {/* Contact List - Left Panel */}
       <div className="w-80 border-r border-slate-700 flex flex-col bg-slate-800/50">
         <div className="p-4 border-b border-slate-700">
