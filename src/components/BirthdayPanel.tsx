@@ -20,7 +20,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export function BirthdayPanel() {
-  const { birthdays, loading, importBirthdays, markCongratulated, deleteBirthday, clearAll } = useBirthdays();
+  const { birthdays, loading, importBirthdays, markCongratulated, deleteBirthday, clearAll, testToday, restoreOriginalDate } = useBirthdays();
   const [showPaste, setShowPaste] = useState(false);
   const [composerEntries, setComposerEntries] = useState<BirthdayEntry[] | null>(null);
   const [composerIndex, setComposerIndex] = useState(0);
@@ -215,6 +215,19 @@ export function BirthdayPanel() {
                         </div>
                       </div>
                       <div className="flex items-center gap-1">
+                        {/* Test Today / Restore */}
+                        {b.status !== 'congratulated' && !(b as any).original_congratulate_by_date && (
+                          <button type="button" onClick={() => testToday(b.id)} title="Test Today — temporarily set to today"
+                            className="p-1.5 hover:bg-purple-500/20 rounded-md transition-colors">
+                            <FlaskConical className="w-3.5 h-3.5 text-purple-400" />
+                          </button>
+                        )}
+                        {(b as any).original_congratulate_by_date && (
+                          <button type="button" onClick={() => restoreOriginalDate(b.id)} title="Restore original date"
+                            className="p-1.5 hover:bg-orange-500/20 rounded-md transition-colors">
+                            <Undo2 className="w-3.5 h-3.5 text-orange-400" />
+                          </button>
+                        )}
                         {b.status !== 'congratulated' && (
                           <button type="button" onClick={() => openComposer([b], 0)} title="Send birthday message"
                             className="p-1.5 hover:bg-green-500/20 rounded-md transition-colors">
