@@ -130,6 +130,29 @@ export function useBirthdays() {
     await fetchBirthdays();
   }, [user, fetchBirthdays]);
 
+  const testToday = useCallback(async (id: string) => {
+    const today = new Date().toISOString().split('T')[0];
+    const entry = birthdays.find(b => b.id === id);
+    if (!entry) return;
+    // Save original only if not already in test mode
+    const updates: Record<string, any> = { congratulate_by_date: today };
+    if (!(entry as any).original_congratulate_by_date) {
+      updates.original_congratulate_by_date = entry.congratulate_by_date || entry.birth_date || today;
+    }
+    await supabase.from('contact_birthdays').update(updates as any).eq('id', id);
+    await fetchBirthdays();
+  }, [birthdays, fetchBirthdays]);
+
+  const restoreOriginalDate = useCallback(async (id: string) => {
+    const entry = birthdays.find(b => b.id === id) as any;
+    if (!entry?.original_congratulate_by_date) return;
+    await supabase.from('contact_birthdays').update({
+      congratulate_by_date: entry.original_congratulate_by_date,
+      original_congratulate_by_date: null,
+    } as any).eq('id', id);
+    await fetchBirthdays();
+  }, [birthdays, fetchBirthdays]);
+
   return {
     birthdays,
     loading,
@@ -138,6 +161,8 @@ export function useBirthdays() {
     updateStatus,
     deleteBirthday,
     clearAll,
+    testToday,
+    restoreOriginalDate,
     refetch: fetchBirthdays,
   };
 }

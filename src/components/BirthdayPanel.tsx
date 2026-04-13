@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback } from 'react';
 import {
   Cake, ClipboardPaste, Search, ExternalLink, Check,
   ChevronDown, ChevronUp, MessageCircle, Trash2, Filter, PartyPopper, Play,
+  FlaskConical, Undo2,
 } from 'lucide-react';
 import { classifyBirthday, daysUntil } from '@/utils/birthdayParser';
 import { useBirthdays, type BirthdayEntry } from '@/hooks/useBirthdays';
@@ -19,7 +20,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export function BirthdayPanel() {
-  const { birthdays, loading, importBirthdays, markCongratulated, deleteBirthday, clearAll } = useBirthdays();
+  const { birthdays, loading, importBirthdays, markCongratulated, deleteBirthday, clearAll, testToday, restoreOriginalDate } = useBirthdays();
   const [showPaste, setShowPaste] = useState(false);
   const [composerEntries, setComposerEntries] = useState<BirthdayEntry[] | null>(null);
   const [composerIndex, setComposerIndex] = useState(0);
@@ -206,6 +207,9 @@ export function BirthdayPanel() {
                         <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
                           <span>🎂 {b.birth_date_text || '—'}</span>
                           {b.associate_id && <span className="font-mono">ID: {b.associate_id}</span>}
+                          {(b as any).original_congratulate_by_date && (
+                            <span className="text-purple-400 font-medium">🧪 Test Mode</span>
+                          )}
                           {days !== null && (
                             <span className={`${timing === 'today' ? 'text-rose-400 font-medium' : timing === 'tomorrow' ? 'text-amber-400' : 'text-slate-500'}`}>
                               {timing === 'today' ? '🎉 Today!' : timing === 'tomorrow' ? 'Tomorrow' : days > 0 ? `In ${days}d` : days < 0 ? `${Math.abs(days)}d ago` : ''}
@@ -214,6 +218,19 @@ export function BirthdayPanel() {
                         </div>
                       </div>
                       <div className="flex items-center gap-1">
+                        {/* Test Today / Restore */}
+                        {b.status !== 'congratulated' && !(b as any).original_congratulate_by_date && (
+                          <button type="button" onClick={() => testToday(b.id)} title="Test Today — temporarily set to today"
+                            className="p-1.5 hover:bg-purple-500/20 rounded-md transition-colors">
+                            <FlaskConical className="w-3.5 h-3.5 text-purple-400" />
+                          </button>
+                        )}
+                        {(b as any).original_congratulate_by_date && (
+                          <button type="button" onClick={() => restoreOriginalDate(b.id)} title="Restore original date"
+                            className="p-1.5 hover:bg-orange-500/20 rounded-md transition-colors">
+                            <Undo2 className="w-3.5 h-3.5 text-orange-400" />
+                          </button>
+                        )}
                         {b.status !== 'congratulated' && (
                           <button type="button" onClick={() => openComposer([b], 0)} title="Send birthday message"
                             className="p-1.5 hover:bg-green-500/20 rounded-md transition-colors">
