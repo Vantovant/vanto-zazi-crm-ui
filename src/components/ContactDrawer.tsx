@@ -35,7 +35,7 @@ interface ContactDrawerProps {
   prospect: Prospect;
   onClose: () => void;
   onOpenTemplatePicker?: (channel: 'whatsapp' | 'email') => void;
-  onOpenActivityAppreciation?: (contact: Prospect, activity: ContactActivity) => void;
+  
 }
 
 
