@@ -65,19 +65,37 @@ function formatTimeAgo(dateStr: string) {
   return date.toLocaleDateString();
 }
 
+interface ActivityAppreciationOrder {
+  id: string;
+  contactId: string | null;
+  contactName: string;
+  amount: number;
+  product: string;
+}
+
 interface ActivityAppreciationEntry {
   contact: Prospect;
-  order: {
-    id: string;
-    contactId: string | null;
-    contactName: string;
-    amount: number;
-    product: string;
-  };
+  order: ActivityAppreciationOrder;
   month: string;
 }
 
 const APPRECIATION_SUMMARY_PATTERN = /Month:\s*(.+?)\s*\|\s*Amount:\s*R([\d,.]+)/i;
+
+function normalizeActivityAppreciationOrder(order: {
+  id: string | number;
+  contactId?: string | null;
+  contactName?: string;
+  amount?: number;
+  product?: string;
+}): ActivityAppreciationOrder {
+  return {
+    id: String(order.id),
+    contactId: order.contactId ?? null,
+    contactName: order.contactName ?? '',
+    amount: order.amount ?? 0,
+    product: order.product ?? '',
+  };
+}
 
 function buildAppreciationEntryFromActivity(contact: Prospect, activity: ContactActivity): ActivityAppreciationEntry | null {
   const match = activity.summary.match(APPRECIATION_SUMMARY_PATTERN);
@@ -92,13 +110,13 @@ function buildAppreciationEntryFromActivity(contact: Prospect, activity: Contact
   return {
     contact,
     month,
-    order: {
+    order: normalizeActivityAppreciationOrder({
       id: `${activity.id}-appreciation`,
       contactId: String(contact.id),
       contactName: contact.FullName,
       amount,
       product: `Monthly Activity - ${month}`,
-    },
+    }),
   };
 }
 
@@ -298,17 +316,17 @@ export function Activities() {
     const notAppreciatedCount = latestOrders.length - appreciatedCount;
 
     const handleOpenSingleAppreciation = (order: typeof latestOrders[0], contactOrFallback: Prospect) => {
-      setAppreciationEntries([{ contact: contactOrFallback, order, month: latestMonth }]);
+      setAppreciationEntries([{ contact: contactOrFallback, order: normalizeActivityAppreciationOrder(order), month: latestMonth }]);
       setAppreciationIndex(0);
     };
 
     const handleBulkAppreciation = () => {
-      const entries: { contact: Prospect; order: typeof latestOrders[0]; month: string }[] = [];
+      const entries: ActivityAppreciationEntry[] = [];
       for (const order of filteredOrders) {
         const contact = contacts.find(c => String(c.id) === order.contactId);
         const fallback = { id: order.id, FullName: order.contactName, PhoneNumber: '', LeadTemperature: '', LeadType: '', AssignedTo: '' } as unknown as Prospect;
         if (!selectedActivityRows.size || selectedActivityRows.has(String(order.id))) {
-          entries.push({ contact: contact || fallback, order, month: latestMonth });
+          entries.push({ contact: contact || fallback, order: normalizeActivityAppreciationOrder(order), month: latestMonth });
         }
       }
       if (entries.length > 0) {
