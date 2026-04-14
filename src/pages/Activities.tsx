@@ -28,7 +28,7 @@ import { ContactDrawer } from '../components/ContactDrawer';
 import { MessageTemplatePicker } from '../components/MessageTemplatePicker';
 import { ActivityAppreciationModal } from '../components/ActivityAppreciationModal';
 import { useCrm } from '@/contexts/CrmContext';
-import { useContactActivities } from '@/hooks/useContactActivities';
+import { useContactActivities, type ContactActivity } from '@/hooks/useContactActivities';
 import { useActivityGoals } from '@/hooks/useActivityGoals';
 import { useWaitingRoom, ISSUE_TYPE_LABELS } from '@/hooks/useWaitingRoom';
 import { supabase } from '@/integrations/supabase/client';
@@ -65,6 +65,61 @@ function formatTimeAgo(dateStr: string) {
   return date.toLocaleDateString();
 }
 
+interface ActivityAppreciationOrder {
+  id: string;
+  contactId: string | null;
+  contactName: string;
+  amount: number;
+  product: string;
+}
+
+interface ActivityAppreciationEntry {
+  contact: Prospect;
+  order: ActivityAppreciationOrder;
+  month: string;
+}
+
+const APPRECIATION_SUMMARY_PATTERN = /Month:\s*(.+?)\s*\|\s*Amount:\s*R([\d,.]+)/i;
+
+function normalizeActivityAppreciationOrder(order: {
+  id: string | number;
+  contactId?: string | null;
+  contactName?: string;
+  amount?: number;
+  product?: string;
+}): ActivityAppreciationOrder {
+  return {
+    id: String(order.id),
+    contactId: order.contactId ?? null,
+    contactName: order.contactName ?? '',
+    amount: order.amount ?? 0,
+    product: order.product ?? '',
+  };
+}
+
+function buildAppreciationEntryFromActivity(contact: Prospect, activity: ContactActivity): ActivityAppreciationEntry | null {
+  const match = activity.summary.match(APPRECIATION_SUMMARY_PATTERN);
+
+  if (!match) return null;
+
+  const month = match[1]?.trim();
+  const amount = Number(match[2]?.replace(/,/g, ''));
+
+  if (!month || Number.isNaN(amount)) return null;
+
+  return {
+    contact,
+    month,
+    order: normalizeActivityAppreciationOrder({
+      id: `${activity.id}-appreciation`,
+      contactId: String(contact.id),
+      contactName: contact.FullName,
+      amount,
+      product: `Monthly Activity - ${month}`,
+    }),
+  };
+}
+
 export function Activities() {
   const { contacts, orders } = useCrm();
   const [showLogActivity, setShowLogActivity] = useState(false);
@@ -81,11 +136,19 @@ export function Activities() {
   const [wrFilter, setWrFilter] = useState<'all' | 'high' | 'resolved'>('all');
 
   // Activity Appreciation state
-  const [appreciationEntries, setAppreciationEntries] = useState<{ contact: Prospect; order: any; month: string }[] | null>(null);
+  const [appreciationEntries, setAppreciationEntries] = useState<ActivityAppreciationEntry[] | null>(null);
   const [appreciationIndex, setAppreciationIndex] = useState(0);
   const [appreciatedIds, setAppreciatedIds] = useState<Set<string>>(new Set());
   const [activityPaidFilter, setActivityPaidFilter] = useState<'all' | 'not_appreciated' | 'appreciated'>('all');
   const [selectedActivityRows, setSelectedActivityRows] = useState<Set<string>>(new Set());
+
+  const handleOpenLoggedAppreciation = useCallback((contact: Prospect, activity: ContactActivity) => {
+    const entry = buildAppreciationEntryFromActivity(contact, activity);
+    if (!entry) return;
+
+    setAppreciationEntries([entry]);
+    setAppreciationIndex(0);
+  }, []);
 
   // Detect appreciated contacts from activity log
   const appreciatedFromLog = useMemo(() => {
@@ -253,17 +316,17 @@ export function Activities() {
     const notAppreciatedCount = latestOrders.length - appreciatedCount;
 
     const handleOpenSingleAppreciation = (order: typeof latestOrders[0], contactOrFallback: Prospect) => {
-      setAppreciationEntries([{ contact: contactOrFallback, order, month: latestMonth }]);
+      setAppreciationEntries([{ contact: contactOrFallback, order: normalizeActivityAppreciationOrder(order), month: latestMonth }]);
       setAppreciationIndex(0);
     };
 
     const handleBulkAppreciation = () => {
-      const entries: { contact: Prospect; order: typeof latestOrders[0]; month: string }[] = [];
+      const entries: ActivityAppreciationEntry[] = [];
       for (const order of filteredOrders) {
         const contact = contacts.find(c => String(c.id) === order.contactId);
         const fallback = { id: order.id, FullName: order.contactName, PhoneNumber: '', LeadTemperature: '', LeadType: '', AssignedTo: '' } as unknown as Prospect;
         if (!selectedActivityRows.size || selectedActivityRows.has(String(order.id))) {
-          entries.push({ contact: contact || fallback, order, month: latestMonth });
+          entries.push({ contact: contact || fallback, order: normalizeActivityAppreciationOrder(order), month: latestMonth });
         }
       }
       if (entries.length > 0) {
@@ -820,7 +883,7 @@ export function Activities() {
         return c ? <ContactDrawer prospect={c} onClose={() => setDrawerContactId(null)} onOpenTemplatePicker={(channel) => {
           if (c) setTemplatePicker({ contact: c, channel });
           setDrawerContactId(null);
-        }} /> : null;
+        }} onOpenActivityAppreciation={handleOpenLoggedAppreciation} /> : null;
       })()}
 
       {templatePicker && (
