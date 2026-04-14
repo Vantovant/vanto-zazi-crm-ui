@@ -38,9 +38,6 @@ interface ContactDrawerProps {
   onOpenActivityAppreciation?: (contact: Prospect, activity: ContactActivity) => void;
 }
 
-const isActivityAppreciationLog = (activity: ContactActivity) => (
-  activity.activity_type === 'whatsapp' && activity.summary?.toLowerCase().includes('activity appreciation')
-);
 
 const temperatureColors: Record<string, string> = {
   Hot: 'bg-rose-500/20 text-rose-400 border-rose-500/40',
