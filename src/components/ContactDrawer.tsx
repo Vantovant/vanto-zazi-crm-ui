@@ -59,7 +59,7 @@ const regStatusColors: Record<string, string> = {
   Activated: 'bg-emerald-500/20 text-emerald-400',
 };
 
-export function ContactDrawer({ prospect: initialProspect, onClose, onOpenTemplatePicker, onOpenActivityAppreciation }: ContactDrawerProps) {
+export function ContactDrawer({ prospect: initialProspect, onClose, onOpenTemplatePicker }: ContactDrawerProps) {
   const { contacts, updateContact } = useCrm();
   const { logActivity, getContactActivities } = useContactActivities();
   const { getEntryForContact, addToWaitingRoom, updateEntry, removeEntry } = useWaitingRoom();

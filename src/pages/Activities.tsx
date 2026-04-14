@@ -907,7 +907,7 @@ export function Activities() {
         return c ? <ContactDrawer prospect={c} onClose={() => setDrawerContactId(null)} onOpenTemplatePicker={(channel) => {
           if (c) setTemplatePicker({ contact: c, channel });
           setDrawerContactId(null);
-        }} onOpenActivityAppreciation={handleOpenLoggedAppreciation} /> : null;
+        }} /> : null;
       })()}
 
       {templatePicker && (
