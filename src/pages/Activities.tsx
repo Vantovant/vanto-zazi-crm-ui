@@ -80,6 +80,21 @@ interface ActivityAppreciationEntry {
   month: string;
 }
 
+function normalizeActivityAppreciationOrder(order: {
+  id: string | number;
+  contactId?: string | null;
+  contactName?: string;
+  amount?: number;
+  product?: string;
+}): ActivityAppreciationOrder {
+  return {
+    id: String(order.id),
+    contactId: order.contactId ?? null,
+    contactName: order.contactName ?? '',
+    amount: order.amount ?? 0,
+    product: order.product ?? '',
+  };
+}
 
 export function Activities() {
   const { contacts, orders } = useCrm();
