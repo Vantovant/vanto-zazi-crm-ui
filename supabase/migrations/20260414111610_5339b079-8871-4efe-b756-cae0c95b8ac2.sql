@@ -1,0 +1,1 @@
+UPDATE public.contact_birthdays SET birth_date = '2026-04-15', congratulate_by_date = '2026-04-15' WHERE id = '863c2b17-9334-4ac9-a344-1e050b11997e';
