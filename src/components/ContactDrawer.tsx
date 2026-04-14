@@ -520,8 +520,8 @@ export function ContactDrawer({ prospect: initialProspect, onClose, onOpenTempla
                           <p className="text-sm text-slate-300 mt-1">{a.summary}</p>
                           {a.notes && <p className="text-xs text-slate-500 mt-1 line-clamp-2">{a.notes}</p>}
                         </div>
-                      );
-                    })}
+                      ))}
+
                   </div>
                 )}
               </div>
