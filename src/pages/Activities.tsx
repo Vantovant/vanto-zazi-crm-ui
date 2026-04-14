@@ -80,46 +80,6 @@ interface ActivityAppreciationEntry {
   month: string;
 }
 
-const APPRECIATION_SUMMARY_PATTERN = /Month:\s*(.+?)\s*\|\s*Amount:\s*R([\d,.]+)/i;
-
-function normalizeActivityAppreciationOrder(order: {
-  id: string | number;
-  contactId?: string | null;
-  contactName?: string;
-  amount?: number;
-  product?: string;
-}): ActivityAppreciationOrder {
-  return {
-    id: String(order.id),
-    contactId: order.contactId ?? null,
-    contactName: order.contactName ?? '',
-    amount: order.amount ?? 0,
-    product: order.product ?? '',
-  };
-}
-
-function buildAppreciationEntryFromActivity(contact: Prospect, activity: ContactActivity): ActivityAppreciationEntry | null {
-  const match = activity.summary.match(APPRECIATION_SUMMARY_PATTERN);
-
-  if (!match) return null;
-
-  const month = match[1]?.trim();
-  const amount = Number(match[2]?.replace(/,/g, ''));
-
-  if (!month || Number.isNaN(amount)) return null;
-
-  return {
-    contact,
-    month,
-    order: normalizeActivityAppreciationOrder({
-      id: `${activity.id}-appreciation`,
-      contactId: String(contact.id),
-      contactName: contact.FullName,
-      amount,
-      product: `Monthly Activity - ${month}`,
-    }),
-  };
-}
 
 export function Activities() {
   const { contacts, orders } = useCrm();
@@ -144,13 +104,6 @@ export function Activities() {
   const [selectedActivityRows, setSelectedActivityRows] = useState<Set<string>>(new Set());
   const [activityPaidSearch, setActivityPaidSearch] = useState('');
 
-  const handleOpenLoggedAppreciation = useCallback((contact: Prospect, activity: ContactActivity) => {
-    const entry = buildAppreciationEntryFromActivity(contact, activity);
-    if (!entry) return;
-
-    setAppreciationEntries([entry]);
-    setAppreciationIndex(0);
-  }, []);
 
   // Detect appreciated contacts from activity log
   const appreciatedFromLog = useMemo(() => {
