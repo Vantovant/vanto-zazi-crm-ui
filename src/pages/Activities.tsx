@@ -14,6 +14,7 @@ import {
   Zap,
   Mail,
   Settings,
+  Search,
   Target,
   DollarSign,
   Crown,
@@ -79,8 +80,6 @@ interface ActivityAppreciationEntry {
   month: string;
 }
 
-const APPRECIATION_SUMMARY_PATTERN = /Month:\s*(.+?)\s*\|\s*Amount:\s*R([\d,.]+)/i;
-
 function normalizeActivityAppreciationOrder(order: {
   id: string | number;
   contactId?: string | null;
@@ -94,29 +93,6 @@ function normalizeActivityAppreciationOrder(order: {
     contactName: order.contactName ?? '',
     amount: order.amount ?? 0,
     product: order.product ?? '',
-  };
-}
-
-function buildAppreciationEntryFromActivity(contact: Prospect, activity: ContactActivity): ActivityAppreciationEntry | null {
-  const match = activity.summary.match(APPRECIATION_SUMMARY_PATTERN);
-
-  if (!match) return null;
-
-  const month = match[1]?.trim();
-  const amount = Number(match[2]?.replace(/,/g, ''));
-
-  if (!month || Number.isNaN(amount)) return null;
-
-  return {
-    contact,
-    month,
-    order: normalizeActivityAppreciationOrder({
-      id: `${activity.id}-appreciation`,
-      contactId: String(contact.id),
-      contactName: contact.FullName,
-      amount,
-      product: `Monthly Activity - ${month}`,
-    }),
   };
 }
 
@@ -141,14 +117,8 @@ export function Activities() {
   const [appreciatedIds, setAppreciatedIds] = useState<Set<string>>(new Set());
   const [activityPaidFilter, setActivityPaidFilter] = useState<'all' | 'not_appreciated' | 'appreciated'>('all');
   const [selectedActivityRows, setSelectedActivityRows] = useState<Set<string>>(new Set());
+  const [activityPaidSearch, setActivityPaidSearch] = useState('');
 
-  const handleOpenLoggedAppreciation = useCallback((contact: Prospect, activity: ContactActivity) => {
-    const entry = buildAppreciationEntryFromActivity(contact, activity);
-    if (!entry) return;
-
-    setAppreciationEntries([entry]);
-    setAppreciationIndex(0);
-  }, []);
 
   // Detect appreciated contacts from activity log
   const appreciatedFromLog = useMemo(() => {
@@ -305,10 +275,21 @@ export function Activities() {
 
     const filteredOrders = latestOrders.filter(order => {
       const cId = order.contactId;
-      if (!cId) return activityPaidFilter === 'all';
-      const isAppreciated = allAppreciatedIds.has(cId);
-      if (activityPaidFilter === 'appreciated') return isAppreciated;
-      if (activityPaidFilter === 'not_appreciated') return !isAppreciated;
+      // Status filter
+      if (activityPaidFilter !== 'all') {
+        if (!cId) return false;
+        const isAppreciated = allAppreciatedIds.has(cId);
+        if (activityPaidFilter === 'appreciated' && !isAppreciated) return false;
+        if (activityPaidFilter === 'not_appreciated' && isAppreciated) return false;
+      }
+      // Name search filter
+      if (activityPaidSearch.trim()) {
+        const q = activityPaidSearch.trim().toLowerCase();
+        const nameMatch = order.contactName.toLowerCase().includes(q);
+        const contact = contacts.find(c => String(c.id) === order.contactId);
+        const idMatch = contact?.APLGoID?.toLowerCase().includes(q);
+        if (!nameMatch && !idMatch) return false;
+      }
       return true;
     });
 
@@ -388,8 +369,19 @@ export function Activities() {
                 </button>
               )}
             </div>
+            </div>
           </div>
-        </div>
+          {/* Search input */}
+          <div className="relative mt-2">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
+            <input
+              type="text"
+              value={activityPaidSearch}
+              onChange={e => { setActivityPaidSearch(e.target.value); setSelectedActivityRows(new Set()); }}
+              placeholder="Search by name or ID..."
+              className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
+            />
+          </div>
         {latestOrders.length === 0 ? (
           <div className="p-6 sm:p-8 text-center">
             <DollarSign className="w-10 h-10 text-slate-600 mx-auto mb-3" />
@@ -883,7 +875,7 @@ export function Activities() {
         return c ? <ContactDrawer prospect={c} onClose={() => setDrawerContactId(null)} onOpenTemplatePicker={(channel) => {
           if (c) setTemplatePicker({ contact: c, channel });
           setDrawerContactId(null);
-        }} onOpenActivityAppreciation={handleOpenLoggedAppreciation} /> : null;
+        }} /> : null;
       })()}
 
       {templatePicker && (

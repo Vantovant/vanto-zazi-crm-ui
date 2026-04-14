@@ -20,8 +20,6 @@ import {
   Copy,
   Check,
   Send,
-  RefreshCw,
-  Crown,
 } from 'lucide-react';
 import type { Prospect } from '../data/mockData';
 import { EditContactModal } from './EditContactModal';
@@ -36,12 +34,9 @@ interface ContactDrawerProps {
   prospect: Prospect;
   onClose: () => void;
   onOpenTemplatePicker?: (channel: 'whatsapp' | 'email') => void;
-  onOpenActivityAppreciation?: (contact: Prospect, activity: ContactActivity) => void;
+  
 }
 
-const isActivityAppreciationLog = (activity: ContactActivity) => (
-  activity.activity_type === 'whatsapp' && activity.summary?.toLowerCase().includes('activity appreciation')
-);
 
 const temperatureColors: Record<string, string> = {
   Hot: 'bg-rose-500/20 text-rose-400 border-rose-500/40',
@@ -63,7 +58,7 @@ const regStatusColors: Record<string, string> = {
   Activated: 'bg-emerald-500/20 text-emerald-400',
 };
 
-export function ContactDrawer({ prospect: initialProspect, onClose, onOpenTemplatePicker, onOpenActivityAppreciation }: ContactDrawerProps) {
+export function ContactDrawer({ prospect: initialProspect, onClose, onOpenTemplatePicker }: ContactDrawerProps) {
   const { contacts, updateContact } = useCrm();
   const { logActivity, getContactActivities } = useContactActivities();
   const { getEntryForContact, addToWaitingRoom, updateEntry, removeEntry } = useWaitingRoom();
@@ -512,10 +507,7 @@ export function ContactDrawer({ prospect: initialProspect, onClose, onOpenTempla
                   </div>
                 ) : (
                   <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {contactActivities.slice(0, 20).map((a) => {
-                      const canOpenOriginalAppreciation = isActivityAppreciationLog(a) && Boolean(onOpenActivityAppreciation);
-
-                      return (
+                    {contactActivities.slice(0, 20).map((a) => (
                         <div key={a.id} className="bg-slate-800/50 rounded-lg border border-slate-700 p-3">
                           <div className="flex items-center justify-between">
                             <span className="text-xs font-medium text-teal-400 capitalize">{a.activity_type}</span>
@@ -523,26 +515,9 @@ export function ContactDrawer({ prospect: initialProspect, onClose, onOpenTempla
                           </div>
                           <p className="text-sm text-slate-300 mt-1">{a.summary}</p>
                           {a.notes && <p className="text-xs text-slate-500 mt-1 line-clamp-2">{a.notes}</p>}
-                          {a.activity_type === 'whatsapp' && prospect.PhoneNumber && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (canOpenOriginalAppreciation) {
-                                  onOpenActivityAppreciation?.(prospect, a);
-                                  return;
-                                }
-
-                                handleWhatsApp(a.notes || undefined);
-                              }}
-                              className="flex items-center gap-1.5 mt-2 px-2.5 py-1 text-[11px] font-medium bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors"
-                            >
-                              {canOpenOriginalAppreciation ? <Crown className="w-3 h-3" /> : <RefreshCw className="w-3 h-3" />}
-                              {canOpenOriginalAppreciation ? 'Resend Original' : 'Resend'}
-                            </button>
-                          )}
                         </div>
-                      );
-                    })}
+                      ))}
+
                   </div>
                 )}
               </div>
