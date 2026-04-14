@@ -513,7 +513,7 @@ export function ContactDrawer({ prospect: initialProspect, onClose, onOpenTempla
                           <span className="text-xs text-slate-500">{new Date(a.created_at).toLocaleDateString()}</span>
                         </div>
                         <p className="text-sm text-slate-300 mt-1">{a.summary}</p>
-                        {a.notes && <p className="text-xs text-slate-500 mt-1">{a.notes}</p>}
+                        {a.notes && <p className="text-xs text-slate-500 mt-1 line-clamp-2">{a.notes}</p>}
                         {a.activity_type === 'whatsapp' && prospect.PhoneNumber && (
                           <button
                             type="button"

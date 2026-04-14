@@ -136,8 +136,8 @@ export function ActivityAppreciationModal({
     await logActivity({
       contact_id: String(entry.contact.id),
       activity_type: 'whatsapp',
-      summary: `Sent monthly activity appreciation message`,
-      notes: `Month: ${entry.month} | Amount: R${entry.order.amount.toLocaleString()} | User ID: ${entry.contact.APLGoID || 'N/A'}`,
+      summary: `Sent monthly activity appreciation message — Month: ${entry.month} | Amount: R${entry.order.amount.toLocaleString()} | User ID: ${entry.contact.APLGoID || 'N/A'}`,
+      notes: editedMessage,
     });
     await updateContact(String(entry.contact.id), {
       ActionTaken: `Activity Appreciation sent for ${entry.month} (${new Date().toLocaleDateString()})`,
