@@ -75,6 +75,15 @@ export function useBirthdays() {
       if (contact) matched++;
       else unmatched++;
 
+      // Format date as local YYYY-MM-DD to avoid UTC timezone shift
+      const formatLocal = (d: Date | null) => {
+        if (!d) return null;
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      };
+
       return {
         user_id: user.id,
         contact_id: contact ? String(contact.id) : null,
@@ -83,9 +92,9 @@ export function useBirthdays() {
         first_name: row.firstName,
         level: row.level,
         birth_date_text: row.birthDateText,
-        birth_date: row.birthDate ? row.birthDate.toISOString().split('T')[0] : null,
+        birth_date: formatLocal(row.birthDate),
         when_to_congratulate: row.whenToCongratulate,
-        congratulate_by_date: row.congratulateByDate ? row.congratulateByDate.toISOString().split('T')[0] : null,
+        congratulate_by_date: formatLocal(row.congratulateByDate),
         status: contact ? 'not_congratulated' : 'unmatched',
         cycle_year: new Date().getFullYear(),
       };
