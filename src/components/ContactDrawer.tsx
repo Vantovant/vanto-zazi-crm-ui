@@ -20,7 +20,6 @@ import {
   Copy,
   Check,
   Send,
-  Crown,
 } from 'lucide-react';
 import type { Prospect } from '../data/mockData';
 import { EditContactModal } from './EditContactModal';
