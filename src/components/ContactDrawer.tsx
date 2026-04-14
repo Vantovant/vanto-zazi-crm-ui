@@ -511,10 +511,7 @@ export function ContactDrawer({ prospect: initialProspect, onClose, onOpenTempla
                   </div>
                 ) : (
                   <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {contactActivities.slice(0, 20).map((a) => {
-                      const canOpenOriginalAppreciation = isActivityAppreciationLog(a) && Boolean(onOpenActivityAppreciation);
-
-                      return (
+                    {contactActivities.slice(0, 20).map((a) => (
                         <div key={a.id} className="bg-slate-800/50 rounded-lg border border-slate-700 p-3">
                           <div className="flex items-center justify-between">
                             <span className="text-xs font-medium text-teal-400 capitalize">{a.activity_type}</span>
