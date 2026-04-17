@@ -98,33 +98,38 @@
     const style = document.createElement('style');
     style.textContent = `
       #zazi-copilot-launcher {
-        position: fixed; bottom: 24px; right: 24px; z-index: 99999;
-        width: 48px; height: 48px; border-radius: 50%;
+        position: fixed; top: 50%; right: 8px; transform: translateY(-50%);
+        z-index: 99999;
+        width: 40px; height: 40px; border-radius: 50%;
         background: linear-gradient(135deg, #6366f1, #8b5cf6);
         display: flex; align-items: center; justify-content: center;
-        cursor: pointer; box-shadow: 0 4px 20px rgba(99,102,241,0.4);
-        transition: transform 0.2s, box-shadow 0.2s;
-        font-size: 20px; user-select: none; border: none;
+        cursor: grab; box-shadow: 0 4px 20px rgba(99,102,241,0.4);
+        transition: box-shadow 0.2s, opacity 0.2s;
+        font-size: 18px; user-select: none; border: none;
         color: white; font-family: sans-serif;
+        opacity: 0.85;
       }
       #zazi-copilot-launcher:hover {
-        transform: scale(1.1);
+        opacity: 1;
         box-shadow: 0 6px 28px rgba(99,102,241,0.55);
       }
+      #zazi-copilot-launcher:active { cursor: grabbing; }
       #zazi-copilot-launcher .zazi-badge-dot {
-        position: absolute; top: 0; right: 0; width: 12px; height: 12px;
+        position: absolute; top: 0; right: 0; width: 10px; height: 10px;
         border-radius: 50%; background: #22c55e; border: 2px solid #1a1a2e;
         display: none;
       }
       #zazi-copilot-launcher.has-context .zazi-badge-dot { display: block; }
       #zazi-copilot-launcher-tooltip {
-        position: fixed; bottom: 80px; right: 24px; z-index: 99999;
+        position: fixed; right: 56px; top: 50%; transform: translateY(-50%);
+        z-index: 99999;
         background: #1a1a2e; color: #e2e8f0; padding: 6px 12px;
         border-radius: 8px; font-size: 12px; font-family: sans-serif;
         box-shadow: 0 4px 12px rgba(0,0,0,0.3); pointer-events: none;
         opacity: 0; transition: opacity 0.2s;
         white-space: nowrap;
       }
+      #zazi-copilot-launcher:hover ~ #zazi-copilot-launcher-tooltip,
       #zazi-copilot-launcher:hover + #zazi-copilot-launcher-tooltip { opacity: 1; }
     `;
     document.head.appendChild(style);
