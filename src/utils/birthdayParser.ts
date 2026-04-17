@@ -246,3 +246,53 @@ export function daysUntil(date: Date | string | null): number | null {
   target.setHours(0, 0, 0, 0);
   return Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 }
+
+/**
+ * Get this year's calendar date for a birthday from its text ("17 April", "May 03", "03/05").
+ * Always returns the date in the CURRENT calendar year (local timezone), so
+ * classification is timezone-safe and independent of how birth_date was stored.
+ */
+export function birthdayThisYear(birthDateText: string | null | undefined): Date | null {
+  if (!birthDateText) return null;
+  const parsed = parseDateText(birthDateText);
+  if (!parsed) return null;
+  const today = new Date();
+  return new Date(today.getFullYear(), parsed.getMonth(), parsed.getDate());
+}
+
+/**
+ * Classify a birthday entry using its birth_date_text (the source of truth for month+day).
+ * Falls back to stored birth_date / congratulate_by_date when text is missing.
+ * Overdue (past) only triggers if congratulate_by_date is in the past AND birthday hasn't been hit yet this year.
+ */
+export function classifyBirthdayEntry(entry: {
+  birth_date_text?: string | null;
+  birth_date?: string | null;
+  congratulate_by_date?: string | null;
+}): 'today' | 'tomorrow' | 'this_week' | 'upcoming' | 'past' {
+  const calendarDate = birthdayThisYear(entry.birth_date_text || '') || parseLocalDate(entry.birth_date || null);
+  if (!calendarDate) {
+    return classifyBirthday(entry.congratulate_by_date || entry.birth_date || null);
+  }
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  calendarDate.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((calendarDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) return 'today';
+  if (diffDays === 1) return 'tomorrow';
+  if (diffDays >= 2 && diffDays <= 7) return 'this_week';
+  if (diffDays < 0) return 'past';
+  return 'upcoming';
+}
+
+export function daysUntilEntry(entry: {
+  birth_date_text?: string | null;
+  birth_date?: string | null;
+}): number | null {
+  const d = birthdayThisYear(entry.birth_date_text || '') || parseLocalDate(entry.birth_date || null);
+  if (!d) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  d.setHours(0, 0, 0, 0);
+  return Math.round((d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+}
