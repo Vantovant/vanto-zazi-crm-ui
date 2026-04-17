@@ -4,7 +4,7 @@ import {
   ChevronDown, ChevronUp, MessageCircle, Trash2, Filter, PartyPopper, Play,
   FlaskConical, Undo2,
 } from 'lucide-react';
-import { classifyBirthday, daysUntil } from '@/utils/birthdayParser';
+import { classifyBirthday, daysUntil, classifyBirthdayEntry, daysUntilEntry } from '@/utils/birthdayParser';
 import { useBirthdays, type BirthdayEntry } from '@/hooks/useBirthdays';
 import { BirthdaySmartPasteModal } from './BirthdaySmartPasteModal';
 import { BirthdayComposerModal } from './BirthdayComposerModal';
@@ -34,7 +34,7 @@ export function BirthdayPanel() {
   const counts = useMemo(() => {
     const c = { today: 0, tomorrow: 0, this_week: 0, upcoming: 0, congratulated: 0, not_congratulated: 0, unmatched: 0 };
     birthdays.forEach(b => {
-      const timing = classifyBirthday(b.congratulate_by_date || b.birth_date || null);
+      const timing = classifyBirthdayEntry(b);
       if (timing === 'today') c.today++;
       else if (timing === 'tomorrow') c.tomorrow++;
       else if (timing === 'this_week') c.this_week++;
@@ -49,10 +49,7 @@ export function BirthdayPanel() {
   const filtered = useMemo(() => {
     let list = birthdays;
     if (filter === 'today' || filter === 'tomorrow' || filter === 'this_week' || filter === 'upcoming') {
-      list = list.filter(b => {
-        const d = b.congratulate_by_date || b.birth_date || null;
-        return classifyBirthday(d) === filter;
-      });
+      list = list.filter(b => classifyBirthdayEntry(b) === filter);
     } else if (filter === 'congratulated') {
       list = list.filter(b => b.status === 'congratulated');
     } else if (filter === 'not_congratulated') {
@@ -185,9 +182,8 @@ export function BirthdayPanel() {
             ) : (
               <div className="space-y-1 max-h-80 overflow-y-auto">
                 {filtered.map((b, idx) => {
-                  const d = b.congratulate_by_date || b.birth_date || null;
-                  const days = daysUntil(d);
-                  const timing = classifyBirthday(d);
+                  const days = daysUntilEntry(b);
+                  const timing = classifyBirthdayEntry(b);
                   const isSelected = selectedIds.has(b.id);
 
                   return (
