@@ -98,7 +98,7 @@
     const style = document.createElement('style');
     style.textContent = `
       #zazi-copilot-launcher {
-        position: fixed; top: 50%; right: 8px; transform: translateY(-50%);
+        position: fixed; top: 80px; right: 8px;
         z-index: 99999;
         width: 40px; height: 40px; border-radius: 50%;
         background: linear-gradient(135deg, #6366f1, #8b5cf6);
@@ -121,7 +121,7 @@
       }
       #zazi-copilot-launcher.has-context .zazi-badge-dot { display: block; }
       #zazi-copilot-launcher-tooltip {
-        position: fixed; right: 56px; top: 50%; transform: translateY(-50%);
+        position: fixed; right: 56px; top: 88px;
         z-index: 99999;
         background: #1a1a2e; color: #e2e8f0; padding: 6px 12px;
         border-radius: 8px; font-size: 12px; font-family: sans-serif;
