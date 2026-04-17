@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { classifyBirthdayEntry } from '@/utils/birthdayParser';
 
 export interface BirthdayCounts {
   today: number;
@@ -19,31 +20,21 @@ export function useBirthdayCounts() {
     if (!user) return;
     const { data } = await supabase
       .from('contact_birthdays')
-      .select('congratulate_by_date, birth_date, status')
+      .select('congratulate_by_date, birth_date, birth_date_text, status')
       .eq('user_id', user.id)
       .eq('cycle_year', new Date().getFullYear())
       .neq('status', 'congratulated');
 
     if (!data) return;
 
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-
     let today = 0, tomorrow = 0, thisWeek = 0, overdue = 0;
 
     for (const b of data) {
-      const raw = b.congratulate_by_date || b.birth_date;
-      if (!raw) continue;
-      // Parse as local date to avoid UTC timezone shift
-      const parts = (raw as string).split('T')[0].split('-');
-      const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-      d.setHours(0, 0, 0, 0);
-      const diff = Math.round((d.getTime() - now.getTime()) / 86400000);
-
-      if (diff < 0) overdue++;
-      else if (diff === 0) today++;
-      else if (diff === 1) tomorrow++;
-      else if (diff <= 7) thisWeek++;
+      const timing = classifyBirthdayEntry(b as any);
+      if (timing === 'today') today++;
+      else if (timing === 'tomorrow') tomorrow++;
+      else if (timing === 'this_week') thisWeek++;
+      else if (timing === 'past') overdue++;
     }
 
     setCounts({
