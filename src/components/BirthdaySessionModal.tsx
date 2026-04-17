@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import { X, Cake, Play, Check } from 'lucide-react';
-import { classifyBirthday } from '@/utils/birthdayParser';
+import { classifyBirthdayEntry } from '@/utils/birthdayParser';
 import type { BirthdayEntry } from '@/hooks/useBirthdays';
 import { BirthdayComposerModal } from './BirthdayComposerModal';
 
@@ -24,8 +24,7 @@ export function BirthdaySessionModal({ birthdays, onClose, onCongratulated }: Pr
 
     return birthdays.filter(b => {
       if (b.status === 'congratulated') return false;
-      const d = b.congratulate_by_date || b.birth_date || null;
-      const cls = classifyBirthday(d);
+      const cls = classifyBirthdayEntry(b);
       return scopes.includes(cls as Scope) || cls === 'past'; // include overdue
     });
   }, [birthdays, scope]);
@@ -52,9 +51,9 @@ export function BirthdaySessionModal({ birthdays, onClose, onCongratulated }: Pr
   }
 
   const scopeOptions: { key: Scope; label: string; count: number }[] = [
-    { key: 'today', label: 'Today Only', count: birthdays.filter(b => { const d = b.congratulate_by_date || b.birth_date || null; return classifyBirthday(d) === 'today' && b.status !== 'congratulated'; }).length },
-    { key: 'tomorrow', label: 'Today + Tomorrow', count: birthdays.filter(b => { const d = b.congratulate_by_date || b.birth_date || null; const c = classifyBirthday(d); return (c === 'today' || c === 'tomorrow') && b.status !== 'congratulated'; }).length },
-    { key: 'this_week', label: 'This Week', count: birthdays.filter(b => { const d = b.congratulate_by_date || b.birth_date || null; const c = classifyBirthday(d); return (c === 'today' || c === 'tomorrow' || c === 'this_week') && b.status !== 'congratulated'; }).length },
+    { key: 'today', label: 'Today Only', count: birthdays.filter(b => classifyBirthdayEntry(b) === 'today' && b.status !== 'congratulated').length },
+    { key: 'tomorrow', label: 'Today + Tomorrow', count: birthdays.filter(b => { const c = classifyBirthdayEntry(b); return (c === 'today' || c === 'tomorrow') && b.status !== 'congratulated'; }).length },
+    { key: 'this_week', label: 'This Week', count: birthdays.filter(b => { const c = classifyBirthdayEntry(b); return (c === 'today' || c === 'tomorrow' || c === 'this_week') && b.status !== 'congratulated'; }).length },
   ];
 
   return (
@@ -111,10 +110,7 @@ export function BirthdaySessionModal({ birthdays, onClose, onCongratulated }: Pr
               </div>
 
               {/* Overdue warning */}
-              {birthdays.some(b => {
-                const d = b.congratulate_by_date || b.birth_date || null;
-                return classifyBirthday(d) === 'past' && b.status !== 'congratulated';
-              }) && (
+              {birthdays.some(b => classifyBirthdayEntry(b) === 'past' && b.status !== 'congratulated') && (
                 <div className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
                   ⚠️ You have overdue birthdays that will be included in this session.
                 </div>
