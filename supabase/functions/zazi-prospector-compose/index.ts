@@ -16,8 +16,10 @@ const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
 
 const BRAND_LINK = "https://vanto-zazi-bloom.lovable.app/aplgo.html";
 const BRAND_SIGNATURE = "— Vanto\nvanto@onlinecourseformlm.com";
-const BRAND_FOOTER =
-  `\n\nHere is a short page I prepared so you can understand what this wellness opportunity is about:\n${BRAND_LINK}\n\n${BRAND_SIGNATURE}`;
+// First-touch wrapper: URL on its own line at the TOP (acts as WhatsApp preview header / branded letterhead),
+// then the personal message, then the signature at the bottom. No explanatory sentence about the link.
+const BRAND_HEADER = `${BRAND_LINK}\n\n`;
+const BRAND_SIGNATURE_BLOCK = `\n\n${BRAND_SIGNATURE}`;
 
 const SYSTEM_PROMPT_BASE = `You are Zazi MAM, a wise African field leader inside an APLGO network-marketing CRM.
 You write short, warm, leadership-focused 1-on-1 WhatsApp messages.
