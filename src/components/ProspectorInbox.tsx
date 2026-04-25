@@ -4,13 +4,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { ProspectorProposalCard, type ProspectorProposal, type ProposalAction } from './ProspectorProposalCard';
 
-type FilterKey = 'draft_review' | 'draft' | 'approved' | 'rejected' | 'snoozed' | 'needs_review' | 'all';
+type FilterKey = 'draft_review' | 'draft' | 'approved' | 'sent' | 'rejected' | 'snoozed' | 'needs_review' | 'all';
 
 const FILTERS: { key: FilterKey; label: string }[] = [
   { key: 'draft_review', label: 'Draft + Needs Review' },
   { key: 'draft', label: 'Draft' },
   { key: 'needs_review', label: 'Needs Review' },
-  { key: 'approved', label: 'Approved' },
+  { key: 'approved', label: 'Approved (not sent)' },
+  { key: 'sent', label: 'Sent' },
   { key: 'snoozed', label: 'Snoozed' },
   { key: 'rejected', label: 'Rejected' },
   { key: 'all', label: 'All' },
