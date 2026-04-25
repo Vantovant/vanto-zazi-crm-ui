@@ -183,8 +183,14 @@ export function ProspectorProposalCard({ proposal, onAction, busy = false }: Pro
           {status === 'snoozed' && proposal.snoozed_until && (
             <div className="text-xs text-blue-300 mt-1">Snoozed until {new Date(proposal.snoozed_until).toLocaleString()}</div>
           )}
-          {status === 'approved' && proposal.approved_at && (
+          {status === 'approved' && !isSent && proposal.approved_at && (
             <div className="text-xs text-emerald-300 mt-1">Approved {new Date(proposal.approved_at).toLocaleString()} — NOT SENT YET</div>
+          )}
+          {isSent && (
+            <div className="text-xs text-violet-300 mt-1">
+              Sent {proposal.sent_at ? new Date(proposal.sent_at).toLocaleString() : ''}
+              {proposal.maytapi_message_id ? ` · msg ${proposal.maytapi_message_id}` : ''}
+            </div>
           )}
         </div>
 
