@@ -400,15 +400,46 @@ export function ProspectorProposalCard({ proposal, onAction, busy = false }: Pro
               )}
             </>
           )}
-          {status === 'approved' && (
-            <>
-              <span className="text-xs text-emerald-300 font-medium">Approved for future Maytapi send — NOT SENT YET</span>
-              <button
-                onClick={() => onAction({ type: 'undo_approve' })}
-                disabled={busy}
-                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-100 rounded ml-auto"
-              ><Undo2 className="w-3 h-3" /> Undo approval</button>
-            </>
+          {status === 'approved' && !isSent && (
+            <div className="w-full space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-emerald-300 font-medium">Approved — ready for one-by-one Maytapi send</span>
+                <button
+                  onClick={() => onAction({ type: 'undo_approve' })}
+                  disabled={busy}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-100 rounded ml-auto"
+                ><Undo2 className="w-3 h-3" /> Undo approval</button>
+              </div>
+              {canSend ? (
+                <div className="bg-violet-500/10 border border-violet-500/30 rounded-lg p-3 space-y-2">
+                  <div className="text-[11px] text-amber-300 font-medium">
+                    ⚠ This will send one WhatsApp message via Maytapi. Not reversible.
+                  </div>
+                  <button
+                    onClick={() => {
+                      const ok = window.confirm(
+                        `Send this approved message to ${proposal.contact_name || 'contact'}` +
+                        `${proposal.contact_phone ? ` (${proposal.contact_phone})` : ''}?\n\n` +
+                        `This will send one WhatsApp message now.`
+                      );
+                      if (ok) onAction({ type: 'send_whatsapp' });
+                    }}
+                    disabled={busy}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold bg-violet-600 hover:bg-violet-500 disabled:bg-slate-700 disabled:text-slate-400 disabled:cursor-not-allowed text-white rounded"
+                  >
+                    {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                    Send via WhatsApp
+                  </button>
+                </div>
+              ) : (
+                <span className="text-[11px] text-amber-300">Send disabled — supervisor thresholds not met.</span>
+              )}
+            </div>
+          )}
+          {isSent && (
+            <span className="inline-flex items-center gap-1.5 text-xs text-violet-300 font-medium">
+              <Lock className="w-3 h-3" /> Sent — read-only. Resend / edit / undo disabled.
+            </span>
           )}
           {status === 'snoozed' && (
             <>
