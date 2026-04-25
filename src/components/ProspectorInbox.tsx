@@ -126,109 +126,25 @@ export function ProspectorInbox() {
     needs_review: proposals.filter((p) => p.status === 'draft' && !!p.supervisor_block_reason).length,
   }), [proposals]);
 
-  // ---- D.1 action handler — writes ONLY to zazi_actions ----
+  // ---- D.1.1 action handler — calls admin-only edge function (no direct table writes) ----
   const handleAction = async (proposal: ProspectorProposal, action: ProposalAction) => {
     if (!user || !isAdmin) return;
     setBusyId(proposal.id);
     setError(null);
     try {
-      // Re-validate approval gate server-side context (still client-side gate below)
-      const baseEvidence = (proposal.evidence && typeof proposal.evidence === 'object') ? proposal.evidence : {};
-      const nowIso = new Date().toISOString();
+      let payload: Record<string, unknown> = { id: proposal.id };
+      if (action.type === 'approve') payload = { ...payload, type: 'approve' };
+      else if (action.type === 'undo_approve') payload = { ...payload, type: 'undo_approve' };
+      else if (action.type === 'edit_save') payload = { ...payload, type: 'edit_save', new_message: action.newMessage, reason: action.reason };
+      else if (action.type === 'reject') payload = { ...payload, type: 'reject', reason: action.reason };
+      else if (action.type === 'snooze') payload = { ...payload, type: 'snooze', until: action.until, label: action.label };
+      else if (action.type === 'unsnooze') payload = { ...payload, type: 'unsnooze' };
 
-      if (action.type === 'approve') {
-        // Hard safety re-check
-        if (proposal.supervisor_block_reason
-          || proposal.supervisor_quality_score == null
-          || (proposal.supervisor_safety ?? 0) < 70
-          || (proposal.supervisor_leadership_fit ?? 0) < 60
-          || (proposal.supervisor_quality_score ?? 0) < 60) {
-          throw new Error('Supervisor review failed. Fix or reject this draft.');
-        }
-        const { error: e } = await supabase
-          .from('zazi_actions')
-          .update({
-            status: 'approved',
-            approved_by: user.id,
-            approved_at: nowIso,
-            // explicit: no sent_at, no maytapi_message_id
-          } as any)
-          .eq('id', proposal.id)
-          .eq('user_id', user.id)
-          .eq('status', 'draft');
-        if (e) throw e;
-      } else if (action.type === 'undo_approve') {
-        const { error: e } = await supabase
-          .from('zazi_actions')
-          .update({
-            status: 'draft',
-            approved_by: null,
-            approved_at: null,
-          } as any)
-          .eq('id', proposal.id)
-          .eq('user_id', user.id)
-          .eq('status', 'approved');
-        if (e) throw e;
-      } else if (action.type === 'edit_save') {
-        const ui_edit = {
-          edited_by: user.id,
-          edited_at: nowIso,
-          previous_message: proposal.proposed_message,
-          edit_reason: action.reason || null,
-        };
-        const newEvidence = { ...baseEvidence, ui_edit };
-        const { error: e } = await supabase
-          .from('zazi_actions')
-          .update({
-            proposed_message: action.newMessage,
-            evidence: newEvidence,
-            status: 'draft',
-          } as any)
-          .eq('id', proposal.id)
-          .eq('user_id', user.id);
-        if (e) throw e;
-      } else if (action.type === 'reject') {
-        const feedback = {
-          rejected_by: user.id,
-          rejected_at: nowIso,
-          reason: action.reason,
-        };
-        const newEvidence = { ...baseEvidence, feedback };
-        const { error: e } = await supabase
-          .from('zazi_actions')
-          .update({
-            status: 'rejected',
-            approved_by: null,
-            approved_at: null,
-            evidence: newEvidence,
-          } as any)
-          .eq('id', proposal.id)
-          .eq('user_id', user.id);
-        if (e) throw e;
-      } else if (action.type === 'snooze') {
-        const { error: e } = await supabase
-          .from('zazi_actions')
-          .update({
-            status: 'snoozed',
-            snoozed_until: action.until,
-            snooze_reason: action.label,
-          } as any)
-          .eq('id', proposal.id)
-          .eq('user_id', user.id);
-        if (e) throw e;
-      } else if (action.type === 'unsnooze') {
-        const { error: e } = await supabase
-          .from('zazi_actions')
-          .update({
-            status: 'draft',
-            snoozed_until: null,
-            snooze_reason: null,
-          } as any)
-          .eq('id', proposal.id)
-          .eq('user_id', user.id)
-          .eq('status', 'snoozed');
-        if (e) throw e;
-      }
+      const { data, error: fnErr } = await supabase.functions.invoke('zazi-prospector-action', {
+        body: payload,
+      });
+      if (fnErr) throw fnErr;
+      if (data && (data as any).error) throw new Error((data as any).error);
 
       await fetchProposals();
     } catch (e: any) {
