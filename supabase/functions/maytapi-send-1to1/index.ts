@@ -8,6 +8,7 @@ const corsHeaders = {
 };
 
 const BRANDED_URL = 'https://crm.onlinecourseformlm.com/aplgo.html';
+const BRANDED_MEDIA_IMAGE = 'https://crm.onlinecourseformlm.com/images/aplgo-og-card.jpg';
 
 function normalizePhoneForMaytapi(raw: string): string | null {
   if (!raw) return null;
