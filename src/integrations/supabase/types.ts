@@ -447,6 +447,60 @@ export type Database = {
           },
         ]
       }
+      integration_settings: {
+        Row: {
+          created_at: string
+          daily_send_cap: number
+          daily_token_cap: number
+          maytapi_enabled: boolean
+          maytapi_phone_allowlist: string[]
+          prospector_can_auto_apply_low: boolean
+          prospector_can_propose: boolean
+          prospector_can_send_autonomous: boolean
+          prospector_supervisor_required: boolean
+          supervisor_block_threshold: number
+          supervisor_leadership_fit_threshold: number
+          supervisor_safety_threshold: number
+          updated_at: string
+          user_id: string
+          zazi_prospector_enabled: boolean
+        }
+        Insert: {
+          created_at?: string
+          daily_send_cap?: number
+          daily_token_cap?: number
+          maytapi_enabled?: boolean
+          maytapi_phone_allowlist?: string[]
+          prospector_can_auto_apply_low?: boolean
+          prospector_can_propose?: boolean
+          prospector_can_send_autonomous?: boolean
+          prospector_supervisor_required?: boolean
+          supervisor_block_threshold?: number
+          supervisor_leadership_fit_threshold?: number
+          supervisor_safety_threshold?: number
+          updated_at?: string
+          user_id: string
+          zazi_prospector_enabled?: boolean
+        }
+        Update: {
+          created_at?: string
+          daily_send_cap?: number
+          daily_token_cap?: number
+          maytapi_enabled?: boolean
+          maytapi_phone_allowlist?: string[]
+          prospector_can_auto_apply_low?: boolean
+          prospector_can_propose?: boolean
+          prospector_can_send_autonomous?: boolean
+          prospector_supervisor_required?: boolean
+          supervisor_block_threshold?: number
+          supervisor_leadership_fit_threshold?: number
+          supervisor_safety_threshold?: number
+          updated_at?: string
+          user_id?: string
+          zazi_prospector_enabled?: boolean
+        }
+        Relationships: []
+      }
       inventory: {
         Row: {
           created_at: string
@@ -747,6 +801,7 @@ export type Database = {
           file_type: string
           id: string
           status: string
+          tags: string[]
           updated_at: string
           user_id: string
         }
@@ -759,6 +814,7 @@ export type Database = {
           file_type?: string
           id?: string
           status?: string
+          tags?: string[]
           updated_at?: string
           user_id: string
         }
@@ -771,6 +827,7 @@ export type Database = {
           file_type?: string
           id?: string
           status?: string
+          tags?: string[]
           updated_at?: string
           user_id?: string
         }
@@ -790,6 +847,102 @@ export type Database = {
         Update: {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      zazi_actions: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          belief_risk: number
+          channel: string
+          contact_id: string | null
+          created_at: string
+          evidence: Json
+          expected_next_step: string
+          id: string
+          leadership_need: string
+          maytapi_message_id: string | null
+          movement_stage: string
+          next_best_business_action: string
+          proposed_message: string
+          reason_for_message: string
+          recommended_tone: string
+          sent_at: string | null
+          status: string
+          supervisor_block_reason: string | null
+          supervisor_clarity: number
+          supervisor_cultural_fit: number
+          supervisor_grounding: number
+          supervisor_leadership_fit: number
+          supervisor_quality_score: number
+          supervisor_relevance: number
+          supervisor_safety: number
+          supervisor_tone_fit: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          belief_risk?: number
+          channel?: string
+          contact_id?: string | null
+          created_at?: string
+          evidence?: Json
+          expected_next_step?: string
+          id?: string
+          leadership_need?: string
+          maytapi_message_id?: string | null
+          movement_stage?: string
+          next_best_business_action?: string
+          proposed_message?: string
+          reason_for_message?: string
+          recommended_tone?: string
+          sent_at?: string | null
+          status?: string
+          supervisor_block_reason?: string | null
+          supervisor_clarity?: number
+          supervisor_cultural_fit?: number
+          supervisor_grounding?: number
+          supervisor_leadership_fit?: number
+          supervisor_quality_score?: number
+          supervisor_relevance?: number
+          supervisor_safety?: number
+          supervisor_tone_fit?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          belief_risk?: number
+          channel?: string
+          contact_id?: string | null
+          created_at?: string
+          evidence?: Json
+          expected_next_step?: string
+          id?: string
+          leadership_need?: string
+          maytapi_message_id?: string | null
+          movement_stage?: string
+          next_best_business_action?: string
+          proposed_message?: string
+          reason_for_message?: string
+          recommended_tone?: string
+          sent_at?: string | null
+          status?: string
+          supervisor_block_reason?: string | null
+          supervisor_clarity?: number
+          supervisor_cultural_fit?: number
+          supervisor_grounding?: number
+          supervisor_leadership_fit?: number
+          supervisor_quality_score?: number
+          supervisor_relevance?: number
+          supervisor_safety?: number
+          supervisor_tone_fit?: number
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
