@@ -8,6 +8,7 @@ const corsHeaders = {
 };
 
 const BRANDED_URL = 'https://crm.onlinecourseformlm.com/aplgo.html';
+const BRANDED_MEDIA_IMAGE = 'https://crm.onlinecourseformlm.com/images/aplgo-og-card.jpg';
 
 function normalizePhoneForMaytapi(raw: string): string | null {
   if (!raw) return null;
@@ -33,14 +34,26 @@ function verifyFirstTouchFormat(message: string): { ok: boolean; reason?: string
   return { ok: true };
 }
 
-// Phase E.0.1 — split stored proposed_message into the URL (Maytapi `message` field)
-// and the body+signature (Maytapi `text` field). The URL must NOT be repeated inside `text`.
-function splitFirstTouchForLinkSend(proposedMessage: string): { url: string; text: string } {
+// Phase E.0.2 — Build Maytapi `media` payload for first-touch.
+// Maytapi `type:"media"` sends an image attachment with caption — no "Forwarded" label.
+//   - `message` field carries the IMAGE URL (Maytapi downloads + attaches as media).
+//   - `text` field carries the caption: body + branded URL + signature.
+function buildFirstTouchMediaCaption(proposedMessage: string): string {
+  // Stored format: first line = BRANDED_URL, then blank, body, blank, signature.
+  // For media caption we want: body + blank + BRANDED_URL + blank + signature.
   const lines = proposedMessage.split('\n');
-  const url = (lines[0] || '').trim();
-  // Drop the URL line, then trim any leading blank lines so the body starts cleanly.
+  const firstLine = (lines[0] || '').trim();
+  // Drop the leading URL line and any blank lines after it.
   const rest = lines.slice(1).join('\n').replace(/^\s*\n+/, '');
-  return { url, text: rest };
+  // Split body from signature (signature starts at "— Vanto").
+  const sigIdx = rest.indexOf('— Vanto');
+  if (sigIdx === -1) {
+    // Fallback: keep rest as-is, append URL at top.
+    return `${firstLine}\n\n${rest}`;
+  }
+  const body = rest.slice(0, sigIdx).replace(/\s+$/, '');
+  const signature = rest.slice(sigIdx).replace(/^\s+/, '');
+  return `${body}\n\n${firstLine}\n\n${signature}`;
 }
 
 
@@ -155,15 +168,14 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ---- Send via Maytapi sendMessage (type="link" — preview-capable) ----
-    // Endpoint: https://api.maytapi.com/api/{productId}/{phoneId}/sendMessage
-    // Phase E.0.1: switched from type="text" (no preview) to type="link".
-    //   - `message` carries ONLY the URL (Maytapi builds the preview card from this).
-    //   - `text` carries the body + signature (URL is NOT repeated here).
-    const { url: linkUrl, text: linkText } = splitFirstTouchForLinkSend(row.proposed_message);
-    if (linkUrl !== BRANDED_URL) {
+    // ---- Send via Maytapi sendMessage (type="media" — image card with caption, no "Forwarded") ----
+    // Phase E.0.2: switched from type="link" (caused "Forwarded" label) to type="media".
+    //   - `message` carries the IMAGE URL (Maytapi attaches as image).
+    //   - `text` carries the caption: body + branded page URL + signature.
+    const caption = buildFirstTouchMediaCaption(row.proposed_message);
+    if (!caption.includes(BRANDED_URL)) {
       return new Response(JSON.stringify({
-        error: 'Parsed first-line URL does not match BRANDED_URL after split',
+        error: 'Built caption is missing the branded page URL',
       }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
@@ -182,9 +194,9 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify({
           to_number: phone,
-          type: 'link',
-          message: linkUrl,
-          text: linkText,
+          type: 'media',
+          message: BRANDED_MEDIA_IMAGE,
+          text: caption,
         }),
       });
       upstreamText = await upstream.text();
@@ -238,9 +250,10 @@ Deno.serve(async (req) => {
         maytapi_response: sanitizedResponse,
         sent_by: callerId,
         sent_at: new Date().toISOString(),
-        preview_expected: true, // type="link" → Maytapi builds the WhatsApp preview card
-        send_type: 'link',
+        preview_expected: true, // type="media" → image card with caption, no "Forwarded" label
+        send_type: 'media',
         branded_url: BRANDED_URL,
+        branded_media_image: BRANDED_MEDIA_IMAGE,
         test_mode: true,
       },
     };
