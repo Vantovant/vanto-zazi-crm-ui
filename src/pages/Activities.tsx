@@ -28,6 +28,7 @@ import { ActivityGoalsModal } from '../components/ActivityGoalsModal';
 import { ContactDrawer } from '../components/ContactDrawer';
 import { MessageTemplatePicker } from '../components/MessageTemplatePicker';
 import { ActivityAppreciationModal } from '../components/ActivityAppreciationModal';
+import { ProspectorInbox } from '../components/ProspectorInbox';
 import { useCrm } from '@/contexts/CrmContext';
 import { useContactActivities, type ContactActivity } from '@/hooks/useContactActivities';
 import { useActivityGoals } from '@/hooks/useActivityGoals';
