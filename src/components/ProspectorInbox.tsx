@@ -197,7 +197,7 @@ export function ProspectorInbox() {
           </span>
         </div>
         <div className="text-xs text-slate-400">
-          {counts.draft} draft · {counts.needs_review} needs review · {counts.approved} approved · {counts.snoozed} snoozed · {counts.rejected} rejected
+          {counts.draft} draft · {counts.needs_review} needs review · {counts.approved} approved · {counts.sent} sent · {counts.snoozed} snoozed · {counts.rejected} rejected
         </div>
       </div>
 
