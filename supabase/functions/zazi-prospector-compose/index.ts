@@ -168,12 +168,12 @@ Deno.serve(async (req) => {
         `Could we connect briefly this week?`;
     }
 
-    // Append branded footer ONLY for first-touch
-    let brandingFooterAdded = false;
+    // Wrap with branded URL header + signature ONLY for first-touch
+    let brandingHeaderAdded = false;
     let brandedLinkUsed = false;
     if (isFirstTouch) {
-      text = text + BRAND_FOOTER;
-      brandingFooterAdded = true;
+      text = BRAND_HEADER + text + BRAND_SIGNATURE_BLOCK;
+      brandingHeaderAdded = true;
       brandedLinkUsed = true;
     }
 
@@ -184,8 +184,10 @@ Deno.serve(async (req) => {
       safety_constraints_applied: SAFETY_LIST,
       filter_flags: filter.reasons,
       first_touch: isFirstTouch,
-      branding_footer_added: brandingFooterAdded,
+      branding_header_added: brandingHeaderAdded,
+      branding_footer_added: false,
       branded_link_used: brandedLinkUsed,
+      first_touch_format: isFirstTouch ? "url_header_preview_plus_signature" : null,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
     console.error("[compose] error:", e);
