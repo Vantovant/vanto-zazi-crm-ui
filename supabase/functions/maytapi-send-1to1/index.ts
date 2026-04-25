@@ -24,7 +24,6 @@ function verifyFirstTouchFormat(message: string): { ok: boolean; reason?: string
   if (firstLine !== BRANDED_URL) {
     return { ok: false, reason: 'first line is not the branded URL' };
   }
-  // No punctuation immediately after URL on its own line (already enforced by exact match)
   if (!message.includes('— Vanto')) {
     return { ok: false, reason: 'signature missing' };
   }
@@ -33,6 +32,17 @@ function verifyFirstTouchFormat(message: string): { ok: boolean; reason?: string
   }
   return { ok: true };
 }
+
+// Phase E.0.1 — split stored proposed_message into the URL (Maytapi `message` field)
+// and the body+signature (Maytapi `text` field). The URL must NOT be repeated inside `text`.
+function splitFirstTouchForLinkSend(proposedMessage: string): { url: string; text: string } {
+  const lines = proposedMessage.split('\n');
+  const url = (lines[0] || '').trim();
+  // Drop the URL line, then trim any leading blank lines so the body starts cleanly.
+  const rest = lines.slice(1).join('\n').replace(/^\s*\n+/, '');
+  return { url, text: rest };
+}
+
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
@@ -145,10 +155,18 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ---- Send via Maytapi sendMessage ----
+    // ---- Send via Maytapi sendMessage (type="link" — preview-capable) ----
     // Endpoint: https://api.maytapi.com/api/{productId}/{phoneId}/sendMessage
-    // Body: { to_number, type:"text", message }
-    // NOTE: link previews are enabled by default for plain text — we do NOT pass any disable flag.
+    // Phase E.0.1: switched from type="text" (no preview) to type="link".
+    //   - `message` carries ONLY the URL (Maytapi builds the preview card from this).
+    //   - `text` carries the body + signature (URL is NOT repeated here).
+    const { url: linkUrl, text: linkText } = splitFirstTouchForLinkSend(row.proposed_message);
+    if (linkUrl !== BRANDED_URL) {
+      return new Response(JSON.stringify({
+        error: 'Parsed first-line URL does not match BRANDED_URL after split',
+      }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
     const sendUrl = `https://api.maytapi.com/api/${productId}/${phoneId}/sendMessage`;
     let upstream: Response;
     let upstreamJson: any = null;
@@ -164,8 +182,9 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify({
           to_number: phone,
-          type: 'text',
-          message: row.proposed_message,
+          type: 'link',
+          message: linkUrl,
+          text: linkText,
         }),
       });
       upstreamText = await upstream.text();
@@ -173,6 +192,7 @@ Deno.serve(async (req) => {
     } catch (e) {
       networkError = (e as Error).message;
     }
+
 
     const sanitizedResponse = upstreamJson ? {
       success: upstreamJson.success ?? null,
