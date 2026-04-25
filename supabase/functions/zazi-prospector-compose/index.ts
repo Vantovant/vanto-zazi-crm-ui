@@ -187,7 +187,7 @@ Deno.serve(async (req) => {
     let brandingHeaderAdded = false;
     let brandedLinkUsed = false;
     if (isFirstTouch) {
-      text = BRAND_HEADER + text + BRAND_SIGNATURE_BLOCK;
+      text = buildFirstTouchMessage(text);
       brandingHeaderAdded = true;
       brandedLinkUsed = true;
     }
