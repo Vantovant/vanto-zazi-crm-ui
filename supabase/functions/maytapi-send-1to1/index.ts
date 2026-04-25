@@ -250,9 +250,10 @@ Deno.serve(async (req) => {
         maytapi_response: sanitizedResponse,
         sent_by: callerId,
         sent_at: new Date().toISOString(),
-        preview_expected: true, // type="link" → Maytapi builds the WhatsApp preview card
-        send_type: 'link',
+        preview_expected: true, // type="media" → image card with caption, no "Forwarded" label
+        send_type: 'media',
         branded_url: BRANDED_URL,
+        branded_media_image: BRANDED_MEDIA_IMAGE,
         test_mode: true,
       },
     };
