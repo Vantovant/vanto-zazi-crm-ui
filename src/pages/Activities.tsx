@@ -541,6 +541,9 @@ export function Activities() {
         </div>
       )}
 
+      {/* Prospector Inbox — Phase D.0 read-only, admin-only (component self-hides for non-admins) */}
+      <ProspectorInbox />
+
       {/* Activity Paid This Month — MOBILE: show before grid for visibility */}
       <div className="block lg:hidden">
         {renderActivityPaidSection()}
