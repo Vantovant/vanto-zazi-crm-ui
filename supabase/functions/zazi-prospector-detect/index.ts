@@ -294,7 +294,32 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      const composer = await callCompose({ contact, detector, reasoner });
+      // ---- First-touch detection ----
+      // First-touch = no prior outbound prospector message AND no prior outbound
+      // whatsapp activity logged for this contact.
+      const [{ count: priorActions }, { count: priorOutboundActivity }, { count: priorOutboundFu }] = await Promise.all([
+        sb.from("zazi_actions")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", targetUserId)
+          .eq("contact_id", contact.id)
+          .in("status", ["approved", "sent"]),
+        sb.from("contact_activities")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", targetUserId)
+          .eq("contact_id", contact.id)
+          .in("activity_type", ["whatsapp", "whatsapp_sent", "message_sent", "outbound_message"]),
+        sb.from("follow_up_states")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", targetUserId)
+          .eq("contact_id", contact.id)
+          .not("last_outbound_at", "is", null),
+      ]);
+      const isFirstTouch =
+        (priorActions || 0) === 0 &&
+        (priorOutboundActivity || 0) === 0 &&
+        (priorOutboundFu || 0) === 0;
+
+      const composer = await callCompose({ contact, detector, reasoner, first_touch: isFirstTouch });
 
       const evidence = {
         movement_stage: detector.movement_stage, leadership_need: reasoner.leadership_need,
