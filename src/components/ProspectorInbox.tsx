@@ -18,9 +18,10 @@ const FILTERS: { key: FilterKey; label: string }[] = [
 ];
 
 /**
- * Prospector Inbox — Phase D.1
- * Admin/owner only. Approve/Edit/Reject/Snooze writes status only on zazi_actions.
- * NO Maytapi send. NO contact_activities writes. NO contacts.lead_type writes.
+ * ZAZI AI PROSPECTOR — Inbox (admin/owner only)
+ * AI Field Leader for MLM Downline Growth.
+ * Approve/Edit/Reject/Snooze writes status only on zazi_actions.
+ * One-by-one Maytapi send via maytapi-send-1to1 (test_mode). NO contact_activities writes. NO contacts.lead_type writes.
  */
 export function ProspectorInbox() {
   const { user } = useAuth();
@@ -133,7 +134,7 @@ export function ProspectorInbox() {
     needs_review: proposals.filter((p) => p.status === 'draft' && !!p.supervisor_block_reason).length,
   }), [proposals]);
 
-  // ---- D.1.1 action handler — calls admin-only edge function (no direct table writes) ----
+  // ---- Zazi AI Prospector — admin-only action handler (no direct table writes) ----
   // ---- E.1: send_whatsapp invokes the already-tested maytapi-send-1to1 (test_mode=true) ----
   const handleAction = async (proposal: ProspectorProposal, action: ProposalAction) => {
     if (!user || !isAdmin) return;
@@ -189,12 +190,18 @@ export function ProspectorInbox() {
   return (
     <div className="bg-slate-800/40 border border-slate-700 rounded-xl p-5">
       <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
-        <div className="flex items-center gap-2">
-          <Brain className="w-5 h-5 text-violet-400" />
-          <h3 className="text-lg font-semibold text-white">Prospector Inbox</h3>
-          <span className="text-[10px] uppercase tracking-wide bg-violet-500/15 text-violet-300 px-2 py-0.5 rounded border border-violet-500/30">
-            Admin only · Approval workflow · No send yet
-          </span>
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Brain className="w-5 h-5 text-violet-400" />
+            <h3 className="text-lg font-semibold text-white">ZAZI AI PROSPECTOR</h3>
+            <span className="text-[10px] uppercase tracking-wide bg-violet-500/15 text-violet-300 px-2 py-0.5 rounded border border-violet-500/30">
+              Admin only · Approval workflow · One-by-one send
+            </span>
+          </div>
+          <div className="text-xs text-violet-300/80 ml-7">AI Field Leader for MLM Downline Growth</div>
+          <div className="text-[11px] text-slate-400 ml-7 max-w-3xl">
+            An AI-powered prospector and field leader that helps scout, reactivate, follow up, approve messages, and send one-by-one WhatsApp leadership touches through Maytapi.
+          </div>
         </div>
         <div className="text-xs text-slate-400">
           {counts.draft} draft · {counts.needs_review} needs review · {counts.approved} approved · {counts.sent} sent · {counts.snoozed} snoozed · {counts.rejected} rejected
