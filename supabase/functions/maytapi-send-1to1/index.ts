@@ -238,10 +238,13 @@ Deno.serve(async (req) => {
         maytapi_response: sanitizedResponse,
         sent_by: callerId,
         sent_at: new Date().toISOString(),
-        preview_expected: true, // first-touch URL on top, plain text — preview should render
+        preview_expected: true, // type="link" → Maytapi builds the WhatsApp preview card
+        send_type: 'link',
+        branded_url: BRANDED_URL,
         test_mode: true,
       },
     };
+
 
     const { error: updErr } = await admin.from('zazi_actions').update({
       status: 'sent',
