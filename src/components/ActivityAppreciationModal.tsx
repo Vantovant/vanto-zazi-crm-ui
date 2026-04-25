@@ -36,7 +36,7 @@ interface ActivityAppreciationModalProps {
   onAppreciated?: (contactId: string) => void;
 }
 
-const APLGO_BRAND_URL = 'https://vanto-zazi-bloom.lovable.app/aplgo.html';
+const APLGO_BRAND_URL = 'https://crm.onlinecourseformlm.com/aplgo.html';
 
 const TONE_CONFIG: Record<AppreciationTone, { label: string; icon: typeof Heart; color: string; description: string }> = {
   warm: { label: 'Warm', icon: Heart, color: 'text-rose-400', description: 'Friendly and heartfelt' },

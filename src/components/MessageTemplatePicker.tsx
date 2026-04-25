@@ -74,7 +74,7 @@ export function MessageTemplatePicker({ contact, channel, onClose }: MessageTemp
     );
   }, [templates, channel]);
 
-  const APLGO_BRAND_URL = 'https://vanto-zazi-bloom.lovable.app/aplgo.html';
+  const APLGO_BRAND_URL = 'https://crm.onlinecourseformlm.com/aplgo.html';
 
   const mergeCtx = useMemo(() => ({ contact }), [contact]);
 
