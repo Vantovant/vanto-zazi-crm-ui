@@ -1,12 +1,25 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Loader2, Inbox, Brain } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { ProspectorProposalCard, type ProspectorProposal } from './ProspectorProposalCard';
+import { ProspectorProposalCard, type ProspectorProposal, type ProposalAction } from './ProspectorProposalCard';
+
+type FilterKey = 'draft_review' | 'draft' | 'approved' | 'rejected' | 'snoozed' | 'needs_review' | 'all';
+
+const FILTERS: { key: FilterKey; label: string }[] = [
+  { key: 'draft_review', label: 'Draft + Needs Review' },
+  { key: 'draft', label: 'Draft' },
+  { key: 'needs_review', label: 'Needs Review' },
+  { key: 'approved', label: 'Approved' },
+  { key: 'snoozed', label: 'Snoozed' },
+  { key: 'rejected', label: 'Rejected' },
+  { key: 'all', label: 'All' },
+];
 
 /**
- * Prospector Inbox — Phase D.0 (READ-ONLY)
- * Admin/owner only. SELECT-only. No writes, no status changes, no sends.
+ * Prospector Inbox — Phase D.1
+ * Admin/owner only. Approve/Edit/Reject/Snooze writes status only on zazi_actions.
+ * NO Maytapi send. NO contact_activities writes. NO contacts.lead_type writes.
  */
 export function ProspectorInbox() {
   const { user } = useAuth();
@@ -14,8 +27,10 @@ export function ProspectorInbox() {
   const [loading, setLoading] = useState(true);
   const [proposals, setProposals] = useState<ProspectorProposal[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<FilterKey>('draft_review');
+  const [busyId, setBusyId] = useState<string | null>(null);
 
-  // Admin check (mirrors TeamDashboard pattern)
+  // Admin check
   useEffect(() => {
     let cancelled = false;
     const check = async () => {
@@ -32,63 +47,197 @@ export function ProspectorInbox() {
     return () => { cancelled = true; };
   }, [user]);
 
-  // Fetch drafts (SELECT only)
+  const fetchProposals = async () => {
+    if (!user) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const { data: rows, error: err } = await supabase
+        .from('zazi_actions')
+        .select('id, contact_id, status, movement_stage, leadership_need, belief_risk, recommended_tone, reason_for_message, next_best_business_action, expected_next_step, proposed_message, supervisor_quality_score, supervisor_safety, supervisor_grounding, supervisor_cultural_fit, supervisor_clarity, supervisor_relevance, supervisor_tone_fit, supervisor_leadership_fit, supervisor_block_reason, evidence, created_at, approved_at, approved_by, snoozed_until, snooze_reason' as any)
+        .eq('user_id', user.id)
+        .neq('status', 'sent');
+      if (err) throw err;
+
+      const contactIds = Array.from(new Set((rows || []).map((r: any) => r.contact_id).filter(Boolean)));
+      const contactMap: Record<string, { full_name: string; phone_number: string }> = {};
+      if (contactIds.length > 0) {
+        const { data: contacts } = await supabase
+          .from('contacts')
+          .select('id, full_name, phone_number')
+          .in('id', contactIds);
+        (contacts || []).forEach((c: any) => {
+          contactMap[c.id] = { full_name: c.full_name, phone_number: c.phone_number };
+        });
+      }
+
+      const enriched: ProspectorProposal[] = (rows || []).map((r: any) => ({
+        ...r,
+        contact_name: r.contact_id ? (contactMap[r.contact_id]?.full_name || 'Unknown contact') : 'Unknown contact',
+        contact_phone: r.contact_id ? (contactMap[r.contact_id]?.phone_number || '') : '',
+      }));
+
+      enriched.sort((a, b) => {
+        const aBlock = a.supervisor_block_reason ? 1 : 0;
+        const bBlock = b.supervisor_block_reason ? 1 : 0;
+        if (aBlock !== bBlock) return bBlock - aBlock;
+        if (a.belief_risk !== b.belief_risk) return b.belief_risk - a.belief_risk;
+        const aQ = a.supervisor_quality_score ?? 999;
+        const bQ = b.supervisor_quality_score ?? 999;
+        if (aQ !== bQ) return aQ - bQ;
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+
+      setProposals(enriched);
+    } catch (e: any) {
+      setError(e?.message || 'Failed to load drafts');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!isAdmin || !user) return;
-    let cancelled = false;
-    const fetchDrafts = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const { data: rows, error: err } = await supabase
-          .from('zazi_actions')
-          .select('id, contact_id, status, movement_stage, leadership_need, belief_risk, recommended_tone, reason_for_message, next_best_business_action, expected_next_step, proposed_message, supervisor_quality_score, supervisor_safety, supervisor_grounding, supervisor_cultural_fit, supervisor_clarity, supervisor_relevance, supervisor_tone_fit, supervisor_leadership_fit, supervisor_block_reason, evidence, created_at')
-          .eq('user_id', user.id)
-          .eq('status', 'draft');
-        if (err) throw err;
-
-        const contactIds = Array.from(new Set((rows || []).map((r: any) => r.contact_id).filter(Boolean)));
-        let contactMap: Record<string, { full_name: string; phone_number: string }> = {};
-        if (contactIds.length > 0) {
-          const { data: contacts } = await supabase
-            .from('contacts')
-            .select('id, full_name, phone_number')
-            .in('id', contactIds);
-          (contacts || []).forEach((c: any) => {
-            contactMap[c.id] = { full_name: c.full_name, phone_number: c.phone_number };
-          });
-        }
-
-        const enriched: ProspectorProposal[] = (rows || []).map((r: any) => ({
-          ...r,
-          contact_name: r.contact_id ? (contactMap[r.contact_id]?.full_name || 'Unknown contact') : 'Unknown contact',
-          contact_phone: r.contact_id ? (contactMap[r.contact_id]?.phone_number || '') : '',
-        }));
-
-        // Sort: blocked first, belief_risk desc, supervisor_quality_score asc (nulls last), created_at desc
-        enriched.sort((a, b) => {
-          const aBlock = a.supervisor_block_reason ? 1 : 0;
-          const bBlock = b.supervisor_block_reason ? 1 : 0;
-          if (aBlock !== bBlock) return bBlock - aBlock;
-          if (a.belief_risk !== b.belief_risk) return b.belief_risk - a.belief_risk;
-          const aQ = a.supervisor_quality_score ?? 999;
-          const bQ = b.supervisor_quality_score ?? 999;
-          if (aQ !== bQ) return aQ - bQ;
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-        });
-
-        if (!cancelled) setProposals(enriched);
-      } catch (e: any) {
-        if (!cancelled) setError(e?.message || 'Failed to load drafts');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    fetchDrafts();
-    return () => { cancelled = true; };
+    fetchProposals();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin, user]);
 
-  // Hide entirely from non-admins
+  const filtered = useMemo(() => {
+    return proposals.filter((p) => {
+      const needsReview = p.status === 'draft' && !!p.supervisor_block_reason;
+      switch (filter) {
+        case 'draft_review': return p.status === 'draft';
+        case 'draft': return p.status === 'draft' && !p.supervisor_block_reason;
+        case 'needs_review': return needsReview;
+        case 'approved': return p.status === 'approved';
+        case 'rejected': return p.status === 'rejected';
+        case 'snoozed': return p.status === 'snoozed';
+        case 'all': return true;
+        default: return true;
+      }
+    });
+  }, [proposals, filter]);
+
+  const counts = useMemo(() => ({
+    draft: proposals.filter((p) => p.status === 'draft').length,
+    approved: proposals.filter((p) => p.status === 'approved').length,
+    rejected: proposals.filter((p) => p.status === 'rejected').length,
+    snoozed: proposals.filter((p) => p.status === 'snoozed').length,
+    needs_review: proposals.filter((p) => p.status === 'draft' && !!p.supervisor_block_reason).length,
+  }), [proposals]);
+
+  // ---- D.1 action handler — writes ONLY to zazi_actions ----
+  const handleAction = async (proposal: ProspectorProposal, action: ProposalAction) => {
+    if (!user || !isAdmin) return;
+    setBusyId(proposal.id);
+    setError(null);
+    try {
+      // Re-validate approval gate server-side context (still client-side gate below)
+      const baseEvidence = (proposal.evidence && typeof proposal.evidence === 'object') ? proposal.evidence : {};
+      const nowIso = new Date().toISOString();
+
+      if (action.type === 'approve') {
+        // Hard safety re-check
+        if (proposal.supervisor_block_reason
+          || proposal.supervisor_quality_score == null
+          || (proposal.supervisor_safety ?? 0) < 70
+          || (proposal.supervisor_leadership_fit ?? 0) < 60
+          || (proposal.supervisor_quality_score ?? 0) < 60) {
+          throw new Error('Supervisor review failed. Fix or reject this draft.');
+        }
+        const { error: e } = await supabase
+          .from('zazi_actions')
+          .update({
+            status: 'approved',
+            approved_by: user.id,
+            approved_at: nowIso,
+            // explicit: no sent_at, no maytapi_message_id
+          } as any)
+          .eq('id', proposal.id)
+          .eq('user_id', user.id)
+          .eq('status', 'draft');
+        if (e) throw e;
+      } else if (action.type === 'undo_approve') {
+        const { error: e } = await supabase
+          .from('zazi_actions')
+          .update({
+            status: 'draft',
+            approved_by: null,
+            approved_at: null,
+          } as any)
+          .eq('id', proposal.id)
+          .eq('user_id', user.id)
+          .eq('status', 'approved');
+        if (e) throw e;
+      } else if (action.type === 'edit_save') {
+        const ui_edit = {
+          edited_by: user.id,
+          edited_at: nowIso,
+          previous_message: proposal.proposed_message,
+          edit_reason: action.reason || null,
+        };
+        const newEvidence = { ...baseEvidence, ui_edit };
+        const { error: e } = await supabase
+          .from('zazi_actions')
+          .update({
+            proposed_message: action.newMessage,
+            evidence: newEvidence,
+            status: 'draft',
+          } as any)
+          .eq('id', proposal.id)
+          .eq('user_id', user.id);
+        if (e) throw e;
+      } else if (action.type === 'reject') {
+        const feedback = {
+          rejected_by: user.id,
+          rejected_at: nowIso,
+          reason: action.reason,
+        };
+        const newEvidence = { ...baseEvidence, feedback };
+        const { error: e } = await supabase
+          .from('zazi_actions')
+          .update({
+            status: 'rejected',
+            approved_by: null,
+            approved_at: null,
+            evidence: newEvidence,
+          } as any)
+          .eq('id', proposal.id)
+          .eq('user_id', user.id);
+        if (e) throw e;
+      } else if (action.type === 'snooze') {
+        const { error: e } = await supabase
+          .from('zazi_actions')
+          .update({
+            status: 'snoozed',
+            snoozed_until: action.until,
+            snooze_reason: action.label,
+          } as any)
+          .eq('id', proposal.id)
+          .eq('user_id', user.id);
+        if (e) throw e;
+      } else if (action.type === 'unsnooze') {
+        const { error: e } = await supabase
+          .from('zazi_actions')
+          .update({
+            status: 'draft',
+            snoozed_until: null,
+            snooze_reason: null,
+          } as any)
+          .eq('id', proposal.id)
+          .eq('user_id', user.id)
+          .eq('status', 'snoozed');
+        if (e) throw e;
+      }
+
+      await fetchProposals();
+    } catch (e: any) {
+      setError(e?.message || 'Action failed');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   if (isAdmin === null) return null;
   if (isAdmin === false) return null;
 
@@ -99,12 +248,27 @@ export function ProspectorInbox() {
           <Brain className="w-5 h-5 text-violet-400" />
           <h3 className="text-lg font-semibold text-white">Prospector Inbox</h3>
           <span className="text-[10px] uppercase tracking-wide bg-violet-500/15 text-violet-300 px-2 py-0.5 rounded border border-violet-500/30">
-            Admin only · Shadow mode
+            Admin only · Approval workflow · No send yet
           </span>
         </div>
         <div className="text-xs text-slate-400">
-          {proposals.length} draft{proposals.length === 1 ? '' : 's'} · Read-only review
+          {counts.draft} draft · {counts.needs_review} needs review · {counts.approved} approved · {counts.snoozed} snoozed · {counts.rejected} rejected
         </div>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-1.5 mb-4">
+        {FILTERS.map((f) => (
+          <button
+            key={f.key}
+            onClick={() => setFilter(f.key)}
+            className={`px-3 py-1 text-xs rounded border transition-colors ${
+              filter === f.key
+                ? 'bg-violet-600 border-violet-500 text-white'
+                : 'bg-slate-900/60 border-slate-700 text-slate-300 hover:bg-slate-800'
+            }`}
+          >{f.label}</button>
+        ))}
       </div>
 
       {loading && (
@@ -114,22 +278,31 @@ export function ProspectorInbox() {
       )}
 
       {!loading && error && (
-        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-sm text-red-300">
+        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-sm text-red-300 mb-3">
           {error}
         </div>
       )}
 
-      {!loading && !error && proposals.length === 0 && (
+      {!loading && !error && filtered.length === 0 && (
         <div className="flex flex-col items-center justify-center py-10 text-center">
           <Inbox className="w-10 h-10 text-slate-600 mb-2" />
-          <div className="text-sm text-slate-400">No Prospector drafts yet. Run a manual admin shadow scan first.</div>
+          <div className="text-sm text-slate-400">
+            {proposals.length === 0
+              ? 'No Prospector drafts yet. Run a manual admin shadow scan first.'
+              : 'No drafts match this filter.'}
+          </div>
         </div>
       )}
 
-      {!loading && !error && proposals.length > 0 && (
+      {!loading && filtered.length > 0 && (
         <div className="space-y-3">
-          {proposals.map((p) => (
-            <ProspectorProposalCard key={p.id} proposal={p} />
+          {filtered.map((p) => (
+            <ProspectorProposalCard
+              key={p.id}
+              proposal={p}
+              busy={busyId === p.id}
+              onAction={(action) => handleAction(p, action)}
+            />
           ))}
         </div>
       )}
