@@ -1,6 +1,11 @@
 // Zazi MAM Prospector — Composer Brain (Phase B, shadow mode)
 // Drafts proposed_message via Lovable AI Gateway. Strict negative-prompt guardrails.
 // No sending. No Maytapi. Just text + metadata returned to the orchestrator.
+//
+// First-touch branding rule:
+//   When the orchestrator passes first_touch=true, the message ends with Vanto's
+//   branded APLGO landing page link and a short signature. Follow-ups stay
+//   conversational with NO link and NO signature footer.
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,7 +14,12 @@ const corsHeaders = {
 
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
 
-const SYSTEM_PROMPT = `You are Zazi MAM, a wise African field leader inside an APLGO network-marketing CRM.
+const BRAND_LINK = "https://vanto-zazi-bloom.lovable.app/aplgo.html";
+const BRAND_SIGNATURE = "— Vanto\nvanto@onlinecourseformlm.com";
+const BRAND_FOOTER =
+  `\n\nHere is a short page I prepared so you can understand what this wellness opportunity is about:\n${BRAND_LINK}\n\n${BRAND_SIGNATURE}`;
+
+const SYSTEM_PROMPT_BASE = `You are Zazi MAM, a wise African field leader inside an APLGO network-marketing CRM.
 You write short, warm, leadership-focused 1-on-1 WhatsApp messages.
 
 VOICE: belief-restoring, practical, respectful, action-focused. Sound like a trusted mentor, not a salesperson.
@@ -20,13 +30,24 @@ HARD RULES — never violate:
 - No medical or health claims ("this cures / treats / heals ...").
 - No comparisons that shame ("others are doing better than you").
 - No emojis spam — at most one tasteful emoji.
-- Keep it WhatsApp-short: 2–4 short sentences, max ~360 characters.
 - Address the contact respectfully using their salutation_title + first name when available.
 - End with EXACTLY ONE clear next step (a question or simple ask) — UNLESS the leadership_need is "recognition", in which case end with celebration only.
 - Plain text, no markdown.
 
 You will receive contact context, detector signals, and a chosen leadership_need + tone.
 Return ONLY the message text — no preface, no labels, no quotes.`;
+
+const FIRST_TOUCH_RULES = `
+FIRST-TOUCH MODE (this is the first outbound message to this contact):
+- Open with a warm personal greeting using salutation + first name.
+- 2–3 short sentences of leadership-grade introduction tied to their focus_area.
+- Do NOT include any URL, link, or signature in your output. The system will append the branded link and signature automatically. Just write the warm intro + one clear ask.
+- Total body length: 280–420 characters (tighter is better).`;
+
+const FOLLOWUP_RULES = `
+FOLLOW-UP MODE (this contact has prior outbound history):
+- Keep it WhatsApp-short: 2–4 short sentences, max ~360 characters.
+- Do NOT include any URL or signature. Conversational only.`;
 
 const SAFETY_LIST = [
   "no_income_promises",
@@ -39,7 +60,6 @@ const SAFETY_LIST = [
 ];
 
 function postFilter(text: string): { ok: boolean; reasons: string[] } {
-  const t = text.toLowerCase();
   const reasons: string[] = [];
   const banned = [
     /you (will|'ll) (earn|make) [r$€£]?\s*\d/i,
@@ -49,19 +69,34 @@ function postFilter(text: string): { ok: boolean; reasons: string[] } {
     /others are doing better/i,
   ];
   for (const r of banned) if (r.test(text)) reasons.push(`matched_banned:${r}`);
-  if (text.length > 600) reasons.push("too_long");
+  if (text.length > 900) reasons.push("too_long");
   return { ok: reasons.length === 0, reasons };
+}
+
+// Strip any model-emitted link/signature so we can append our canonical one
+function stripModelBranding(text: string): string {
+  let t = text;
+  // remove any URL the model invented
+  t = t.replace(/https?:\/\/\S+/gi, "");
+  // remove em-dash signature lines like "— Vanto"
+  t = t.replace(/^\s*[—\-–]\s*Vanto.*$/gim, "");
+  // remove stray vanto email
+  t = t.replace(/vanto@onlinecourseformlm\.com/gi, "");
+  return t.replace(/\n{3,}/g, "\n\n").trim();
 }
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
-    const { contact, detector, reasoner } = await req.json();
+    const { contact, detector, reasoner, first_touch } = await req.json();
     if (!contact || !detector || !reasoner) {
       return new Response(JSON.stringify({ error: "contact, detector, reasoner required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    const isFirstTouch = Boolean(first_touch);
+    const systemPrompt = SYSTEM_PROMPT_BASE + (isFirstTouch ? FIRST_TOUCH_RULES : FOLLOWUP_RULES);
 
     const userPrompt = [
       `CONTACT:`,
@@ -75,8 +110,11 @@ Deno.serve(async (req) => {
       `BELIEF RISK: ${detector.belief_risk}/100`,
       `WHY: ${detector.reason_for_message}`,
       `EXPECTED NEXT STEP: ${detector.expected_next_step}`,
+      `FIRST_TOUCH: ${isFirstTouch ? "yes" : "no"}`,
       ``,
-      `Write the WhatsApp message now. Plain text only. One clear ask at the end (unless leadership_need is "recognition").`,
+      isFirstTouch
+        ? `Write the FIRST WhatsApp message body now. Plain text only. No link, no signature — those will be appended by the system. End with one clear ask.`
+        : `Write the WhatsApp follow-up now. Plain text only. No link, no signature. One clear ask at the end (unless leadership_need is "recognition").`,
     ].join("\n");
 
     const ai = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -88,7 +126,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
         messages: [
-          { role: "system", content: SYSTEM_PROMPT },
+          { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
       }),
@@ -114,22 +152,37 @@ Deno.serve(async (req) => {
 
     // strip stray quotes/markdown if model added any
     text = text.replace(/^["'`]+|["'`]+$/g, "").trim();
+    // strip any branding the model emitted (we control it deterministically)
+    text = stripModelBranding(text);
 
     const filter = postFilter(text);
     if (!filter.ok) {
       // Soft-fallback to a safe template draft so shadow mode still produces a row
+      const firstName = contact.full_name?.split(" ")[0] || "";
       text =
-        `Hi ${contact.salutation_title || "Leader"} ${contact.full_name?.split(" ")[0] || ""}, ` +
+        `Hi ${contact.salutation_title || "Leader"} ${firstName}, ` +
         `just a quick check-in from me. ${detector.next_best_business_action} ` +
         `Could we connect briefly this week?`;
     }
 
+    // Append branded footer ONLY for first-touch
+    let brandingFooterAdded = false;
+    let brandedLinkUsed = false;
+    if (isFirstTouch) {
+      text = text + BRAND_FOOTER;
+      brandingFooterAdded = true;
+      brandedLinkUsed = true;
+    }
+
     return new Response(JSON.stringify({
       proposed_message: text,
-      pattern_used: `${reasoner.leadership_need}/${reasoner.recommended_tone}`,
+      pattern_used: `${reasoner.leadership_need}/${reasoner.recommended_tone}${isFirstTouch ? "/first_touch" : "/follow_up"}`,
       knowledge_used: [],
       safety_constraints_applied: SAFETY_LIST,
       filter_flags: filter.reasons,
+      first_touch: isFirstTouch,
+      branding_footer_added: brandingFooterAdded,
+      branded_link_used: brandedLinkUsed,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
     console.error("[compose] error:", e);
