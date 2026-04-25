@@ -43,7 +43,8 @@ const FIRST_TOUCH_RULES = `
 FIRST-TOUCH MODE (this is the first outbound message to this contact):
 - Open with a warm personal greeting using salutation + first name.
 - 2–3 short sentences of leadership-grade introduction tied to their focus_area.
-- Do NOT include any URL, link, or signature in your output. The system will append the branded link and signature automatically. Just write the warm intro + one clear ask.
+- Do NOT include any URL, link, or signature in your output. The system will prepend the branded URL at the TOP (as a WhatsApp preview header) and append the signature at the bottom automatically. Just write the warm intro + one clear ask.
+- Do NOT write any sentence describing or referring to the link (e.g. "Here is a short page", "see the link below", "check this page"). The URL is a silent letterhead, not content.
 - Total body length: 280–420 characters (tighter is better).`;
 
 const FOLLOWUP_RULES = `
