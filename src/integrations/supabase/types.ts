@@ -872,14 +872,14 @@ export type Database = {
           sent_at: string | null
           status: string
           supervisor_block_reason: string | null
-          supervisor_clarity: number
-          supervisor_cultural_fit: number
-          supervisor_grounding: number
-          supervisor_leadership_fit: number
-          supervisor_quality_score: number
-          supervisor_relevance: number
-          supervisor_safety: number
-          supervisor_tone_fit: number
+          supervisor_clarity: number | null
+          supervisor_cultural_fit: number | null
+          supervisor_grounding: number | null
+          supervisor_leadership_fit: number | null
+          supervisor_quality_score: number | null
+          supervisor_relevance: number | null
+          supervisor_safety: number | null
+          supervisor_tone_fit: number | null
           updated_at: string
           user_id: string
         }
@@ -903,14 +903,14 @@ export type Database = {
           sent_at?: string | null
           status?: string
           supervisor_block_reason?: string | null
-          supervisor_clarity?: number
-          supervisor_cultural_fit?: number
-          supervisor_grounding?: number
-          supervisor_leadership_fit?: number
-          supervisor_quality_score?: number
-          supervisor_relevance?: number
-          supervisor_safety?: number
-          supervisor_tone_fit?: number
+          supervisor_clarity?: number | null
+          supervisor_cultural_fit?: number | null
+          supervisor_grounding?: number | null
+          supervisor_leadership_fit?: number | null
+          supervisor_quality_score?: number | null
+          supervisor_relevance?: number | null
+          supervisor_safety?: number | null
+          supervisor_tone_fit?: number | null
           updated_at?: string
           user_id: string
         }
@@ -934,14 +934,14 @@ export type Database = {
           sent_at?: string | null
           status?: string
           supervisor_block_reason?: string | null
-          supervisor_clarity?: number
-          supervisor_cultural_fit?: number
-          supervisor_grounding?: number
-          supervisor_leadership_fit?: number
-          supervisor_quality_score?: number
-          supervisor_relevance?: number
-          supervisor_safety?: number
-          supervisor_tone_fit?: number
+          supervisor_clarity?: number | null
+          supervisor_cultural_fit?: number | null
+          supervisor_grounding?: number | null
+          supervisor_leadership_fit?: number | null
+          supervisor_quality_score?: number | null
+          supervisor_relevance?: number | null
+          supervisor_safety?: number | null
+          supervisor_tone_fit?: number | null
           updated_at?: string
           user_id?: string
         }
