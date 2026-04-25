@@ -55,9 +55,8 @@ export function ProspectorInbox() {
     try {
       const { data: rows, error: err } = await supabase
         .from('zazi_actions')
-        .select('id, contact_id, status, movement_stage, leadership_need, belief_risk, recommended_tone, reason_for_message, next_best_business_action, expected_next_step, proposed_message, supervisor_quality_score, supervisor_safety, supervisor_grounding, supervisor_cultural_fit, supervisor_clarity, supervisor_relevance, supervisor_tone_fit, supervisor_leadership_fit, supervisor_block_reason, evidence, created_at, approved_at, approved_by, snoozed_until, snooze_reason' as any)
-        .eq('user_id', user.id)
-        .neq('status', 'sent');
+        .select('id, contact_id, status, movement_stage, leadership_need, belief_risk, recommended_tone, reason_for_message, next_best_business_action, expected_next_step, proposed_message, supervisor_quality_score, supervisor_safety, supervisor_grounding, supervisor_cultural_fit, supervisor_clarity, supervisor_relevance, supervisor_tone_fit, supervisor_leadership_fit, supervisor_block_reason, evidence, created_at, approved_at, approved_by, snoozed_until, snooze_reason, sent_at, maytapi_message_id' as any)
+        .eq('user_id', user.id);
       if (err) throw err;
 
       const contactIds = Array.from(new Set((rows || []).map((r: any) => r.contact_id).filter(Boolean)));
