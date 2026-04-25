@@ -341,6 +341,14 @@ Deno.serve(async (req) => {
           template_or_pattern_used: composer.pattern_used,
           knowledge_used: composer.knowledge_used || [],
           safety_constraints_applied: composer.safety_constraints_applied || [],
+          first_touch: Boolean(composer.first_touch ?? isFirstTouch),
+          branding_footer_added: Boolean(composer.branding_footer_added),
+          branded_link_used: Boolean(composer.branded_link_used),
+          first_touch_signals: {
+            prior_zazi_actions: priorActions || 0,
+            prior_outbound_activities: priorOutboundActivity || 0,
+            prior_outbound_followups: priorOutboundFu || 0,
+          },
         },
       };
 
