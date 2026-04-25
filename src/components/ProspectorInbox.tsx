@@ -108,12 +108,14 @@ export function ProspectorInbox() {
 
   const filtered = useMemo(() => {
     return proposals.filter((p) => {
+      const isSent = p.status === 'sent' || !!p.sent_at;
       const needsReview = p.status === 'draft' && !!p.supervisor_block_reason;
       switch (filter) {
         case 'draft_review': return p.status === 'draft';
         case 'draft': return p.status === 'draft' && !p.supervisor_block_reason;
         case 'needs_review': return needsReview;
-        case 'approved': return p.status === 'approved';
+        case 'approved': return p.status === 'approved' && !isSent;
+        case 'sent': return isSent;
         case 'rejected': return p.status === 'rejected';
         case 'snoozed': return p.status === 'snoozed';
         case 'all': return true;
@@ -124,18 +126,41 @@ export function ProspectorInbox() {
 
   const counts = useMemo(() => ({
     draft: proposals.filter((p) => p.status === 'draft').length,
-    approved: proposals.filter((p) => p.status === 'approved').length,
+    approved: proposals.filter((p) => p.status === 'approved' && !p.sent_at).length,
+    sent: proposals.filter((p) => p.status === 'sent' || !!p.sent_at).length,
     rejected: proposals.filter((p) => p.status === 'rejected').length,
     snoozed: proposals.filter((p) => p.status === 'snoozed').length,
     needs_review: proposals.filter((p) => p.status === 'draft' && !!p.supervisor_block_reason).length,
   }), [proposals]);
 
   // ---- D.1.1 action handler — calls admin-only edge function (no direct table writes) ----
+  // ---- E.1: send_whatsapp invokes the already-tested maytapi-send-1to1 (test_mode=true) ----
   const handleAction = async (proposal: ProspectorProposal, action: ProposalAction) => {
     if (!user || !isAdmin) return;
     setBusyId(proposal.id);
     setError(null);
     try {
+      // E.1 — one-by-one send via existing maytapi-send-1to1 (no batch, no cron)
+      if (action.type === 'send_whatsapp') {
+        // Hard client-side gate (server enforces too)
+        const okGate = proposal.status === 'approved'
+          && !proposal.sent_at
+          && !proposal.maytapi_message_id
+          && !proposal.supervisor_block_reason
+          && (proposal.supervisor_quality_score ?? 0) >= 60
+          && (proposal.supervisor_safety ?? 0) >= 70
+          && (proposal.supervisor_leadership_fit ?? 0) >= 60;
+        if (!okGate) throw new Error('Send blocked: row is not eligible.');
+
+        const { data, error: fnErr } = await supabase.functions.invoke('maytapi-send-1to1', {
+          body: { zazi_action_id: proposal.id, test_mode: true },
+        });
+        if (fnErr) throw fnErr;
+        if (data && (data as any).error) throw new Error((data as any).error);
+        await fetchProposals();
+        return;
+      }
+
       let payload: Record<string, unknown> = { id: proposal.id };
       if (action.type === 'approve') payload = { ...payload, type: 'approve' };
       else if (action.type === 'undo_approve') payload = { ...payload, type: 'undo_approve' };
