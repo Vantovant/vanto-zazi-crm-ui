@@ -4,13 +4,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { ProspectorProposalCard, type ProspectorProposal, type ProposalAction } from './ProspectorProposalCard';
 
-type FilterKey = 'draft_review' | 'draft' | 'approved' | 'rejected' | 'snoozed' | 'needs_review' | 'all';
+type FilterKey = 'draft_review' | 'draft' | 'approved' | 'sent' | 'rejected' | 'snoozed' | 'needs_review' | 'all';
 
 const FILTERS: { key: FilterKey; label: string }[] = [
   { key: 'draft_review', label: 'Draft + Needs Review' },
   { key: 'draft', label: 'Draft' },
   { key: 'needs_review', label: 'Needs Review' },
-  { key: 'approved', label: 'Approved' },
+  { key: 'approved', label: 'Approved (not sent)' },
+  { key: 'sent', label: 'Sent' },
   { key: 'snoozed', label: 'Snoozed' },
   { key: 'rejected', label: 'Rejected' },
   { key: 'all', label: 'All' },
@@ -54,9 +55,8 @@ export function ProspectorInbox() {
     try {
       const { data: rows, error: err } = await supabase
         .from('zazi_actions')
-        .select('id, contact_id, status, movement_stage, leadership_need, belief_risk, recommended_tone, reason_for_message, next_best_business_action, expected_next_step, proposed_message, supervisor_quality_score, supervisor_safety, supervisor_grounding, supervisor_cultural_fit, supervisor_clarity, supervisor_relevance, supervisor_tone_fit, supervisor_leadership_fit, supervisor_block_reason, evidence, created_at, approved_at, approved_by, snoozed_until, snooze_reason' as any)
-        .eq('user_id', user.id)
-        .neq('status', 'sent');
+        .select('id, contact_id, status, movement_stage, leadership_need, belief_risk, recommended_tone, reason_for_message, next_best_business_action, expected_next_step, proposed_message, supervisor_quality_score, supervisor_safety, supervisor_grounding, supervisor_cultural_fit, supervisor_clarity, supervisor_relevance, supervisor_tone_fit, supervisor_leadership_fit, supervisor_block_reason, evidence, created_at, approved_at, approved_by, snoozed_until, snooze_reason, sent_at, maytapi_message_id' as any)
+        .eq('user_id', user.id);
       if (err) throw err;
 
       const contactIds = Array.from(new Set((rows || []).map((r: any) => r.contact_id).filter(Boolean)));
@@ -78,6 +78,10 @@ export function ProspectorInbox() {
       }));
 
       enriched.sort((a, b) => {
+        // Sent rows last
+        const aSent = a.status === 'sent' || !!a.sent_at ? 1 : 0;
+        const bSent = b.status === 'sent' || !!b.sent_at ? 1 : 0;
+        if (aSent !== bSent) return aSent - bSent;
         const aBlock = a.supervisor_block_reason ? 1 : 0;
         const bBlock = b.supervisor_block_reason ? 1 : 0;
         if (aBlock !== bBlock) return bBlock - aBlock;
@@ -104,12 +108,14 @@ export function ProspectorInbox() {
 
   const filtered = useMemo(() => {
     return proposals.filter((p) => {
+      const isSent = p.status === 'sent' || !!p.sent_at;
       const needsReview = p.status === 'draft' && !!p.supervisor_block_reason;
       switch (filter) {
         case 'draft_review': return p.status === 'draft';
         case 'draft': return p.status === 'draft' && !p.supervisor_block_reason;
         case 'needs_review': return needsReview;
-        case 'approved': return p.status === 'approved';
+        case 'approved': return p.status === 'approved' && !isSent;
+        case 'sent': return isSent;
         case 'rejected': return p.status === 'rejected';
         case 'snoozed': return p.status === 'snoozed';
         case 'all': return true;
@@ -120,18 +126,41 @@ export function ProspectorInbox() {
 
   const counts = useMemo(() => ({
     draft: proposals.filter((p) => p.status === 'draft').length,
-    approved: proposals.filter((p) => p.status === 'approved').length,
+    approved: proposals.filter((p) => p.status === 'approved' && !p.sent_at).length,
+    sent: proposals.filter((p) => p.status === 'sent' || !!p.sent_at).length,
     rejected: proposals.filter((p) => p.status === 'rejected').length,
     snoozed: proposals.filter((p) => p.status === 'snoozed').length,
     needs_review: proposals.filter((p) => p.status === 'draft' && !!p.supervisor_block_reason).length,
   }), [proposals]);
 
   // ---- D.1.1 action handler — calls admin-only edge function (no direct table writes) ----
+  // ---- E.1: send_whatsapp invokes the already-tested maytapi-send-1to1 (test_mode=true) ----
   const handleAction = async (proposal: ProspectorProposal, action: ProposalAction) => {
     if (!user || !isAdmin) return;
     setBusyId(proposal.id);
     setError(null);
     try {
+      // E.1 — one-by-one send via existing maytapi-send-1to1 (no batch, no cron)
+      if (action.type === 'send_whatsapp') {
+        // Hard client-side gate (server enforces too)
+        const okGate = proposal.status === 'approved'
+          && !proposal.sent_at
+          && !proposal.maytapi_message_id
+          && !proposal.supervisor_block_reason
+          && (proposal.supervisor_quality_score ?? 0) >= 60
+          && (proposal.supervisor_safety ?? 0) >= 70
+          && (proposal.supervisor_leadership_fit ?? 0) >= 60;
+        if (!okGate) throw new Error('Send blocked: row is not eligible.');
+
+        const { data, error: fnErr } = await supabase.functions.invoke('maytapi-send-1to1', {
+          body: { zazi_action_id: proposal.id, test_mode: true },
+        });
+        if (fnErr) throw fnErr;
+        if (data && (data as any).error) throw new Error((data as any).error);
+        await fetchProposals();
+        return;
+      }
+
       let payload: Record<string, unknown> = { id: proposal.id };
       if (action.type === 'approve') payload = { ...payload, type: 'approve' };
       else if (action.type === 'undo_approve') payload = { ...payload, type: 'undo_approve' };
@@ -168,7 +197,7 @@ export function ProspectorInbox() {
           </span>
         </div>
         <div className="text-xs text-slate-400">
-          {counts.draft} draft · {counts.needs_review} needs review · {counts.approved} approved · {counts.snoozed} snoozed · {counts.rejected} rejected
+          {counts.draft} draft · {counts.needs_review} needs review · {counts.approved} approved · {counts.sent} sent · {counts.snoozed} snoozed · {counts.rejected} rejected
         </div>
       </div>
 

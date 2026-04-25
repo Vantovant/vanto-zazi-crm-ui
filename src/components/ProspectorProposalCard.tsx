@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, ShieldAlert, Eye, Phone, Check, Pencil, X, Clock, Undo2, Loader2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, ShieldAlert, Eye, Phone, Check, Pencil, X, Clock, Undo2, Loader2, Send, Lock } from 'lucide-react';
 
 export interface ProspectorProposal {
   id: string;
@@ -30,6 +30,8 @@ export interface ProspectorProposal {
   approved_by?: string | null;
   snoozed_until?: string | null;
   snooze_reason?: string | null;
+  sent_at?: string | null;
+  maytapi_message_id?: string | null;
 }
 
 export type ProposalAction =
@@ -38,7 +40,8 @@ export type ProposalAction =
   | { type: 'edit_save'; newMessage: string; reason?: string }
   | { type: 'reject'; reason: string }
   | { type: 'snooze'; until: string; label: string }
-  | { type: 'unsnooze' };
+  | { type: 'unsnooze' }
+  | { type: 'send_whatsapp' };
 
 const stageColor: Record<string, string> = {
   expired: 'bg-red-500/20 text-red-300 border-red-500/30',
@@ -116,7 +119,19 @@ export function ProspectorProposalCard({ proposal, onAction, busy = false }: Pro
   const gate = approvalGate(proposal);
 
   const status = proposal.status;
+  const isSent = status === 'sent' || !!proposal.sent_at || !!proposal.maytapi_message_id;
+
+  // E.1 send eligibility — strict gate
+  const canSend = status === 'approved'
+    && !proposal.sent_at
+    && !proposal.maytapi_message_id
+    && !proposal.supervisor_block_reason
+    && (proposal.supervisor_quality_score ?? 0) >= 60
+    && (proposal.supervisor_safety ?? 0) >= 70
+    && (proposal.supervisor_leadership_fit ?? 0) >= 60;
+
   const statusBadge = (() => {
+    if (isSent) return { text: 'SENT VIA MAYTAPI', cls: 'bg-violet-500/20 text-violet-200 border-violet-500/40' };
     if (status === 'approved') return { text: 'APPROVED — NOT SENT', cls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40' };
     if (status === 'rejected') return { text: 'REJECTED — WILL NOT SEND', cls: 'bg-red-500/15 text-red-300 border-red-500/40' };
     if (status === 'snoozed') return { text: 'SNOOZED — NOT ACTIVE', cls: 'bg-blue-500/15 text-blue-300 border-blue-500/40' };
@@ -124,7 +139,8 @@ export function ProspectorProposalCard({ proposal, onAction, busy = false }: Pro
     return { text: 'SHADOW DRAFT — NOT SENT', cls: 'bg-slate-700/60 text-slate-300 border-slate-600' };
   })();
 
-  const cardBorder = status === 'approved' ? 'border-emerald-500/40'
+  const cardBorder = isSent ? 'border-violet-500/40'
+    : status === 'approved' ? 'border-emerald-500/40'
     : status === 'rejected' ? 'border-red-500/30 opacity-70'
     : status === 'snoozed' ? 'border-blue-500/30'
     : blocked ? 'border-red-500/40'
@@ -167,8 +183,14 @@ export function ProspectorProposalCard({ proposal, onAction, busy = false }: Pro
           {status === 'snoozed' && proposal.snoozed_until && (
             <div className="text-xs text-blue-300 mt-1">Snoozed until {new Date(proposal.snoozed_until).toLocaleString()}</div>
           )}
-          {status === 'approved' && proposal.approved_at && (
+          {status === 'approved' && !isSent && proposal.approved_at && (
             <div className="text-xs text-emerald-300 mt-1">Approved {new Date(proposal.approved_at).toLocaleString()} — NOT SENT YET</div>
+          )}
+          {isSent && (
+            <div className="text-xs text-violet-300 mt-1">
+              Sent {proposal.sent_at ? new Date(proposal.sent_at).toLocaleString() : ''}
+              {proposal.maytapi_message_id ? ` · msg ${proposal.maytapi_message_id}` : ''}
+            </div>
           )}
         </div>
 
@@ -378,15 +400,46 @@ export function ProspectorProposalCard({ proposal, onAction, busy = false }: Pro
               )}
             </>
           )}
-          {status === 'approved' && (
-            <>
-              <span className="text-xs text-emerald-300 font-medium">Approved for future Maytapi send — NOT SENT YET</span>
-              <button
-                onClick={() => onAction({ type: 'undo_approve' })}
-                disabled={busy}
-                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-100 rounded ml-auto"
-              ><Undo2 className="w-3 h-3" /> Undo approval</button>
-            </>
+          {status === 'approved' && !isSent && (
+            <div className="w-full space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-emerald-300 font-medium">Approved — ready for one-by-one Maytapi send</span>
+                <button
+                  onClick={() => onAction({ type: 'undo_approve' })}
+                  disabled={busy}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-100 rounded ml-auto"
+                ><Undo2 className="w-3 h-3" /> Undo approval</button>
+              </div>
+              {canSend ? (
+                <div className="bg-violet-500/10 border border-violet-500/30 rounded-lg p-3 space-y-2">
+                  <div className="text-[11px] text-amber-300 font-medium">
+                    ⚠ This will send one WhatsApp message via Maytapi. Not reversible.
+                  </div>
+                  <button
+                    onClick={() => {
+                      const ok = window.confirm(
+                        `Send this approved message to ${proposal.contact_name || 'contact'}` +
+                        `${proposal.contact_phone ? ` (${proposal.contact_phone})` : ''}?\n\n` +
+                        `This will send one WhatsApp message now.`
+                      );
+                      if (ok) onAction({ type: 'send_whatsapp' });
+                    }}
+                    disabled={busy}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold bg-violet-600 hover:bg-violet-500 disabled:bg-slate-700 disabled:text-slate-400 disabled:cursor-not-allowed text-white rounded"
+                  >
+                    {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                    Send via WhatsApp
+                  </button>
+                </div>
+              ) : (
+                <span className="text-[11px] text-amber-300">Send disabled — supervisor thresholds not met.</span>
+              )}
+            </div>
+          )}
+          {isSent && (
+            <span className="inline-flex items-center gap-1.5 text-xs text-violet-300 font-medium">
+              <Lock className="w-3 h-3" /> Sent — read-only. Resend / edit / undo disabled.
+            </span>
           )}
           {status === 'snoozed' && (
             <>
