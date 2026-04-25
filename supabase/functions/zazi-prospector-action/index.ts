@@ -83,9 +83,9 @@ Deno.serve(async (req) => {
     global: { headers: { Authorization: authHeader } },
   });
   const token = authHeader.replace("Bearer ", "");
-  const { data: claims, error: claimErr } = await userClient.auth.getClaims(token);
-  if (claimErr || !claims?.claims?.sub) return json(401, { error: "Unauthorized" });
-  const callerId = claims.claims.sub as string;
+  const { data: userData, error: userErr } = await userClient.auth.getUser(token);
+  if (userErr || !userData?.user?.id) return json(401, { error: "Unauthorized" });
+  const callerId = userData.user.id;
 
   // 2) Admin/owner gate (uses public.has_role -> security definer)
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
