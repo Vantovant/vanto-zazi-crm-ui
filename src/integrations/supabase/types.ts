@@ -870,6 +870,8 @@ export type Database = {
           reason_for_message: string
           recommended_tone: string
           sent_at: string | null
+          snooze_reason: string | null
+          snoozed_until: string | null
           status: string
           supervisor_block_reason: string | null
           supervisor_clarity: number | null
@@ -901,6 +903,8 @@ export type Database = {
           reason_for_message?: string
           recommended_tone?: string
           sent_at?: string | null
+          snooze_reason?: string | null
+          snoozed_until?: string | null
           status?: string
           supervisor_block_reason?: string | null
           supervisor_clarity?: number | null
@@ -932,6 +936,8 @@ export type Database = {
           reason_for_message?: string
           recommended_tone?: string
           sent_at?: string | null
+          snooze_reason?: string | null
+          snoozed_until?: string | null
           status?: string
           supervisor_block_reason?: string | null
           supervisor_clarity?: number | null
