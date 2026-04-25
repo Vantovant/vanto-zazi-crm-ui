@@ -169,7 +169,7 @@ Deno.serve(async (req) => {
     let text: string = json.choices?.[0]?.message?.content?.trim() || "";
 
     // strip stray quotes/markdown if model added any
-    text = text.replace(/^["'`]+|["'`]+$/g, "").trim();
+    text = normalizeMessageNewlines(text.replace(/^["'`]+|["'`]+$/g, ""));
     // strip any branding the model emitted (we control it deterministically)
     text = stripModelBranding(text);
 
