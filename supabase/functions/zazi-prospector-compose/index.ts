@@ -14,7 +14,7 @@ const corsHeaders = {
 
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
 
-const BRANDED_URL = "https://vanto-zazi-bloom.lovable.app/aplgo.html";
+const BRANDED_URL = "https://crm.onlinecourseformlm.com/aplgo.html";
 const BRAND_SIGNATURE = "— Vanto\nvanto@onlinecourseformlm.com";
 // First-touch wrapper: URL on its own first line (WhatsApp preview header / branded letterhead),
 // then the personal message, then the signature on its own bottom lines. No explanatory sentence about the link.

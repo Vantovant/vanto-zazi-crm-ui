@@ -7,7 +7,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const BRANDED_URL = 'https://vanto-zazi-bloom.lovable.app/aplgo.html';
+const BRANDED_URL = 'https://crm.onlinecourseformlm.com/aplgo.html';
 
 function normalizePhoneForMaytapi(raw: string): string | null {
   if (!raw) return null;
