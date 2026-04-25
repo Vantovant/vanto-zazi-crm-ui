@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, ShieldAlert, Eye, Phone, Check, Pencil, X, Clock, Undo2, Loader2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, ShieldAlert, Eye, Phone, Check, Pencil, X, Clock, Undo2, Loader2, Send, Lock } from 'lucide-react';
 
 export interface ProspectorProposal {
   id: string;
