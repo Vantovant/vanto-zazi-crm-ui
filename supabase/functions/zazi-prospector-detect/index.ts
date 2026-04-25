@@ -294,7 +294,32 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      const composer = await callCompose({ contact, detector, reasoner });
+      // ---- First-touch detection ----
+      // First-touch = no prior outbound prospector message AND no prior outbound
+      // whatsapp activity logged for this contact.
+      const [{ count: priorActions }, { count: priorOutboundActivity }, { count: priorOutboundFu }] = await Promise.all([
+        sb.from("zazi_actions")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", targetUserId)
+          .eq("contact_id", contact.id)
+          .in("status", ["approved", "sent"]),
+        sb.from("contact_activities")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", targetUserId)
+          .eq("contact_id", contact.id)
+          .in("activity_type", ["whatsapp", "whatsapp_sent", "message_sent", "outbound_message"]),
+        sb.from("follow_up_states")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", targetUserId)
+          .eq("contact_id", contact.id)
+          .not("last_outbound_at", "is", null),
+      ]);
+      const isFirstTouch =
+        (priorActions || 0) === 0 &&
+        (priorOutboundActivity || 0) === 0 &&
+        (priorOutboundFu || 0) === 0;
+
+      const composer = await callCompose({ contact, detector, reasoner, first_touch: isFirstTouch });
 
       const evidence = {
         movement_stage: detector.movement_stage, leadership_need: reasoner.leadership_need,
@@ -316,6 +341,14 @@ Deno.serve(async (req) => {
           template_or_pattern_used: composer.pattern_used,
           knowledge_used: composer.knowledge_used || [],
           safety_constraints_applied: composer.safety_constraints_applied || [],
+          first_touch: Boolean(composer.first_touch ?? isFirstTouch),
+          branding_footer_added: Boolean(composer.branding_footer_added),
+          branded_link_used: Boolean(composer.branded_link_used),
+          first_touch_signals: {
+            prior_zazi_actions: priorActions || 0,
+            prior_outbound_activities: priorOutboundActivity || 0,
+            prior_outbound_followups: priorOutboundFu || 0,
+          },
         },
       };
 
