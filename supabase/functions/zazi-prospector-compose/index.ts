@@ -16,8 +16,10 @@ const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
 
 const BRAND_LINK = "https://vanto-zazi-bloom.lovable.app/aplgo.html";
 const BRAND_SIGNATURE = "— Vanto\nvanto@onlinecourseformlm.com";
-const BRAND_FOOTER =
-  `\n\nHere is a short page I prepared so you can understand what this wellness opportunity is about:\n${BRAND_LINK}\n\n${BRAND_SIGNATURE}`;
+// First-touch wrapper: URL on its own line at the TOP (acts as WhatsApp preview header / branded letterhead),
+// then the personal message, then the signature at the bottom. No explanatory sentence about the link.
+const BRAND_HEADER = `${BRAND_LINK}\n\n`;
+const BRAND_SIGNATURE_BLOCK = `\n\n${BRAND_SIGNATURE}`;
 
 const SYSTEM_PROMPT_BASE = `You are Zazi MAM, a wise African field leader inside an APLGO network-marketing CRM.
 You write short, warm, leadership-focused 1-on-1 WhatsApp messages.
@@ -41,7 +43,8 @@ const FIRST_TOUCH_RULES = `
 FIRST-TOUCH MODE (this is the first outbound message to this contact):
 - Open with a warm personal greeting using salutation + first name.
 - 2–3 short sentences of leadership-grade introduction tied to their focus_area.
-- Do NOT include any URL, link, or signature in your output. The system will append the branded link and signature automatically. Just write the warm intro + one clear ask.
+- Do NOT include any URL, link, or signature in your output. The system will prepend the branded URL at the TOP (as a WhatsApp preview header) and append the signature at the bottom automatically. Just write the warm intro + one clear ask.
+- Do NOT write any sentence describing or referring to the link (e.g. "Here is a short page", "see the link below", "check this page"). The URL is a silent letterhead, not content.
 - Total body length: 280–420 characters (tighter is better).`;
 
 const FOLLOWUP_RULES = `
@@ -165,12 +168,12 @@ Deno.serve(async (req) => {
         `Could we connect briefly this week?`;
     }
 
-    // Append branded footer ONLY for first-touch
-    let brandingFooterAdded = false;
+    // Wrap with branded URL header + signature ONLY for first-touch
+    let brandingHeaderAdded = false;
     let brandedLinkUsed = false;
     if (isFirstTouch) {
-      text = text + BRAND_FOOTER;
-      brandingFooterAdded = true;
+      text = BRAND_HEADER + text + BRAND_SIGNATURE_BLOCK;
+      brandingHeaderAdded = true;
       brandedLinkUsed = true;
     }
 
@@ -181,8 +184,10 @@ Deno.serve(async (req) => {
       safety_constraints_applied: SAFETY_LIST,
       filter_flags: filter.reasons,
       first_touch: isFirstTouch,
-      branding_footer_added: brandingFooterAdded,
+      branding_header_added: brandingHeaderAdded,
+      branding_footer_added: false,
       branded_link_used: brandedLinkUsed,
+      first_touch_format: isFirstTouch ? "url_header_preview_plus_signature" : null,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
     console.error("[compose] error:", e);
