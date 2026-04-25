@@ -30,6 +30,8 @@ export interface ProspectorProposal {
   approved_by?: string | null;
   snoozed_until?: string | null;
   snooze_reason?: string | null;
+  sent_at?: string | null;
+  maytapi_message_id?: string | null;
 }
 
 export type ProposalAction =
@@ -38,7 +40,8 @@ export type ProposalAction =
   | { type: 'edit_save'; newMessage: string; reason?: string }
   | { type: 'reject'; reason: string }
   | { type: 'snooze'; until: string; label: string }
-  | { type: 'unsnooze' };
+  | { type: 'unsnooze' }
+  | { type: 'send_whatsapp' };
 
 const stageColor: Record<string, string> = {
   expired: 'bg-red-500/20 text-red-300 border-red-500/30',
