@@ -168,15 +168,14 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ---- Send via Maytapi sendMessage (type="link" — preview-capable) ----
-    // Endpoint: https://api.maytapi.com/api/{productId}/{phoneId}/sendMessage
-    // Phase E.0.1: switched from type="text" (no preview) to type="link".
-    //   - `message` carries ONLY the URL (Maytapi builds the preview card from this).
-    //   - `text` carries the body + signature (URL is NOT repeated here).
-    const { url: linkUrl, text: linkText } = splitFirstTouchForLinkSend(row.proposed_message);
-    if (linkUrl !== BRANDED_URL) {
+    // ---- Send via Maytapi sendMessage (type="media" — image card with caption, no "Forwarded") ----
+    // Phase E.0.2: switched from type="link" (caused "Forwarded" label) to type="media".
+    //   - `message` carries the IMAGE URL (Maytapi attaches as image).
+    //   - `text` carries the caption: body + branded page URL + signature.
+    const caption = buildFirstTouchMediaCaption(row.proposed_message);
+    if (!caption.includes(BRANDED_URL)) {
       return new Response(JSON.stringify({
-        error: 'Parsed first-line URL does not match BRANDED_URL after split',
+        error: 'Built caption is missing the branded page URL',
       }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
@@ -195,9 +194,9 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify({
           to_number: phone,
-          type: 'link',
-          message: linkUrl,
-          text: linkText,
+          type: 'media',
+          message: BRANDED_MEDIA_IMAGE,
+          text: caption,
         }),
       });
       upstreamText = await upstream.text();
