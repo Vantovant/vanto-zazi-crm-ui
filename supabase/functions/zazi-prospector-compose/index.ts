@@ -14,12 +14,10 @@ const corsHeaders = {
 
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
 
-const BRAND_LINK = "https://vanto-zazi-bloom.lovable.app/aplgo.html";
+const BRANDED_URL = "https://vanto-zazi-bloom.lovable.app/aplgo.html";
 const BRAND_SIGNATURE = "— Vanto\nvanto@onlinecourseformlm.com";
-// First-touch wrapper: URL on its own line at the TOP (acts as WhatsApp preview header / branded letterhead),
-// then the personal message, then the signature at the bottom. No explanatory sentence about the link.
-const BRAND_HEADER = `${BRAND_LINK}\n\n`;
-const BRAND_SIGNATURE_BLOCK = `\n\n${BRAND_SIGNATURE}`;
+// First-touch wrapper: URL on its own first line (WhatsApp preview header / branded letterhead),
+// then the personal message, then the signature on its own bottom lines. No explanatory sentence about the link.
 
 const SYSTEM_PROMPT_BASE = `You are Zazi MAM, a wise African field leader inside an APLGO network-marketing CRM.
 You write short, warm, leadership-focused 1-on-1 WhatsApp messages.
@@ -76,16 +74,33 @@ function postFilter(text: string): { ok: boolean; reasons: string[] } {
   return { ok: reasons.length === 0, reasons };
 }
 
-// Strip any model-emitted link/signature so we can append our canonical one
+// Convert any model/database-style escaped newline text into actual line breaks.
+function normalizeMessageNewlines(text: string): string {
+  return text
+    .replace(/\\r\\n/g, "\n")
+    .replace(/\\n/g, "\n")
+    .replace(/\\r/g, "\n")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+// Strip any model-emitted link/signature so we can apply our canonical wrapper
 function stripModelBranding(text: string): string {
-  let t = text;
+  let t = normalizeMessageNewlines(text);
   // remove any URL the model invented
   t = t.replace(/https?:\/\/\S+/gi, "");
   // remove em-dash signature lines like "— Vanto"
   t = t.replace(/^\s*[—\-–]\s*Vanto.*$/gim, "");
   // remove stray vanto email
   t = t.replace(/vanto@onlinecourseformlm\.com/gi, "");
-  return t.replace(/\n{3,}/g, "\n\n").trim();
+  return normalizeMessageNewlines(t);
+}
+
+function buildFirstTouchMessage(aiPersonalMessage: string): string {
+  const personalMessage = normalizeMessageNewlines(aiPersonalMessage);
+  return `${BRANDED_URL}\n\n${personalMessage}\n\n${BRAND_SIGNATURE}`;
 }
 
 Deno.serve(async (req) => {
@@ -154,7 +169,7 @@ Deno.serve(async (req) => {
     let text: string = json.choices?.[0]?.message?.content?.trim() || "";
 
     // strip stray quotes/markdown if model added any
-    text = text.replace(/^["'`]+|["'`]+$/g, "").trim();
+    text = normalizeMessageNewlines(text.replace(/^["'`]+|["'`]+$/g, ""));
     // strip any branding the model emitted (we control it deterministically)
     text = stripModelBranding(text);
 
@@ -172,7 +187,7 @@ Deno.serve(async (req) => {
     let brandingHeaderAdded = false;
     let brandedLinkUsed = false;
     if (isFirstTouch) {
-      text = BRAND_HEADER + text + BRAND_SIGNATURE_BLOCK;
+      text = buildFirstTouchMessage(text);
       brandingHeaderAdded = true;
       brandedLinkUsed = true;
     }
