@@ -119,7 +119,19 @@ export function ProspectorProposalCard({ proposal, onAction, busy = false }: Pro
   const gate = approvalGate(proposal);
 
   const status = proposal.status;
+  const isSent = status === 'sent' || !!proposal.sent_at || !!proposal.maytapi_message_id;
+
+  // E.1 send eligibility — strict gate
+  const canSend = status === 'approved'
+    && !proposal.sent_at
+    && !proposal.maytapi_message_id
+    && !proposal.supervisor_block_reason
+    && (proposal.supervisor_quality_score ?? 0) >= 60
+    && (proposal.supervisor_safety ?? 0) >= 70
+    && (proposal.supervisor_leadership_fit ?? 0) >= 60;
+
   const statusBadge = (() => {
+    if (isSent) return { text: 'SENT VIA MAYTAPI', cls: 'bg-violet-500/20 text-violet-200 border-violet-500/40' };
     if (status === 'approved') return { text: 'APPROVED — NOT SENT', cls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40' };
     if (status === 'rejected') return { text: 'REJECTED — WILL NOT SEND', cls: 'bg-red-500/15 text-red-300 border-red-500/40' };
     if (status === 'snoozed') return { text: 'SNOOZED — NOT ACTIVE', cls: 'bg-blue-500/15 text-blue-300 border-blue-500/40' };
@@ -127,7 +139,8 @@ export function ProspectorProposalCard({ proposal, onAction, busy = false }: Pro
     return { text: 'SHADOW DRAFT — NOT SENT', cls: 'bg-slate-700/60 text-slate-300 border-slate-600' };
   })();
 
-  const cardBorder = status === 'approved' ? 'border-emerald-500/40'
+  const cardBorder = isSent ? 'border-violet-500/40'
+    : status === 'approved' ? 'border-emerald-500/40'
     : status === 'rejected' ? 'border-red-500/30 opacity-70'
     : status === 'snoozed' ? 'border-blue-500/30'
     : blocked ? 'border-red-500/40'
