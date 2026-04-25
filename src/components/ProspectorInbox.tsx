@@ -78,6 +78,10 @@ export function ProspectorInbox() {
       }));
 
       enriched.sort((a, b) => {
+        // Sent rows last
+        const aSent = a.status === 'sent' || !!a.sent_at ? 1 : 0;
+        const bSent = b.status === 'sent' || !!b.sent_at ? 1 : 0;
+        if (aSent !== bSent) return aSent - bSent;
         const aBlock = a.supervisor_block_reason ? 1 : 0;
         const bBlock = b.supervisor_block_reason ? 1 : 0;
         if (aBlock !== bBlock) return bBlock - aBlock;
