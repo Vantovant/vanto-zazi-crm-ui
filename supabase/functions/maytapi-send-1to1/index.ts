@@ -34,26 +34,34 @@ function verifyFirstTouchFormat(message: string): { ok: boolean; reason?: string
   return { ok: true };
 }
 
-// Phase E.0.2 — Build Maytapi `media` payload for first-touch.
-// Maytapi `type:"media"` sends an image attachment with caption — no "Forwarded" label.
-//   - `message` field carries the IMAGE URL (Maytapi downloads + attaches as media).
-//   - `text` field carries the caption: body + branded URL + signature.
+// Phase E.0.2.1 — Build Maytapi `media` caption for first-touch.
+// Caption structure (URL MUST be at the TOP):
+//   <BRANDED_URL>
+//
+//   <body>
+//
+//   — Vanto
+//   vanto@onlinecourseformlm.com
+//
+// The stored proposed_message already follows this format (verified by
+// verifyFirstTouchFormat). We pass it through verbatim — no reordering —
+// to guarantee the link stays as the first line of the caption.
 function buildFirstTouchMediaCaption(proposedMessage: string): string {
-  // Stored format: first line = BRANDED_URL, then blank, body, blank, signature.
-  // For media caption we want: body + blank + BRANDED_URL + blank + signature.
-  const lines = proposedMessage.split('\n');
+  // Normalize trailing whitespace only; preserve URL-at-top ordering exactly.
+  const caption = proposedMessage.replace(/\s+$/, '');
+  // Defensive: ensure URL is on line 1 and not duplicated later in the body.
+  const lines = caption.split('\n');
   const firstLine = (lines[0] || '').trim();
-  // Drop the leading URL line and any blank lines after it.
-  const rest = lines.slice(1).join('\n').replace(/^\s*\n+/, '');
-  // Split body from signature (signature starts at "— Vanto").
-  const sigIdx = rest.indexOf('— Vanto');
-  if (sigIdx === -1) {
-    // Fallback: keep rest as-is, append URL at top.
-    return `${firstLine}\n\n${rest}`;
+  if (firstLine !== BRANDED_URL) {
+    // Should never happen — verifyFirstTouchFormat runs before this.
+    // Force-prepend to satisfy the invariant.
+    return `${BRANDED_URL}\n\n${caption}`;
   }
-  const body = rest.slice(0, sigIdx).replace(/\s+$/, '');
-  const signature = rest.slice(sigIdx).replace(/^\s+/, '');
-  return `${body}\n\n${firstLine}\n\n${signature}`;
+  // Strip any duplicate occurrences of the URL after line 1.
+  const head = lines[0];
+  const tailRaw = lines.slice(1).join('\n');
+  const tail = tailRaw.split(BRANDED_URL).join('').replace(/\n{3,}/g, '\n\n');
+  return `${head}\n${tail}`.replace(/\s+$/, '');
 }
 
 
