@@ -167,14 +167,17 @@ Deno.serve(async (req) => {
     // Service-role admin client (only used after authorization passes)
     const sb = createClient(SUPABASE_URL, SERVICE_ROLE);
 
-    // ---- AUTHORIZATION: caller must be admin OR target user themselves ----
+    // ---- AUTHORIZATION (Phase B.2): admin/owner ONLY for ALL paths ----
+    // No self-run bypass. Manual shadow generation is admin-only until Phase D UI defines visibility.
     let isAdmin = false;
     {
       const { data: rolesRes } = await sb.rpc("has_role", { _user_id: callerId, _role: "admin" });
       isAdmin = Boolean(rolesRes);
     }
-    if (targetUserId !== callerId && !isAdmin) {
-      return new Response(JSON.stringify({ error: "Forbidden: only admin can target another user_id" }), {
+    if (!isAdmin) {
+      return new Response(JSON.stringify({
+        error: "Forbidden: Zazi MAM Prospector shadow runs are admin/owner only in Phase B.2.",
+      }), {
         status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
