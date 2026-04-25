@@ -74,16 +74,33 @@ function postFilter(text: string): { ok: boolean; reasons: string[] } {
   return { ok: reasons.length === 0, reasons };
 }
 
-// Strip any model-emitted link/signature so we can append our canonical one
+// Convert any model/database-style escaped newline text into actual line breaks.
+function normalizeMessageNewlines(text: string): string {
+  return text
+    .replace(/\\r\\n/g, "\n")
+    .replace(/\\n/g, "\n")
+    .replace(/\\r/g, "\n")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+// Strip any model-emitted link/signature so we can apply our canonical wrapper
 function stripModelBranding(text: string): string {
-  let t = text;
+  let t = normalizeMessageNewlines(text);
   // remove any URL the model invented
   t = t.replace(/https?:\/\/\S+/gi, "");
   // remove em-dash signature lines like "— Vanto"
   t = t.replace(/^\s*[—\-–]\s*Vanto.*$/gim, "");
   // remove stray vanto email
   t = t.replace(/vanto@onlinecourseformlm\.com/gi, "");
-  return t.replace(/\n{3,}/g, "\n\n").trim();
+  return normalizeMessageNewlines(t);
+}
+
+function buildFirstTouchMessage(aiPersonalMessage: string): string {
+  const personalMessage = normalizeMessageNewlines(aiPersonalMessage);
+  return `${BRANDED_URL}\n\n${personalMessage}\n\n${BRAND_SIGNATURE}`;
 }
 
 Deno.serve(async (req) => {
