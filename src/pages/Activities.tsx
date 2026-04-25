@@ -28,6 +28,7 @@ import { ActivityGoalsModal } from '../components/ActivityGoalsModal';
 import { ContactDrawer } from '../components/ContactDrawer';
 import { MessageTemplatePicker } from '../components/MessageTemplatePicker';
 import { ActivityAppreciationModal } from '../components/ActivityAppreciationModal';
+import { ProspectorInbox } from '../components/ProspectorInbox';
 import { useCrm } from '@/contexts/CrmContext';
 import { useContactActivities, type ContactActivity } from '@/hooks/useContactActivities';
 import { useActivityGoals } from '@/hooks/useActivityGoals';
@@ -539,6 +540,9 @@ export function Activities() {
           )}
         </div>
       )}
+
+      {/* Prospector Inbox — Phase D.0 read-only, admin-only (component self-hides for non-admins) */}
+      <ProspectorInbox />
 
       {/* Activity Paid This Month — MOBILE: show before grid for visibility */}
       <div className="block lg:hidden">
