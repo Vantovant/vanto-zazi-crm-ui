@@ -1,4 +1,4 @@
-# Zazi MAM Prospector — Phase A + A.1 Lockdown Record
+# ZAZI AI PROSPECTOR — Phase A + A.1 Lockdown Record
 
 **Date:** 2026-04-25
 **Source of truth:** `Vanto_Zazi_MAM_Prospector_Master_Spec_v3.1_2026-04-25.pdf`
