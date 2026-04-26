@@ -356,6 +356,55 @@ Deno.serve(async (req) => {
       metadata: { sent_by: callerId },
     });
 
+    // E.3 — optional safe activity write, gated by per-user feature flag.
+    // Hard rules: no raw caption/body/phone/email; idempotent per zazi_action_id;
+    // never block the send response if anything fails.
+    try {
+      const { data: settings } = await admin
+        .from('integration_settings')
+        .select('prospector_write_activity_on_send')
+        .eq('user_id', row.user_id)
+        .maybeSingle();
+
+      if (settings?.prospector_write_activity_on_send === true) {
+        const marker = `zazi_action_id=${zazi_action_id}`;
+        const { data: existing } = await admin
+          .from('contact_activities')
+          .select('id')
+          .eq('user_id', row.user_id)
+          .ilike('notes', `%${marker}%`)
+          .limit(1)
+          .maybeSingle();
+
+        if (!existing) {
+          const safeNotes = [
+            'source=zazi_ai_prospector',
+            'transport=maytapi',
+            'mode=test',
+            'intended_send_type=media',
+            marker,
+            messageId ? `maytapi_message_id=${messageId}` : null,
+            `content_length=${captionLength}`,
+            `phone_hash=${phoneHash}`,
+          ].filter(Boolean).join(' | ');
+
+          const { error: actErr } = await admin.from('contact_activities').insert({
+            user_id: row.user_id,
+            contact_id: row.contact_id,
+            activity_type: 'whatsapp',
+            summary: 'Zazi AI Prospector outbound WhatsApp sent via Maytapi (test mode).',
+            notes: safeNotes,
+            next_action: '',
+          });
+          if (actErr) {
+            console.warn('[maytapi-send-1to1] contact_activities insert failed (non-blocking):', actErr.message);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[maytapi-send-1to1] E.3 activity write threw (non-blocking):', (e as Error).message);
+    }
+
     return new Response(JSON.stringify({
       ok: true, sent: true,
       zazi_action_id, message_id: messageId,

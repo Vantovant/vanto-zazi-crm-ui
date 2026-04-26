@@ -458,6 +458,7 @@ export type Database = {
           prospector_can_propose: boolean
           prospector_can_send_autonomous: boolean
           prospector_supervisor_required: boolean
+          prospector_write_activity_on_send: boolean
           supervisor_block_threshold: number
           supervisor_leadership_fit_threshold: number
           supervisor_safety_threshold: number
@@ -475,6 +476,7 @@ export type Database = {
           prospector_can_propose?: boolean
           prospector_can_send_autonomous?: boolean
           prospector_supervisor_required?: boolean
+          prospector_write_activity_on_send?: boolean
           supervisor_block_threshold?: number
           supervisor_leadership_fit_threshold?: number
           supervisor_safety_threshold?: number
@@ -492,6 +494,7 @@ export type Database = {
           prospector_can_propose?: boolean
           prospector_can_send_autonomous?: boolean
           prospector_supervisor_required?: boolean
+          prospector_write_activity_on_send?: boolean
           supervisor_block_threshold?: number
           supervisor_leadership_fit_threshold?: number
           supervisor_safety_threshold?: number
