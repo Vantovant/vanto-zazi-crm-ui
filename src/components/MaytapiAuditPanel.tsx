@@ -438,24 +438,14 @@ export function MaytapiAuditPanel({ isAdmin }: { isAdmin: boolean | null }) {
               )}
             </span>
           </div>
-          <div className="flex items-center gap-1.5 flex-wrap">
+          {(fAction !== 'all' || fLast4 || fContact || fActor || fFrom || fTo) && (
             <button
-              onClick={exportFilteredCsv}
-              disabled={filtered.length === 0}
-              className="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded border border-emerald-500/40 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
-              title="Export the currently filtered audit records as a redacted CSV"
+              onClick={resetFilters}
+              className="text-[11px] px-2 py-1 rounded border border-slate-600 bg-slate-800 text-slate-200 hover:text-white hover:border-slate-500"
             >
-              <Download className="w-3 h-3" /> Export filtered audit CSV
+              Clear filters
             </button>
-            {(fAction !== 'all' || fLast4 || fContact || fActor || fFrom || fTo) && (
-              <button
-                onClick={resetFilters}
-                className="text-[11px] px-2 py-1 rounded border border-slate-600 bg-slate-800 text-slate-200 hover:text-white hover:border-slate-500"
-              >
-                Clear filters
-              </button>
-            )}
-          </div>
+          )}
         </div>
         <div className="flex-1 overflow-y-auto">
           {loading && rows.length === 0 ? (
