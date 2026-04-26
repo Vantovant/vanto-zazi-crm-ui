@@ -26,10 +26,13 @@ async function pushToExternalCRM(payload: Record<string, unknown>) {
       body: JSON.stringify(payload),
     });
     const text = await res.text();
-    console.log(`[outbound-webhook] External CRM response ${res.status}: ${text}`);
+    // E.2 audit — redact upstream response body in logs (may echo PII).
+    const safeHash = await hashPayload(text);
+    console.log(`[outbound-webhook] External CRM response status=${res.status} body_len=${text.length} body_hash=${safeHash}`);
     return { status: res.status, body: text };
   } catch (err) {
-    console.error("[outbound-webhook] Failed to push to external CRM:", err);
+    const safeMsg = (err as Error)?.message ?? "unknown";
+    console.error(`[outbound-webhook] Failed to push to external CRM: code=network_error msg_len=${safeMsg.length}`);
     return { status: 0, body: String(err) };
   }
 }
