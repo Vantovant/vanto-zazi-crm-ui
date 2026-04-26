@@ -19,6 +19,7 @@ type SendLogRow = {
   content_length: number | null;
   attempted_at: string;
   error_code: string | null;
+  metadata: Record<string, any> | null;
 };
 
 type ActivityRow = {
