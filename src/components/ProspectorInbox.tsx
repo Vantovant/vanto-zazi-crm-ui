@@ -253,6 +253,7 @@ export function ProspectorInbox() {
               key={p.id}
               proposal={p}
               busy={busyId === p.id}
+              isAdmin={!!isAdmin}
               onAction={(action) => handleAction(p, action)}
             />
           ))}
