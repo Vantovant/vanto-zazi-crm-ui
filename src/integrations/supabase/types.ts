@@ -851,6 +851,69 @@ export type Database = {
         }
         Relationships: []
       }
+      webhook_idempotency_keys: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          idempotency_key: string
+          request_hash: string
+          response_status: number
+          response_summary: Json
+          scope: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          idempotency_key: string
+          request_hash?: string
+          response_status?: number
+          response_summary?: Json
+          scope?: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          idempotency_key?: string
+          request_hash?: string
+          response_status?: number
+          response_summary?: Json
+          scope?: string
+        }
+        Relationships: []
+      }
+      webhook_rate_limit_buckets: {
+        Row: {
+          created_at: string
+          id: string
+          identity: string
+          request_count: number
+          scope: string
+          updated_at: string
+          window_start: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          identity: string
+          request_count?: number
+          scope?: string
+          updated_at?: string
+          window_start: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          identity?: string
+          request_count?: number
+          scope?: string
+          updated_at?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
       zazi_actions: {
         Row: {
           approved_at: string | null
@@ -958,6 +1021,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cleanup_webhook_safety_tables: { Args: never; Returns: undefined }
       create_offline_order_and_deduct_stock: {
         Args: {
           p_amount: number
