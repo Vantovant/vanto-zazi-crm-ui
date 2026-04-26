@@ -10,6 +10,7 @@ const UNMATCHED_GENERIC_PREVIEW = 'Message received from unknown number.';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { MaytapiAuditPanel } from './MaytapiAuditPanel';
+import { HPhaseHealthPanel } from './HPhaseHealthPanel';
 
 /**
  * MAYTAPI INBOX — H4 (operational hardening; still read-only for messages)
@@ -81,7 +82,7 @@ function relTime(iso: string): string {
 export function MaytapiInbox() {
   const { user } = useAuth();
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
-  const [tab, setTab] = useState<'inbox' | 'unmatched' | 'audit'>('inbox');
+  const [tab, setTab] = useState<'inbox' | 'unmatched' | 'audit' | 'health'>('inbox');
 
   const [messages, setMessages] = useState<MsgRow[]>([]);
   const [contactNames, setContactNames] = useState<Record<string, string>>({});
@@ -389,6 +390,14 @@ export function MaytapiInbox() {
           >
             Audit
           </button>
+          {/* H7 — H-Phase Health (admin-only, read-only diagnostics + checklist + handover) */}
+          <button
+            onClick={() => setTab('health')}
+            className={`px-3 py-1.5 text-xs rounded-md border ${tab === 'health' ? 'bg-purple-600/20 border-purple-500/40 text-purple-200' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'}`}
+            title="H-Phase Health — read-only diagnostics, regression checklist, handover"
+          >
+            H-Phase
+          </button>
         </div>
       </div>
 
@@ -641,9 +650,12 @@ export function MaytapiInbox() {
             )}
           </div>
         </div>
-      ) : (
+      ) : tab === 'audit' ? (
         // Audit tab — H5 read-only admin viewer
         <MaytapiAuditPanel isAdmin={isAdmin} />
+      ) : (
+        // H7 — H-Phase Health (read-only diagnostics + checklist + handover summary)
+        <HPhaseHealthPanel isAdmin={isAdmin} />
       )}
 
       {/* Link-to-contact modal (search → confirm) */}
