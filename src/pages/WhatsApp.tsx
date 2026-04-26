@@ -20,6 +20,8 @@ import {
   ChevronUp,
 } from 'lucide-react';
 import { BirthdayPanel } from '@/components/BirthdayPanel';
+import { MaytapiInbox } from '@/components/MaytapiInbox';
+import { useAuth } from '@/contexts/AuthContext';
 import { LogActivityModal } from '../components/LogActivityModal';
 import { AddFollowUpModal } from '../components/AddFollowUpModal';
 import { MessageTemplatePicker } from '../components/MessageTemplatePicker';
@@ -48,8 +50,25 @@ const activityTypeIcons: Record<string, string> = {
 
 export function WhatsApp() {
   const { contacts } = useCrm();
+  const { user } = useAuth();
   const { logActivity, getContactActivities, daysSinceLastActivity } = useContactActivities();
-  const [activeTab, setActiveTab] = useState<'contacts' | 'birthdays'>('contacts');
+  const [activeTab, setActiveTab] = useState<'contacts' | 'birthdays' | 'maytapi'>('contacts');
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!user) { if (!cancelled) setIsAdmin(false); return; }
+      const { data } = await supabase
+        .from('user_roles' as any)
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('role', 'admin')
+        .maybeSingle();
+      if (!cancelled) setIsAdmin(!!data);
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [showLogActivity, setShowLogActivity] = useState(false);
