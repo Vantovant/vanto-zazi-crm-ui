@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle, CheckCircle2, Inbox, Link2, Loader2,
-  MessageSquare, ShieldCheck, Search,
+  MessageSquare, ShieldCheck, Search, Ban,
 } from 'lucide-react';
+
+// H3: Generic preview always rendered for unmatched rows — never raw body.
+const UNMATCHED_GENERIC_PREVIEW = 'Message received from unknown number.';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
