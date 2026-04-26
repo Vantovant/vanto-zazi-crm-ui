@@ -205,8 +205,8 @@ export function MaytapiAuditPanel({ isAdmin }: { isAdmin: boolean | null }) {
     <div className="flex-1 flex flex-col mt-3 mx-2 sm:mx-4 mb-4 gap-3 min-h-0">
       {/* Retention summary */}
       <section className="rounded-lg border border-slate-700/70 bg-slate-800/40">
-        <div className="px-3 py-2 border-b border-slate-700/70 text-[11px] uppercase tracking-wide text-slate-500 font-medium flex items-center gap-2">
-          <Database className="w-3.5 h-3.5" /> Retention summary
+        <div className="px-3 py-2 border-b border-slate-700/70 text-[11px] uppercase tracking-wide text-slate-500 font-medium flex items-center gap-2 flex-wrap">
+          <Database className="w-3.5 h-3.5" /> Retention summary — all audit records, not affected by filters
           <span className="ml-auto text-[10px] normal-case text-slate-500">No auto-cleanup · counts only</span>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3">
