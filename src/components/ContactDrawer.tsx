@@ -69,9 +69,44 @@ export function ContactDrawer({ prospect: initialProspect, onClose, onOpenTempla
   const [suggestedMsg, setSuggestedMsg] = useState('');
   const [msgLoading, setMsgLoading] = useState(false);
   const [msgCopied, setMsgCopied] = useState(false);
+  const [lineage, setLineage] = useState<{ tree_depth: number | null; parent_name: string | null; children_count: number } | null>(null);
 
   // Always use latest contact data from context
   const prospect = contacts.find(c => String(c.id) === String(initialProspect.id)) || initialProspect;
+
+  // I2A: read-only lineage fetch (tree_depth, parent name, children count). No writes.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const id = String(prospect.id);
+      const { data: self } = await supabase
+        .from('contacts')
+        .select('tree_depth, parent_contact_id')
+        .eq('id', id)
+        .maybeSingle();
+      let parentName: string | null = null;
+      if (self?.parent_contact_id) {
+        const { data: parent } = await supabase
+          .from('contacts')
+          .select('full_name')
+          .eq('id', self.parent_contact_id)
+          .maybeSingle();
+        parentName = parent?.full_name ?? null;
+      }
+      const { count } = await supabase
+        .from('contacts')
+        .select('id', { count: 'exact', head: true })
+        .eq('parent_contact_id', id);
+      if (!cancelled) {
+        setLineage({
+          tree_depth: self?.tree_depth ?? 0,
+          parent_name: parentName,
+          children_count: count ?? 0,
+        });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [prospect.id]);
   const waitingRoomEntry = getEntryForContact(String(prospect.id));
 
   const initials = prospect.FullName.split(' ').map(n => n[0]).join('');
