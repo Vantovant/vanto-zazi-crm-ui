@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Download, ShieldAlert, Users, GitBranch, AlertTriangle, UserPlus, X } from 'lucide-react';
+import { Download, ShieldAlert, Users, GitBranch, AlertTriangle, UserPlus, X, Lock, FileCheck2 } from 'lucide-react';
 
 type ResolutionStatus = 'unresolved' | 'ready_to_create' | 'created' | 'skipped';
 
