@@ -1,6 +1,7 @@
 // Phase E.0 — Maytapi send 1-on-1 (admin-only, single approved row, controlled test)
 // Phase E.2 — Adds non-blocking observability into prospector_send_log.
-// HARD GUARDS: no batching, no cron, no contact_activities writes, no contacts.lead_type writes.
+// Phase E.5 — Bounded retry on transient Maytapi failures + safe error classification.
+// HARD GUARDS: no batching, no cron, no contact_activities writes outside flag, no contacts.lead_type writes.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import { hashPhone, hashPayload, contentLength } from '../_shared/redact.ts';
 
@@ -27,11 +28,118 @@ const corsHeaders = {
 const BRANDED_URL = 'https://crm.onlinecourseformlm.com/aplgo.html';
 const BRANDED_MEDIA_IMAGE = 'https://crm.onlinecourseformlm.com/images/aplgo-og-card.jpg';
 
+// E.5 — retry/backoff policy (server-side only)
+const MAX_ATTEMPTS = 3;
+const BACKOFF_MS = [0, 400, 1200];          // attempt 1 immediate, then ~400ms, ~1200ms
+const TOTAL_TIME_BUDGET_MS = 12_000;         // hard wall-clock cap
+const PER_ATTEMPT_TIMEOUT_MS = 8_000;        // upper bound per fetch
+const TRANSIENT_HTTP = new Set([408, 425, 429, 500, 502, 503, 504]);
+
+type ErrorClass = 'transient' | 'permanent' | 'timeout' | 'network' | 'none';
+type SafeErrorCode =
+  | 'network_error' | 'timeout' | 'rate_limited'
+  | 'maytapi_5xx' | 'maytapi_4xx' | 'maytapi_error' | 'unknown_error';
+
+interface AttemptOutcome {
+  ok: boolean;
+  status: number | null;
+  responseJson: any | null;
+  responseText: string;
+  networkError: string | null;
+  timedOut: boolean;
+  errorClass: ErrorClass;
+  shouldRetry: boolean;
+  safeErrorCode: SafeErrorCode | null;
+}
+
+function classifyMaytapiFailure(params: {
+  status: number | null;
+  networkError: string | null;
+  timedOut: boolean;
+  responseJson: any | null;
+}): { errorClass: ErrorClass; shouldRetry: boolean; safeErrorCode: SafeErrorCode | null } {
+  const { status, networkError, timedOut, responseJson } = params;
+
+  if (timedOut) return { errorClass: 'timeout', shouldRetry: true, safeErrorCode: 'timeout' };
+  if (networkError) return { errorClass: 'network', shouldRetry: true, safeErrorCode: 'network_error' };
+
+  if (status == null) {
+    return { errorClass: 'network', shouldRetry: true, safeErrorCode: 'network_error' };
+  }
+  if (status === 429) return { errorClass: 'transient', shouldRetry: true, safeErrorCode: 'rate_limited' };
+  if (TRANSIENT_HTTP.has(status)) {
+    return {
+      errorClass: 'transient',
+      shouldRetry: true,
+      safeErrorCode: status >= 500 ? 'maytapi_5xx' : 'maytapi_error',
+    };
+  }
+  if (status >= 400 && status < 500) {
+    return { errorClass: 'permanent', shouldRetry: false, safeErrorCode: 'maytapi_4xx' };
+  }
+  if (status >= 500) {
+    // unexpected 5xx not in transient list — treat as permanent to avoid loops
+    return { errorClass: 'permanent', shouldRetry: false, safeErrorCode: 'maytapi_5xx' };
+  }
+  // 2xx but maytapi_success=false
+  if (responseJson && responseJson.success === false) {
+    return { errorClass: 'permanent', shouldRetry: false, safeErrorCode: 'maytapi_error' };
+  }
+  return { errorClass: 'none', shouldRetry: false, safeErrorCode: null };
+}
+
+async function attemptMaytapiSend(
+  sendUrl: string,
+  apiToken: string,
+  payload: Record<string, unknown>,
+  perAttemptTimeoutMs: number,
+): Promise<AttemptOutcome> {
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), perAttemptTimeoutMs);
+  let status: number | null = null;
+  let responseText = '';
+  let responseJson: any = null;
+  let networkError: string | null = null;
+  let timedOut = false;
+
+  try {
+    const res = await fetch(sendUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-maytapi-key': apiToken },
+      body: JSON.stringify(payload),
+      signal: ac.signal,
+    });
+    status = res.status;
+    responseText = await res.text();
+    try { responseJson = JSON.parse(responseText); } catch { /* keep text */ }
+    const ok = res.ok && (responseJson?.success === true);
+    if (ok) {
+      return {
+        ok: true, status, responseJson, responseText,
+        networkError: null, timedOut: false,
+        errorClass: 'none', shouldRetry: false, safeErrorCode: null,
+      };
+    }
+    const c = classifyMaytapiFailure({ status, networkError: null, timedOut: false, responseJson });
+    return { ok: false, status, responseJson, responseText, networkError: null, timedOut: false, ...c };
+  } catch (e) {
+    const msg = (e as Error).message || 'fetch failed';
+    if ((e as any)?.name === 'AbortError' || /aborted/i.test(msg)) {
+      timedOut = true;
+    } else {
+      networkError = msg;
+    }
+    const c = classifyMaytapiFailure({ status: null, networkError, timedOut, responseJson: null });
+    return { ok: false, status: null, responseJson: null, responseText: '', networkError, timedOut, ...c };
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 function normalizePhoneForMaytapi(raw: string): string | null {
   if (!raw) return null;
   const digits = raw.replace(/[^0-9]/g, '');
   if (digits.length < 9) return null;
-  // Maytapi expects international format without +
   return digits;
 }
 
@@ -39,42 +147,17 @@ function verifyFirstTouchFormat(message: string): { ok: boolean; reason?: string
   if (!message) return { ok: false, reason: 'empty message' };
   const lines = message.split('\n');
   const firstLine = (lines[0] || '').trim();
-  if (firstLine !== BRANDED_URL) {
-    return { ok: false, reason: 'first line is not the branded URL' };
-  }
-  if (!message.includes('— Vanto')) {
-    return { ok: false, reason: 'signature missing' };
-  }
-  if (!message.includes('vanto@onlinecourseformlm.com')) {
-    return { ok: false, reason: 'signature email missing' };
-  }
+  if (firstLine !== BRANDED_URL) return { ok: false, reason: 'first line is not the branded URL' };
+  if (!message.includes('— Vanto')) return { ok: false, reason: 'signature missing' };
+  if (!message.includes('vanto@onlinecourseformlm.com')) return { ok: false, reason: 'signature email missing' };
   return { ok: true };
 }
 
-// Phase E.0.2.1 — Build Maytapi `media` caption for first-touch.
-// Caption structure (URL MUST be at the TOP):
-//   <BRANDED_URL>
-//
-//   <body>
-//
-//   — Vanto
-//   vanto@onlinecourseformlm.com
-//
-// The stored proposed_message already follows this format (verified by
-// verifyFirstTouchFormat). We pass it through verbatim — no reordering —
-// to guarantee the link stays as the first line of the caption.
 function buildFirstTouchMediaCaption(proposedMessage: string): string {
-  // Normalize trailing whitespace only; preserve URL-at-top ordering exactly.
   const caption = proposedMessage.replace(/\s+$/, '');
-  // Defensive: ensure URL is on line 1 and not duplicated later in the body.
   const lines = caption.split('\n');
   const firstLine = (lines[0] || '').trim();
-  if (firstLine !== BRANDED_URL) {
-    // Should never happen — verifyFirstTouchFormat runs before this.
-    // Force-prepend to satisfy the invariant.
-    return `${BRANDED_URL}\n\n${caption}`;
-  }
-  // Strip any duplicate occurrences of the URL after line 1.
+  if (firstLine !== BRANDED_URL) return `${BRANDED_URL}\n\n${caption}`;
   const head = lines[0];
   const tailRaw = lines.slice(1).join('\n');
   const tail = tailRaw.split(BRANDED_URL).join('').replace(/\n{3,}/g, '\n\n');
@@ -84,6 +167,8 @@ function buildFirstTouchMediaCaption(proposedMessage: string): string {
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
+
+  const invocationStart = Date.now();
 
   try {
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -118,7 +203,7 @@ Deno.serve(async (req) => {
 
     // ---- Input ----
     const body = await req.json().catch(() => ({}));
-    const { zazi_action_id, test_mode } = body || {};
+    const { zazi_action_id, test_mode, force_transient_simulation, force_permanent_simulation, force_timeout_simulation } = body || {};
     if (!zazi_action_id || typeof zazi_action_id !== 'string') {
       return new Response(JSON.stringify({ error: 'zazi_action_id required' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -154,7 +239,6 @@ Deno.serve(async (req) => {
     if (!row.contact_id) failures.push('contact_id is null');
 
     if (failures.length > 0) {
-      // E.2 — log blocked attempt (eligibility gate failed)
       await logSendAttempt(admin, {
         user_id: row.user_id,
         contact_id: row.contact_id ?? null,
@@ -206,10 +290,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ---- Send via Maytapi sendMessage (type="media" — image card with caption, no "Forwarded") ----
-    // Phase E.0.2: switched from type="link" (caused "Forwarded" label) to type="media".
-    //   - `message` carries the IMAGE URL (Maytapi attaches as image).
-    //   - `text` carries the caption: body + branded page URL + signature.
     const caption = buildFirstTouchMediaCaption(row.proposed_message);
     if (!caption.includes(BRANDED_URL)) {
       return new Response(JSON.stringify({
@@ -218,65 +298,93 @@ Deno.serve(async (req) => {
     }
 
     const sendUrl = `https://api.maytapi.com/api/${productId}/${phoneId}/sendMessage`;
-    let upstream: Response;
-    let upstreamJson: any = null;
-    let upstreamText = '';
-    let networkError: string | null = null;
+    const payload = {
+      to_number: phone,
+      type: 'media',
+      message: BRANDED_MEDIA_IMAGE,
+      text: caption,
+    };
 
-    try {
-      upstream = await fetch(sendUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-maytapi-key': apiToken,
-        },
-        body: JSON.stringify({
-          to_number: phone,
-          type: 'media',
-          message: BRANDED_MEDIA_IMAGE,
-          text: caption,
-        }),
-      });
-      upstreamText = await upstream.text();
-      try { upstreamJson = JSON.parse(upstreamText); } catch { /* keep text */ }
-    } catch (e) {
-      networkError = (e as Error).message;
+    // E.5 — bounded retry loop (admin-only synthetic simulation flags allowed because route is admin-gated)
+    let attempts = 0;
+    let last: AttemptOutcome | null = null;
+    let timeBudgetExhausted = false;
+
+    for (let i = 0; i < MAX_ATTEMPTS; i++) {
+      const wait = BACKOFF_MS[i] || 0;
+      if (wait > 0) {
+        if (Date.now() - invocationStart + wait > TOTAL_TIME_BUDGET_MS) {
+          timeBudgetExhausted = true;
+          break;
+        }
+        await new Promise((r) => setTimeout(r, wait));
+      }
+      const remaining = TOTAL_TIME_BUDGET_MS - (Date.now() - invocationStart);
+      if (remaining <= 250) { timeBudgetExhausted = true; break; }
+      const perAttempt = Math.min(PER_ATTEMPT_TIMEOUT_MS, remaining - 100);
+
+      attempts = i + 1;
+
+      // Synthetic test injection (admin-only path; never auto-triggered)
+      if (force_permanent_simulation && i === 0) {
+        last = {
+          ok: false, status: 400, responseJson: { success: false }, responseText: '',
+          networkError: null, timedOut: false,
+          errorClass: 'permanent', shouldRetry: false, safeErrorCode: 'maytapi_4xx',
+        };
+      } else if (force_timeout_simulation) {
+        last = {
+          ok: false, status: null, responseJson: null, responseText: '',
+          networkError: null, timedOut: true,
+          errorClass: 'timeout', shouldRetry: true, safeErrorCode: 'timeout',
+        };
+      } else if (force_transient_simulation && i === 0) {
+        last = {
+          ok: false, status: 503, responseJson: { success: false }, responseText: '',
+          networkError: null, timedOut: false,
+          errorClass: 'transient', shouldRetry: true, safeErrorCode: 'maytapi_5xx',
+        };
+      } else {
+        last = await attemptMaytapiSend(sendUrl, apiToken, payload, perAttempt);
+      }
+
+      if (last.ok) break;
+      if (!last.shouldRetry) break;
+      if (i === MAX_ATTEMPTS - 1) break;
     }
 
-
-    const sanitizedResponse = upstreamJson ? {
-      success: upstreamJson.success ?? null,
-      message_id: upstreamJson.data?.msgId ?? upstreamJson.data?.id ?? null,
-      type: upstreamJson.data?.type ?? null,
-      message: upstreamJson.message ?? null,
-    } : { raw_excerpt: upstreamText.slice(0, 300) };
-
-    const success = !networkError && upstream! && upstream.ok && (upstreamJson?.success === true);
-    const messageId = upstreamJson?.data?.msgId || upstreamJson?.data?.id || null;
-
-    // E.2 — compute safe metadata for prospector_send_log (no raw PII).
     const phoneHash = await hashPhone(phone);
     const payloadHash = await hashPayload({ to: phone, type: 'media', text: caption, image: BRANDED_MEDIA_IMAGE });
     const captionLength = contentLength(caption);
     const respondedAt = new Date().toISOString();
 
+    const success = !!last?.ok;
+    const messageId = last?.responseJson?.data?.msgId || last?.responseJson?.data?.id || null;
+    const sanitizedResponse = last?.responseJson ? {
+      success: last.responseJson.success ?? null,
+      message_id: last.responseJson.data?.msgId ?? last.responseJson.data?.id ?? null,
+      type: last.responseJson.data?.type ?? null,
+      message: last.responseJson.message ?? null,
+    } : { raw_excerpt: (last?.responseText || '').slice(0, 300) };
+
     if (!success) {
-      // Failure path — DO NOT mark sent
+      // Failure path — DO NOT mark sent. ONE log row only.
       const evidence = (row.evidence as any) || {};
       const newEvidence = {
         ...evidence,
         transport: {
           ...(evidence.transport || {}),
-          last_error: networkError || `HTTP ${upstream?.status} ${upstreamText.slice(0, 200)}`,
+          last_error: last?.networkError || (last?.timedOut ? 'timeout' : `HTTP ${last?.status ?? 'n/a'}`),
           failed_at: new Date().toISOString(),
           test_mode: true,
-          maytapi_response: sanitizedResponse,
+          retry_attempts: attempts,
+          error_class: last?.errorClass ?? 'unknown',
         },
       };
-      await admin.from('zazi_actions').update({ evidence: newEvidence })
-        .eq('id', zazi_action_id);
+      await admin.from('zazi_actions').update({ evidence: newEvidence }).eq('id', zazi_action_id);
 
-      // E.2 — log fail attempt (non-blocking)
+      const safeErr: SafeErrorCode = last?.safeErrorCode ?? (timeBudgetExhausted ? 'timeout' : 'unknown_error');
+
       await logSendAttempt(admin, {
         user_id: row.user_id,
         contact_id: row.contact_id,
@@ -287,26 +395,35 @@ Deno.serve(async (req) => {
         intended_send_type: 'media',
         request_status: 'fail',
         payload_hash: payloadHash,
-        response_status_code: upstream?.status ?? null,
-        error_code: networkError ? 'network_error' : 'maytapi_error',
+        response_status_code: last?.status ?? null,
+        error_code: safeErr,
         phone_hash: phoneHash,
         content_length: captionLength,
         metadata: {
-          maytapi_success: upstreamJson?.success ?? null,
-          maytapi_message_field: typeof upstreamJson?.message === 'string' ? upstreamJson.message.slice(0, 80) : null,
+          retry_attempts: attempts,
+          final_attempt: attempts,
+          error_class: last?.errorClass ?? 'unknown',
+          transient_or_permanent: last?.shouldRetry ? 'transient' : 'permanent',
+          last_status: last?.status ?? null,
+          time_budget_exhausted: timeBudgetExhausted,
+          maytapi_success: last?.responseJson?.success ?? null,
         },
       });
 
       return new Response(JSON.stringify({
-        ok: false,
-        sent: false,
-        http_status: upstream?.status ?? null,
-        network_error: networkError,
+        ok: false, sent: false,
+        http_status: last?.status ?? null,
+        network_error: last?.networkError ?? null,
+        timed_out: !!last?.timedOut,
+        retry_attempts: attempts,
+        error_class: last?.errorClass ?? 'unknown',
+        error_code: safeErr,
+        time_budget_exhausted: timeBudgetExhausted,
         maytapi_response: sanitizedResponse,
       }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Success path — update only this zazi_actions row
+    // Success path
     const evidence = (row.evidence as any) || {};
     const newEvidence = {
       ...evidence,
@@ -315,14 +432,14 @@ Deno.serve(async (req) => {
         maytapi_response: sanitizedResponse,
         sent_by: callerId,
         sent_at: new Date().toISOString(),
-        preview_expected: true, // type="media" → image card with caption, no "Forwarded" label
+        preview_expected: true,
         send_type: 'media',
         branded_url: BRANDED_URL,
         branded_media_image: BRANDED_MEDIA_IMAGE,
         test_mode: true,
+        retry_attempts: attempts,
       },
     };
-
 
     const { error: updErr } = await admin.from('zazi_actions').update({
       status: 'sent',
@@ -338,7 +455,6 @@ Deno.serve(async (req) => {
       }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // E.2 — log ok attempt (non-blocking)
     await logSendAttempt(admin, {
       user_id: row.user_id,
       contact_id: row.contact_id,
@@ -350,15 +466,18 @@ Deno.serve(async (req) => {
       maytapi_message_id: messageId,
       request_status: 'ok',
       payload_hash: payloadHash,
-      response_status_code: upstream?.status ?? null,
+      response_status_code: last?.status ?? null,
       phone_hash: phoneHash,
       content_length: captionLength,
-      metadata: { sent_by: callerId },
+      metadata: {
+        sent_by: callerId,
+        retry_attempts: attempts,
+        final_attempt: attempts,
+        error_class: attempts > 1 ? 'transient_recovered' : 'none',
+      },
     });
 
     // E.3 — optional safe activity write, gated by per-user feature flag.
-    // Hard rules: no raw caption/body/phone/email; idempotent per zazi_action_id;
-    // never block the send response if anything fails.
     try {
       const { data: settings } = await admin
         .from('integration_settings')
@@ -367,9 +486,6 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       if (settings?.prospector_write_activity_on_send === true) {
-        // Exact-id idempotency: search for the exact current zazi_action_id,
-        // bounded by ' | ' on the right so a uuid that is a prefix of another
-        // cannot collide. Scoped by user_id AND contact_id when available.
         const marker = `zazi_action_id=${zazi_action_id}`;
         const boundedMarker = `${marker} |`;
         let existingQuery = admin
@@ -377,9 +493,7 @@ Deno.serve(async (req) => {
           .select('id')
           .eq('user_id', row.user_id)
           .or(`notes.ilike.%${boundedMarker}%,notes.ilike.%${marker}`);
-        if (row.contact_id) {
-          existingQuery = existingQuery.eq('contact_id', row.contact_id);
-        }
+        if (row.contact_id) existingQuery = existingQuery.eq('contact_id', row.contact_id);
         const { data: existing } = await existingQuery.limit(1).maybeSingle();
 
         if (!existing) {
@@ -414,6 +528,7 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({
       ok: true, sent: true,
       zazi_action_id, message_id: messageId,
+      retry_attempts: attempts,
       maytapi_response: sanitizedResponse,
       test_mode: true,
     }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
