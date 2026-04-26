@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Download, ShieldAlert, Users, GitBranch, AlertTriangle } from 'lucide-react';
+import { Download, ShieldAlert, Users, GitBranch, AlertTriangle, UserPlus, X } from 'lucide-react';
+
+type ResolutionStatus = 'unresolved' | 'ready_to_create' | 'created' | 'skipped';
 
 const OWNER_ID = 'b8028d7d-6a08-45ef-a369-b438c440bea3';
 
