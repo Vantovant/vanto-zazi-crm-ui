@@ -254,6 +254,12 @@ Deno.serve(async (req) => {
     const success = !networkError && upstream! && upstream.ok && (upstreamJson?.success === true);
     const messageId = upstreamJson?.data?.msgId || upstreamJson?.data?.id || null;
 
+    // E.2 — compute safe metadata for prospector_send_log (no raw PII).
+    const phoneHash = await hashPhone(phone);
+    const payloadHash = await hashPayload({ to: phone, type: 'media', text: caption, image: BRANDED_MEDIA_IMAGE });
+    const captionLength = contentLength(caption);
+    const respondedAt = new Date().toISOString();
+
     if (!success) {
       // Failure path — DO NOT mark sent
       const evidence = (row.evidence as any) || {};
@@ -269,6 +275,27 @@ Deno.serve(async (req) => {
       };
       await admin.from('zazi_actions').update({ evidence: newEvidence })
         .eq('id', zazi_action_id);
+
+      // E.2 — log fail attempt (non-blocking)
+      await logSendAttempt(admin, {
+        user_id: row.user_id,
+        contact_id: row.contact_id,
+        zazi_action_id,
+        attempted_at: new Date().toISOString(),
+        responded_at: respondedAt,
+        mode: 'test',
+        intended_send_type: 'media',
+        request_status: 'fail',
+        payload_hash: payloadHash,
+        response_status_code: upstream?.status ?? null,
+        error_code: networkError ? 'network_error' : 'maytapi_error',
+        phone_hash: phoneHash,
+        content_length: captionLength,
+        metadata: {
+          maytapi_success: upstreamJson?.success ?? null,
+          maytapi_message_field: typeof upstreamJson?.message === 'string' ? upstreamJson.message.slice(0, 80) : null,
+        },
+      });
 
       return new Response(JSON.stringify({
         ok: false,
@@ -310,6 +337,24 @@ Deno.serve(async (req) => {
         maytapi_response: sanitizedResponse, message_id: messageId,
       }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
+
+    // E.2 — log ok attempt (non-blocking)
+    await logSendAttempt(admin, {
+      user_id: row.user_id,
+      contact_id: row.contact_id,
+      zazi_action_id,
+      attempted_at: new Date().toISOString(),
+      responded_at: respondedAt,
+      mode: 'test',
+      intended_send_type: 'media',
+      maytapi_message_id: messageId,
+      request_status: 'ok',
+      payload_hash: payloadHash,
+      response_status_code: upstream?.status ?? null,
+      phone_hash: phoneHash,
+      content_length: captionLength,
+      metadata: { sent_by: callerId },
+    });
 
     return new Response(JSON.stringify({
       ok: true, sent: true,
