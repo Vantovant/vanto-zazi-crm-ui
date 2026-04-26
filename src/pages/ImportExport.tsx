@@ -454,6 +454,14 @@ export function ImportExport() {
           dbRow[col] = rule.fallback;
         }
       }
+      // I1: Normalize leg to L/R/'' so the validation trigger accepts CSV imports with free-text values
+      if (dbRow.leg !== undefined) {
+        const legRaw = String(dbRow.leg ?? '').trim().toLowerCase();
+        if (['1', '1 leg', 'left', 'l'].includes(legRaw)) dbRow.leg = 'L';
+        else if (['2', '2 leg', 'right', 'r'].includes(legRaw)) dbRow.leg = 'R';
+        else if (legRaw === '') dbRow.leg = '';
+        else dbRow.leg = ''; // unknown → Unplaced (avoids trigger rejection; original value is already in CSV source)
+      }
       // UPSERT: Check for existing contact by normalized phone/email
       const normPhone = normalizePhone(dbRow.phone_number as string);
       const normEmail = normalizeEmail(dbRow.email_address as string);
