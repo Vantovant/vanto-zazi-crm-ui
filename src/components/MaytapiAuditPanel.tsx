@@ -276,37 +276,54 @@ export function MaytapiAuditPanel({ isAdmin }: { isAdmin: boolean | null }) {
 
   return (
     <div className="flex-1 flex flex-col mt-3 mx-2 sm:mx-4 mb-4 gap-3 min-h-0">
-      {/* Retention summary */}
+      {/* Retention summary (collapsed by default) */}
       <section className="rounded-lg border border-slate-700/70 bg-slate-800/40">
-        <div className="px-3 py-2 border-b border-slate-700/70 text-[11px] uppercase tracking-wide text-slate-500 font-medium flex items-center gap-2 flex-wrap">
-          <Database className="w-3.5 h-3.5" /> Retention summary — all audit records, not affected by filters
-          <span className="ml-auto text-[10px] normal-case text-slate-500">No auto-cleanup · counts only</span>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3">
-          {[
-            { label: 'Total audit rows', val: retention.total },
-            { label: 'Older than 30 days', val: retention.d30 },
-            { label: 'Older than 90 days', val: retention.d90 },
-            { label: 'Older than 180 days', val: retention.d180 },
-          ].map(s => (
-            <div key={s.label} className="rounded-md border border-slate-700/60 bg-slate-900/40 p-2.5">
-              <div className="text-lg font-semibold text-slate-100 leading-none">{s.val}</div>
-              <div className="text-[10px] uppercase tracking-wide text-slate-500 mt-1">{s.label}</div>
+        <button
+          type="button"
+          onClick={() => setShowRetention(s => !s)}
+          className="w-full px-3 py-2 border-b border-slate-700/70 text-[11px] uppercase tracking-wide text-slate-400 font-medium flex items-center gap-2 flex-wrap hover:bg-slate-800/60"
+        >
+          {showRetention ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+          <Database className="w-3.5 h-3.5" />
+          <span>Retention summary</span>
+          <span className="normal-case text-slate-500 text-[10px]">— {retention.total} total · not affected by filters</span>
+        </button>
+        {showRetention && (
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3">
+              {[
+                { label: 'Total audit rows', val: retention.total },
+                { label: 'Older than 30 days', val: retention.d30 },
+                { label: 'Older than 90 days', val: retention.d90 },
+                { label: 'Older than 180 days', val: retention.d180 },
+              ].map(s => (
+                <div key={s.label} className="rounded-md border border-slate-700/60 bg-slate-900/40 p-2.5">
+                  <div className="text-lg font-semibold text-slate-100 leading-none">{s.val}</div>
+                  <div className="text-[10px] uppercase tracking-wide text-slate-500 mt-1">{s.label}</div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-        <div className="px-3 pb-3 -mt-1">
-          <p className="text-[11px] text-slate-500">
-            Recommended retention: keep <span className="text-slate-300">180 days</span> of audit history,
-            then archive older rows. Cleanup is intentionally not enabled in H5 — propose for H6.
-          </p>
-        </div>
+            <div className="px-3 pb-3 -mt-1">
+              <p className="text-[11px] text-slate-500">
+                Recommended retention: keep <span className="text-slate-300">180 days</span> of audit history,
+                then archive older rows. Cleanup is intentionally not enabled.
+              </p>
+            </div>
+          </>
+        )}
       </section>
 
-      {/* Filters */}
+      {/* Filters — collapsible body, presets always visible */}
       <section className="rounded-lg border border-slate-700/70 bg-slate-800/40">
-        <div className="px-3 py-2 border-b border-slate-700/70 text-[11px] uppercase tracking-wide text-slate-500 font-medium flex items-center gap-2 flex-wrap">
-          <Filter className="w-3.5 h-3.5" /> Filters
+        <div className="px-3 py-2 border-b border-slate-700/70 text-[11px] uppercase tracking-wide text-slate-400 font-medium flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setShowFilters(s => !s)}
+            className="inline-flex items-center gap-1.5 hover:text-slate-100"
+          >
+            {showFilters ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+            <Filter className="w-3.5 h-3.5" /> Filters
+          </button>
           <button
             onClick={() => setOrder(o => o === 'newest' ? 'oldest' : 'newest')}
             className="ml-auto inline-flex items-center gap-1 text-[10px] normal-case px-2 py-1 rounded border border-slate-700 bg-slate-900/40 text-slate-300 hover:text-slate-100"
@@ -323,55 +340,57 @@ export function MaytapiAuditPanel({ isAdmin }: { isAdmin: boolean | null }) {
           </button>
           {loading && <Loader2 className="w-3 h-3 animate-spin text-slate-400" />}
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 p-3">
-          <label className="text-[11px] text-slate-400">
-            Action
-            <select
-              value={fAction}
-              onChange={e => setFAction(e.target.value as any)}
-              className="mt-1 w-full px-2 py-1.5 text-sm bg-slate-950 border border-slate-600 rounded-md text-slate-100"
-            >
-              <option value="all">All</option>
-              <option value="linked">Linked</option>
-              <option value="ignored">Ignored</option>
-              <option value="marked_read">Marked read</option>
-              <option value="marked_unread">Marked unread</option>
-            </select>
-          </label>
-          <label className="text-[11px] text-slate-400">
-            From
-            <input type="date" value={fFrom} onChange={e => setFFrom(e.target.value)}
-              className="mt-1 w-full px-2 py-1.5 text-sm bg-slate-950 border border-slate-600 rounded-md text-slate-100" />
-          </label>
-          <label className="text-[11px] text-slate-400">
-            To
-            <input type="date" value={fTo} onChange={e => setFTo(e.target.value)}
-              className="mt-1 w-full px-2 py-1.5 text-sm bg-slate-950 border border-slate-600 rounded-md text-slate-100" />
-          </label>
-          <label className="text-[11px] text-slate-400">
-            Phone last4
-            <input
-              inputMode="numeric"
-              maxLength={4}
-              value={fLast4}
-              onChange={e => setFLast4(e.target.value.replace(/\D/g, ''))}
-              placeholder="e.g. 4321"
-              className="mt-1 w-full px-2 py-1.5 text-sm bg-slate-950 border border-slate-600 rounded-md text-slate-100 placeholder:text-slate-500 font-mono"
-            />
-          </label>
-          <label className="text-[11px] text-slate-400">
-            Linked contact name
-            <input value={fContact} onChange={e => setFContact(e.target.value)} placeholder="contact name…"
-              className="mt-1 w-full px-2 py-1.5 text-sm bg-slate-950 border border-slate-600 rounded-md text-slate-100 placeholder:text-slate-500" />
-          </label>
-          <label className="text-[11px] text-slate-400">
-            Actor (admin)
-            <input value={fActor} onChange={e => setFActor(e.target.value)} placeholder="admin name…"
-              className="mt-1 w-full px-2 py-1.5 text-sm bg-slate-950 border border-slate-600 rounded-md text-slate-100 placeholder:text-slate-500" />
-          </label>
-        </div>
-        {/* Filter presets — visible filter changes only, no backend, no mutation */}
-        <div className="px-3 pb-3 -mt-1 flex flex-wrap gap-1.5">
+        {showFilters && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 p-3">
+            <label className="text-[11px] text-slate-400">
+              Action
+              <select
+                value={fAction}
+                onChange={e => setFAction(e.target.value as any)}
+                className="mt-1 w-full px-2 py-1.5 text-sm bg-slate-950 border border-slate-600 rounded-md text-slate-100"
+              >
+                <option value="all">All</option>
+                <option value="linked">Linked</option>
+                <option value="ignored">Ignored</option>
+                <option value="marked_read">Marked read</option>
+                <option value="marked_unread">Marked unread</option>
+              </select>
+            </label>
+            <label className="text-[11px] text-slate-400">
+              From
+              <input type="date" value={fFrom} onChange={e => setFFrom(e.target.value)}
+                className="mt-1 w-full px-2 py-1.5 text-sm bg-slate-950 border border-slate-600 rounded-md text-slate-100" />
+            </label>
+            <label className="text-[11px] text-slate-400">
+              To
+              <input type="date" value={fTo} onChange={e => setFTo(e.target.value)}
+                className="mt-1 w-full px-2 py-1.5 text-sm bg-slate-950 border border-slate-600 rounded-md text-slate-100" />
+            </label>
+            <label className="text-[11px] text-slate-400">
+              Phone last4
+              <input
+                inputMode="numeric"
+                maxLength={4}
+                value={fLast4}
+                onChange={e => setFLast4(e.target.value.replace(/\D/g, ''))}
+                placeholder="e.g. 4321"
+                className="mt-1 w-full px-2 py-1.5 text-sm bg-slate-950 border border-slate-600 rounded-md text-slate-100 placeholder:text-slate-500 font-mono"
+              />
+            </label>
+            <label className="text-[11px] text-slate-400">
+              Linked contact name
+              <input value={fContact} onChange={e => setFContact(e.target.value)} placeholder="contact name…"
+                className="mt-1 w-full px-2 py-1.5 text-sm bg-slate-950 border border-slate-600 rounded-md text-slate-100 placeholder:text-slate-500" />
+            </label>
+            <label className="text-[11px] text-slate-400">
+              Actor (admin)
+              <input value={fActor} onChange={e => setFActor(e.target.value)} placeholder="admin name…"
+                className="mt-1 w-full px-2 py-1.5 text-sm bg-slate-950 border border-slate-600 rounded-md text-slate-100 placeholder:text-slate-500" />
+            </label>
+          </div>
+        )}
+        {/* Filter presets — always visible */}
+        <div className="px-3 py-2.5 flex flex-wrap gap-1.5 border-t border-slate-700/40">
           <span className="text-[10px] uppercase tracking-wide text-slate-500 self-center mr-1">Presets:</span>
           {[
             { id: 'today',   label: 'Today' },
@@ -391,6 +410,22 @@ export function MaytapiAuditPanel({ isAdmin }: { isAdmin: boolean | null }) {
           ))}
         </div>
       </section>
+
+      {/* Prominent Export bar — always above audit records */}
+      <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-2.5 flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-2 text-[12px] text-slate-200 min-w-0">
+          <MousePointerClick className="w-4 h-4 text-emerald-300 shrink-0" />
+          <span>Tap any record below to view its read-only detail.</span>
+        </div>
+        <button
+          onClick={exportFilteredCsv}
+          disabled={filtered.length === 0}
+          className="inline-flex items-center gap-1.5 text-[12px] px-3 py-1.5 rounded-md border border-emerald-500/50 bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/25 disabled:opacity-40 disabled:cursor-not-allowed font-medium"
+          title="Export the currently filtered audit records as a redacted CSV"
+        >
+          <Download className="w-3.5 h-3.5" /> Export filtered audit CSV ({filtered.length})
+        </button>
+      </div>
       <section className="flex-1 rounded-lg border border-slate-700/70 bg-slate-800/30 overflow-hidden flex flex-col min-h-0">
         <div className="px-3 py-2 border-b border-slate-700/70 bg-slate-900/40 flex items-center justify-between gap-2 flex-wrap">
           <div className="flex flex-col">
