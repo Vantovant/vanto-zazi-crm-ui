@@ -8,6 +8,22 @@ type ResolutionStatus = 'unresolved' | 'ready_to_create' | 'created' | 'skipped'
 
 const OWNER_ID = 'b8028d7d-6a08-45ef-a369-b438c440bea3';
 
+// I2C bulk top-upline import (Option A, single CSV: APLGO_downline_787262_2026-04-26.csv).
+// Names not present in CSV — defaults to "Upline <id>" unless admin overrides.
+const TOP_UPLINE_CSV_SOURCE = 'APLGO_downline_787262_2026-04-26.csv';
+const TOP_UPLINES_FROM_CSV: { sponsor_id: string; suggested_name: string }[] = [
+  { sponsor_id: '787262', suggested_name: '' },
+  { sponsor_id: '939155', suggested_name: '' },
+  { sponsor_id: '975023', suggested_name: '' },
+  { sponsor_id: '667131', suggested_name: '' },
+  { sponsor_id: '939214', suggested_name: '' },
+  { sponsor_id: '872364', suggested_name: '' },
+  { sponsor_id: '816313', suggested_name: '' },
+  { sponsor_id: '557516', suggested_name: '' },
+  { sponsor_id: '631663', suggested_name: '' },
+  { sponsor_id: '683171', suggested_name: '' },
+];
+
 interface ContactLite {
   id: string;
   full_name: string;
