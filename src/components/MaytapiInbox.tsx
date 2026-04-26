@@ -9,6 +9,7 @@ import {
 const UNMATCHED_GENERIC_PREVIEW = 'Message received from unknown number.';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { MaytapiAuditPanel } from './MaytapiAuditPanel';
 
 /**
  * MAYTAPI INBOX — H4 (operational hardening; still read-only for messages)
