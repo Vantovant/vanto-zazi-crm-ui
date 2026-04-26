@@ -569,7 +569,7 @@ export function MaytapiInbox() {
             )}
           </section>
         </div>
-      ) : (
+      ) : tab === 'unmatched' ? (
         // Unmatched tab
         <div className="flex-1 flex flex-col mt-3 mx-2 sm:mx-4 mb-4 rounded-lg border border-slate-700/70 overflow-hidden bg-slate-800/30">
           <div className="px-3 py-2 border-b border-slate-700/70 text-[11px] uppercase tracking-wide text-slate-500 font-medium flex items-center justify-between gap-3 flex-wrap">
