@@ -457,7 +457,11 @@ export function MaytapiAuditPanel({ isAdmin }: { isAdmin: boolean | null }) {
                 return (
                   <li
                     key={r.id}
-                    className="rounded-lg border border-slate-600/70 bg-slate-900/70 shadow-sm hover:border-slate-500 hover:bg-slate-900 transition-colors p-3 sm:p-4"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setDetail(r)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDetail(r); } }}
+                    className="rounded-lg border border-slate-600/70 bg-slate-900/70 shadow-sm hover:border-slate-500 hover:bg-slate-900 transition-colors p-3 sm:p-4 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
                   >
                     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
                       <div className="flex items-start gap-2.5 min-w-0 flex-1">
