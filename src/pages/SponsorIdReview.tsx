@@ -97,7 +97,7 @@ export function SponsorIdReview() {
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [user, reloadTick]);
 
   // ---- Build aplgo_id index ----
   const aplgoIndex = useMemo(() => {
