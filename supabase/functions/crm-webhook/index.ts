@@ -1,10 +1,24 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { verifyWebhookSecret } from "../_shared/secret-verify.ts";
+import {
+  hashEmail,
+  hashPhone,
+  safePayloadSummary,
+} from "../_shared/redact.ts";
+import {
+  checkIdempotency,
+  recordIdempotency,
+} from "../_shared/idempotency.ts";
+import { checkRateLimit } from "../_shared/rate-limit.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-webhook-secret, x-supabase-client-platform, x-supabase-client-platform-version, x-user-email, x-owner-email",
+    "authorization, x-client-info, apikey, content-type, x-webhook-secret, x-webhook-timestamp, x-idempotency-key, x-supabase-client-platform, x-supabase-client-platform-version, x-user-email, x-owner-email",
 };
+
+const SCOPE = "crm-webhook";
+const RATE_LIMIT_PER_MIN = 60;
 
 /**
  * Resolves a local Zazi user UUID from an email address.
