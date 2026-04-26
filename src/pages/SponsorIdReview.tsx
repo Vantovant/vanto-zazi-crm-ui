@@ -754,6 +754,73 @@ export function SponsorIdReview() {
           </section>
         </>
       )}
+
+      {/* Create Upline Confirmation Modal */}
+      {createTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true">
+          <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-xl w-full max-w-md p-5">
+            <div className="flex items-start justify-between mb-3">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <UserPlus className="w-5 h-5 text-teal-400" />
+                Create upline contact
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setCreateTarget(null);
+                  setCreateName('');
+                }}
+                className="text-slate-400 hover:text-white"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-sm text-slate-300 mb-4">
+              You are about to create a placeholder upline contact for sponsor ID{' '}
+              <span className="font-mono text-teal-300">{createTarget.sponsor_id}</span>. This will
+              NOT link child contacts yet ({createTarget.child_count} child
+              {createTarget.child_count === 1 ? '' : 'ren'}).
+            </p>
+            <label className="block text-xs text-slate-400 mb-1">
+              Optional upline name (leave blank to use “Upline {createTarget.sponsor_id}”)
+            </label>
+            <input
+              type="text"
+              value={createName}
+              onChange={(e) => setCreateName(e.target.value)}
+              placeholder={`Upline ${createTarget.sponsor_id}`}
+              className="w-full px-3 py-2 rounded bg-slate-800 border border-slate-700 text-white text-sm mb-4"
+            />
+            <div className="text-xs text-slate-500 mb-4 space-y-1">
+              <div>• aplgo_id will be set to <span className="font-mono">{createTarget.sponsor_id}</span></div>
+              <div>• parent_contact_id: null • tree_depth: 0 • leg: empty</div>
+              <div>• Tagged in additional_notes as I2C placeholder</div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setCreateTarget(null);
+                  setCreateName('');
+                }}
+                disabled={creating}
+                className="px-3 py-2 rounded bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-700 text-sm disabled:opacity-40"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateUpline}
+                disabled={creating}
+                className="px-3 py-2 rounded bg-teal-500 text-white hover:bg-teal-600 text-sm disabled:opacity-40"
+              >
+                {creating ? 'Creating…' : 'Confirm create'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
