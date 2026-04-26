@@ -586,6 +586,96 @@ export function SponsorIdReview() {
             </div>
           </section>
 
+          {/* Missing Upline Resolution */}
+          <section>
+            <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+              <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wide">
+                Missing Upline Resolution ({missingRows.length})
+              </h2>
+              <button
+                type="button"
+                onClick={exportMissingCsv}
+                disabled={missingRows.length === 0}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-700 disabled:opacity-40 text-xs"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Export missing uplines CSV
+              </button>
+            </div>
+            <p className="text-xs text-slate-500 mb-3 flex items-center gap-1">
+              <AlertTriangle className="w-3 h-3" />
+              Creates a placeholder upline contact only. No child contacts are linked. No parent_contact_id, tree_depth, or leg is written on children.
+            </p>
+            {missingRows.length === 0 ? (
+              <div className="text-sm text-slate-400 p-4 rounded-lg border border-slate-800 bg-slate-900/40">
+                No missing sponsor IDs.
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-lg border border-slate-800">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-900 text-slate-400">
+                    <tr>
+                      <Th>Sponsor ID</Th>
+                      <Th>Children</Th>
+                      <Th>Sample children</Th>
+                      <Th>Recommended action</Th>
+                      <Th>Resolution</Th>
+                      <Th>Action</Th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-slate-300">
+                    {missingRows.slice(0, 200).map((r) => {
+                      const rs = resolutionStatus[r.sponsor_id] || 'unresolved';
+                      return (
+                        <tr key={r.sponsor_id} className="border-t border-slate-800">
+                          <Td mono>{r.sponsor_id}</Td>
+                          <Td>{r.child_count}</Td>
+                          <Td>{r.sample_children.join(', ') || '—'}</Td>
+                          <Td>needs upline contact imported</Td>
+                          <Td>
+                            <ResolutionBadge status={rs} />
+                          </Td>
+                          <Td>
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setCreateName('');
+                                  setCreateTarget({ sponsor_id: r.sponsor_id, child_count: r.child_count });
+                                }}
+                                disabled={rs === 'created'}
+                                className="flex items-center gap-1 px-2 py-1 rounded bg-teal-500/10 text-teal-300 border border-teal-500/30 hover:bg-teal-500/20 disabled:opacity-40 text-xs"
+                              >
+                                <UserPlus className="w-3 h-3" />
+                                Create upline contact
+                              </button>
+                              {rs !== 'created' && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setResolutionStatus((s) => ({ ...s, [r.sponsor_id]: 'skipped' }))
+                                  }
+                                  className="px-2 py-1 rounded bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 text-xs"
+                                >
+                                  Skip
+                                </button>
+                              )}
+                            </div>
+                          </Td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                {missingRows.length > 200 && (
+                  <div className="p-2 text-xs text-slate-500 text-center">
+                    Showing first 200 of {missingRows.length}. Use CSV export for full list.
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+
           {/* Parent Linking Preview */}
           <section>
             <h2 className="text-sm font-semibold text-slate-300 mb-2 uppercase tracking-wide">
