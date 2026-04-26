@@ -146,7 +146,7 @@ export function MaytapiInbox() {
     const { data } = await supabase
       .from('maytapi_inbound_unmatched' as any)
       .select('id,phone_hash,phone_last4,message_count,last_body_preview,last_seen_at,status')
-      .eq('status', 'open')
+      .eq('status', unmatchedFilter)
       .order('last_seen_at', { ascending: false })
       .limit(200);
     setUnmatched((data ?? []) as unknown as UnmatchedRow[]);
@@ -155,7 +155,8 @@ export function MaytapiInbox() {
 
   useEffect(() => {
     if (isAdmin) { loadMessages(); loadUnmatched(); }
-  }, [isAdmin]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin, unmatchedFilter]);
 
   // Realtime refresh
   useEffect(() => {
