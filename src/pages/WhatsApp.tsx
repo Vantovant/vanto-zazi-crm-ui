@@ -622,7 +622,7 @@ export function WhatsApp() {
           </div>
         </div>
       ) : (
-        <div className="flex-1 flex items-center justify-center bg-slate-900/30">
+        <div className="hidden md:flex flex-1 items-center justify-center bg-slate-900/30">
           <div className="text-center">
             <MessageCircle className="w-16 h-16 text-slate-600 mx-auto mb-4" />
             <p className="text-slate-400 text-sm">Select a contact to start messaging</p>
