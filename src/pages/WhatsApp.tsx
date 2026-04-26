@@ -239,9 +239,9 @@ export function WhatsApp() {
           <BirthdayPanel />
         </div>
       ) : (
-    <div className="flex-1 flex rounded-xl overflow-hidden border border-slate-700 bg-slate-800/30">
-      {/* Contact List - Left Panel */}
-      <div className="w-80 border-r border-slate-700 flex flex-col bg-slate-800/50 shrink-0">
+    <div className="flex-1 flex flex-col md:flex-row rounded-xl overflow-hidden border border-slate-700 bg-slate-800/30 min-h-[60vh]">
+      {/* Contact List - Left Panel (full width on mobile, hidden when contact selected) */}
+      <div className={`${selectedContactId ? 'hidden md:flex' : 'flex'} w-full md:w-80 md:border-r border-slate-700 flex-col bg-slate-800/50 shrink-0`}>
         <div className="p-4 border-b border-slate-700">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold text-white flex items-center gap-2">
