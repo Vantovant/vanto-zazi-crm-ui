@@ -504,6 +504,59 @@ export function SponsorIdReview() {
     }
   };
 
+  // ---- Bulk create top-uplines from CSV (Option A, no child writes) ----
+  const handleBulkCreateTopUplines = async () => {
+    if (!user) return;
+    setBulkRunning(true);
+    setError(null);
+    const created: string[] = [];
+    const skipped: string[] = [];
+    const failed: { id: string; reason: string }[] = [];
+    const noteTag = `[I2C bulk top-upline import] Source: ${TOP_UPLINE_CSV_SOURCE}`;
+    try {
+      const allIds = TOP_UPLINES_FROM_CSV.map((u) => u.sponsor_id);
+      const { data: existing, error: chkErr } = await supabase
+        .from('contacts')
+        .select('aplgo_id')
+        .eq('user_id', user.id)
+        .in('aplgo_id', allIds);
+      if (chkErr) throw chkErr;
+      const existingSet = new Set((existing || []).map((r) => r.aplgo_id));
+
+      for (const u of TOP_UPLINES_FROM_CSV) {
+        const sid = u.sponsor_id;
+        if (existingSet.has(sid)) {
+          skipped.push(sid);
+          continue;
+        }
+        const overrideName = (bulkOverrides[sid] || '').trim();
+        const fullName = overrideName || u.suggested_name.trim() || `Upline ${sid}`;
+        const { error: insErr } = await supabase.from('contacts').insert({
+          user_id: user.id,
+          full_name: fullName,
+          aplgo_id: sid,
+          sponsor_name: '',
+          leg: '',
+          tree_depth: 0,
+          parent_contact_id: null,
+          additional_notes: noteTag,
+        });
+        if (insErr) {
+          failed.push({ id: sid, reason: insErr.message });
+        } else {
+          created.push(sid);
+          setResolutionStatus((s) => ({ ...s, [sid]: 'created' }));
+        }
+      }
+      setBulkResult({ created, skipped, failed });
+      setReloadTick((t) => t + 1);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBulkRunning(false);
+    }
+  };
+
   if (authLoading) return null;
   if (!user) return <Navigate to="/auth" replace />;
   if (user.id !== OWNER_ID) {
