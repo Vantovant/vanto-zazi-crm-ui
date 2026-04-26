@@ -678,7 +678,108 @@ export function SponsorIdReview() {
             </div>
           </section>
 
-          {/* Missing Uplines */}
+          {/* I2D READY GATE — read-only status panel */}
+          <section className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+            <div className="flex items-start justify-between gap-3 flex-wrap mb-3">
+              <h2 className="text-sm font-semibold text-amber-200 uppercase tracking-wide flex items-center gap-2">
+                <Lock className="w-4 h-4" />
+                I2D Ready Gate
+              </h2>
+              <span className="text-xs px-2 py-0.5 rounded border border-amber-500/40 bg-amber-500/10 text-amber-200">
+                I2D NOT STARTED
+              </span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-3">
+              <Stat label="Total contacts" value={summary.total} />
+              <Stat label="With sponsor_name" value={summary.withSponsor} />
+              <Stat label="Exact aplgo_id matches" value={summary.exact} tone="good" />
+              <Stat label="Missing sponsor IDs" value={summary.missing} tone="warn" />
+              <Stat label="Already parented (legacy)" value={summary.alreadyParented} />
+              <Stat label="I2C placeholder uplines" value={i2cPlaceholderCount} tone="good" />
+              <Stat label="Children NOT yet linked" value={childrenNotLinkedCount} tone="warn" />
+              <Stat label="Contacts with depth > 0" value={contactsWithDepthGt0} />
+            </div>
+            <div className="text-xs text-amber-200 bg-amber-500/10 border border-amber-500/30 rounded p-2 flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>
+                <strong>I2D not started.</strong> Child linking (writing parent_contact_id, tree_depth, leg
+                to existing contacts) requires separate, explicit approval. No Apply / Link / Bulk Link /
+                Auto Link / Start I2D action exists on this page.
+              </span>
+            </div>
+          </section>
+
+          {/* FINAL AUDIT REPORT — read-only summary */}
+          <section className="rounded-xl border border-slate-700 bg-slate-900/40 p-4">
+            <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+              <h2 className="text-sm font-semibold text-slate-200 uppercase tracking-wide flex items-center gap-2">
+                <FileCheck2 className="w-4 h-4 text-emerald-400" />
+                Final Audit Report
+              </h2>
+              <button
+                type="button"
+                onClick={exportFinalVerificationCsv}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/20 text-xs"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Export Final Verification CSV
+              </button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-slate-300">
+                <thead className="text-slate-400 border-b border-slate-700">
+                  <tr>
+                    <Th>Phase</Th>
+                    <Th>Status</Th>
+                    <Th>Description</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    ['H1–H7', 'LOCKED', 'Maytapi Inbox, gate, audit, retention, handover'],
+                    ['I1', 'LOCKED', 'Binary tree schema foundation'],
+                    ['I2A', 'LOCKED', 'Lineage pill, cycle protection, depth auto-calc, sponsor audit'],
+                    ['I2B', 'LOCKED', 'Sponsor ID Review + Parent Linking Preview (read-only)'],
+                    ['I2C', 'LOCKED', '10 missing top-upline placeholder contacts created'],
+                  ].map(([p, s, d]) => (
+                    <tr key={p} className="border-b border-slate-800/50">
+                      <Td mono>{p}</Td>
+                      <Td><span className="px-2 py-0.5 rounded border text-xs bg-emerald-500/10 text-emerald-300 border-emerald-500/30">{s}</span></Td>
+                      <Td>{d}</Td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-300">
+              <div className="flex items-center gap-2"><span className="text-emerald-400">✓</span> No child linking performed</div>
+              <div className="flex items-center gap-2"><span className="text-emerald-400">✓</span> No visual tree built</div>
+              <div className="flex items-center gap-2"><span className="text-emerald-400">✓</span> No AI / reply / automation added</div>
+              <div className="flex items-center gap-2"><span className="text-emerald-400">✓</span> No send path changes</div>
+              <div className="flex items-center gap-2"><span className="text-emerald-400">✓</span> No Maytapi/H-phase tables touched</div>
+              <div className="flex items-center gap-2"><span className="text-emerald-400">✓</span> No production flip / cron added</div>
+            </div>
+          </section>
+
+          {/* VERIFICATION CHECKS — read-only */}
+          <section>
+            <h2 className="text-sm font-semibold text-slate-300 mb-2 uppercase tracking-wide">
+              Verification Checks (read-only)
+            </h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              <Check label="parent_contact_id IS NOT NULL" value={summary.alreadyParented} />
+              <Check label="tree_depth > 0" value={contactsWithDepthGt0} />
+              <Check label="I2C placeholder uplines" value={i2cPlaceholderCount} />
+              <Check label="Children awaiting link" value={childrenNotLinkedCount} />
+            </div>
+            <p className="text-xs text-slate-500 mt-2">
+              All checks are SELECT-only. No mutations, no RPC writes, no webhook simulation, no message
+              sending. Maytapi/H-phase and send-log tables are intentionally excluded from this client-side
+              page (admin-only, gated by RLS).
+            </p>
+          </section>
+
+
           <section>
             <h2 className="text-sm font-semibold text-slate-300 mb-2 uppercase tracking-wide">
               Missing Uplines ({sponsorRows.length})
