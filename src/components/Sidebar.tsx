@@ -15,6 +15,7 @@ import {
   BarChart3,
   GitMerge,
   Flame,
+  GitBranch,
 } from 'lucide-react';
 
 const OWNER_ID = 'b8028d7d-6a08-45ef-a369-b438c440bea3';
@@ -40,7 +41,11 @@ interface SidebarProps {
 export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
   const { user } = useAuth();
   const navItems = user?.id === OWNER_ID
-    ? [...baseNavItems, { path: '/team', label: 'Tester Dashboard', icon: BarChart3 }]
+    ? [
+        ...baseNavItems,
+        { path: '/sponsor-review', label: 'Sponsor Review', icon: GitBranch },
+        { path: '/team', label: 'Tester Dashboard', icon: BarChart3 },
+      ]
     : baseNavItems;
   return (
     <>
