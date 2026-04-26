@@ -564,6 +564,120 @@ export type Database = {
         }
         Relationships: []
       }
+      maytapi_inbound_unmatched: {
+        Row: {
+          created_at: string
+          first_seen_at: string
+          id: string
+          last_body_preview: string | null
+          last_seen_at: string
+          linked_at: string | null
+          linked_by: string | null
+          linked_contact_id: string | null
+          message_count: number
+          phone_hash: string
+          phone_last4: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          first_seen_at?: string
+          id?: string
+          last_body_preview?: string | null
+          last_seen_at?: string
+          linked_at?: string | null
+          linked_by?: string | null
+          linked_contact_id?: string | null
+          message_count?: number
+          phone_hash: string
+          phone_last4: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          first_seen_at?: string
+          id?: string
+          last_body_preview?: string | null
+          last_seen_at?: string
+          linked_at?: string | null
+          linked_by?: string | null
+          linked_contact_id?: string | null
+          message_count?: number
+          phone_hash?: string
+          phone_last4?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      maytapi_messages: {
+        Row: {
+          body: string | null
+          body_preview: string | null
+          contact_id: string | null
+          conversation_key: string
+          created_at: string
+          direction: string
+          id: string
+          maytapi_message_id: string | null
+          media_type: string | null
+          media_url: string | null
+          phone_e164: string | null
+          phone_hash: string
+          phone_last4: string | null
+          raw: Json
+          received_at: string
+          status: string
+          user_id: string
+          zazi_action_id: string | null
+        }
+        Insert: {
+          body?: string | null
+          body_preview?: string | null
+          contact_id?: string | null
+          conversation_key: string
+          created_at?: string
+          direction: string
+          id?: string
+          maytapi_message_id?: string | null
+          media_type?: string | null
+          media_url?: string | null
+          phone_e164?: string | null
+          phone_hash: string
+          phone_last4?: string | null
+          raw?: Json
+          received_at?: string
+          status?: string
+          user_id: string
+          zazi_action_id?: string | null
+        }
+        Update: {
+          body?: string | null
+          body_preview?: string | null
+          contact_id?: string | null
+          conversation_key?: string
+          created_at?: string
+          direction?: string
+          id?: string
+          maytapi_message_id?: string | null
+          media_type?: string | null
+          media_url?: string | null
+          phone_e164?: string | null
+          phone_hash?: string
+          phone_last4?: string | null
+          raw?: Json
+          received_at?: string
+          status?: string
+          user_id?: string
+          zazi_action_id?: string | null
+        }
+        Relationships: []
+      }
       merge_log: {
         Row: {
           created_at: string

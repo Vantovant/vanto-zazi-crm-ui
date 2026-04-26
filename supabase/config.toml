@@ -19,3 +19,6 @@ verify_jwt = false
 verify_jwt = false
 [functions.maytapi-send-1to1-harness]
 verify_jwt = false
+
+[functions.maytapi-inbound]
+verify_jwt = false
