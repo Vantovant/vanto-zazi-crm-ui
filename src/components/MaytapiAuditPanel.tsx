@@ -505,6 +505,72 @@ export function MaytapiAuditPanel({ isAdmin }: { isAdmin: boolean | null }) {
           )}
         </div>
       </section>
+
+      {/* Audit detail drawer (read-only, redacted) */}
+      {detail && (() => {
+        const meta = ACTION_META[detail.action];
+        const Icon = meta?.icon ?? Inbox;
+        const actor = actorNames[detail.actor_user_id] ?? detail.actor_user_id.slice(0, 8);
+        const linked = detail.linked_contact_id ? contactNames[detail.linked_contact_id] : null;
+        const summary = safeMeta(detail.metadata);
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4"
+            onClick={() => setDetail(null)}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              onClick={(e) => e.stopPropagation()}
+              className="w-full sm:max-w-md bg-slate-900 border border-slate-700 sm:rounded-xl rounded-t-xl shadow-2xl flex flex-col max-h-[90vh]"
+            >
+              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className={`inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-md border font-medium ${meta?.cls ?? ''}`}>
+                    <Icon className="w-3.5 h-3.5" /> {meta?.label ?? detail.action}
+                  </span>
+                  <span className="text-[11px] text-slate-500 truncate">Audit detail (read-only)</span>
+                </div>
+                <button
+                  onClick={() => setDetail(null)}
+                  className="p-1 rounded text-slate-400 hover:text-slate-100 hover:bg-slate-800"
+                  aria-label="Close"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="px-4 py-3 overflow-y-auto text-sm space-y-3">
+                <Field label="Actor / admin" value={actor} />
+                <Field label="Linked contact" value={linked ?? '—'} />
+                <Field
+                  label="Phone"
+                  value={detail.phone_last4 ? `••••${detail.phone_last4}` : '—'}
+                  mono
+                />
+                <Field
+                  label="When"
+                  value={`${relTime(detail.created_at)} · ${new Date(detail.created_at).toLocaleString()}`}
+                />
+                <Field label="Safe metadata" value={summary || '—'} />
+                <Field label="Audit ID" value={detail.id.slice(0, 8) + '…'} mono />
+                <p className="text-[10px] text-slate-500 pt-1 border-t border-slate-800">
+                  Privacy: raw phone, message body, webhook payload, secrets and tokens
+                  are intentionally excluded from this view.
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
+function Field({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-wide text-slate-500">{label}</div>
+      <div className={`mt-0.5 text-slate-100 ${mono ? 'font-mono' : ''} break-words`}>{value}</div>
     </div>
   );
 }
