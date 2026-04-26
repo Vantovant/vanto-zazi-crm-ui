@@ -330,8 +330,37 @@ Deno.serve(async (req) => {
     .eq("phone_normalized", phoneNorm)
     .limit(2);
 
-  const matchedContactId =
+  let matchedContactId: string | null =
     matches && matches.length === 1 ? (matches[0] as any).id : null;
+  let matchSource: "phone_normalized" | "linked_gate" | null = matchedContactId
+    ? "phone_normalized"
+    : null;
+  let linkedGateRow:
+    | { id: string; message_count: number; linked_contact_id: string }
+    | null = null;
+
+  // H3A: If no direct contact match, check the manually-linked unmatched gate.
+  // Only status='linked' rows with a linked_contact_id propagate. No backfill,
+  // no contact mutation, no auto-create.
+  if (!matchedContactId) {
+    const { data: gateRow } = await admin
+      .from("maytapi_inbound_unmatched")
+      .select("id, message_count, linked_contact_id, status")
+      .eq("user_id", ownerId)
+      .eq("phone_hash", phHash)
+      .eq("status", "linked")
+      .not("linked_contact_id", "is", null)
+      .maybeSingle();
+    if (gateRow && (gateRow as any).linked_contact_id) {
+      matchedContactId = (gateRow as any).linked_contact_id;
+      matchSource = "linked_gate";
+      linkedGateRow = {
+        id: (gateRow as any).id,
+        message_count: (gateRow as any).message_count,
+        linked_contact_id: (gateRow as any).linked_contact_id,
+      };
+    }
+  }
 
   const msgType: string = m?.type ?? "text";
   const text: string | null = typeof m?.text === "string"
