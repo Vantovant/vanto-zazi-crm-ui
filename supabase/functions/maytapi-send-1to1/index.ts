@@ -1,6 +1,23 @@
 // Phase E.0 — Maytapi send 1-on-1 (admin-only, single approved row, controlled test)
+// Phase E.2 — Adds non-blocking observability into prospector_send_log.
 // HARD GUARDS: no batching, no cron, no contact_activities writes, no contacts.lead_type writes.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+import { hashPhone, hashPayload, contentLength } from '../_shared/redact.ts';
+
+// E.2 helper — fire-and-forget log insert. Must NEVER throw or block the send path.
+async function logSendAttempt(
+  admin: ReturnType<typeof createClient>,
+  row: Record<string, unknown>,
+): Promise<void> {
+  try {
+    const { error } = await admin.from('prospector_send_log').insert(row);
+    if (error) {
+      console.warn('[maytapi-send-1to1] prospector_send_log insert failed (non-blocking):', error.message);
+    }
+  } catch (e) {
+    console.warn('[maytapi-send-1to1] prospector_send_log insert threw (non-blocking):', (e as Error).message);
+  }
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
