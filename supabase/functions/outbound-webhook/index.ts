@@ -147,7 +147,8 @@ Deno.serve(async (req) => {
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
-    console.error("[outbound-webhook] Error:", err);
+    const m = (err as Error)?.message ?? "unknown";
+    console.error(`[outbound-webhook] Error code=handler_exception msg_len=${m.length}`);
     return new Response(JSON.stringify({ error: (err as Error).message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
