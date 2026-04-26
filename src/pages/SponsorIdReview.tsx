@@ -396,7 +396,94 @@ export function SponsorIdReview() {
     URL.revokeObjectURL(url);
   };
 
-  // ---- Gate ----
+  // ---- Missing uplines (derived from sponsorRows) ----
+  const missingRows = useMemo(() => sponsorRows.filter((r) => r.status === 'missing'), [sponsorRows]);
+
+  const exportMissingCsv = () => {
+    const headers = ['sponsor_id', 'child_count', 'sample_child_names', 'recommended_placeholder_name', 'status'];
+    const escape = (v: string | number) => {
+      const s = String(v ?? '');
+      if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+      return s;
+    };
+    const lines = [headers.join(',')];
+    for (const r of missingRows) {
+      lines.push(
+        [
+          r.sponsor_id,
+          r.child_count,
+          r.sample_children.join('; '),
+          `Upline ${r.sponsor_id}`,
+          resolutionStatus[r.sponsor_id] || 'unresolved',
+        ]
+          .map(escape)
+          .join(','),
+      );
+    }
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `missing-uplines-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // ---- Create placeholder upline contact (one-by-one, no child writes) ----
+  const handleCreateUpline = async () => {
+    if (!createTarget || !user) return;
+    const sid = norm(createTarget.sponsor_id);
+    if (!sid) {
+      setError('Sponsor ID is blank.');
+      return;
+    }
+    const isMissing = missingRows.some((r) => r.sponsor_id === sid);
+    if (!isMissing) {
+      setError('Sponsor ID is not in the missing list (refresh and retry).');
+      return;
+    }
+    setCreating(true);
+    setError(null);
+    try {
+      // Duplicate guard: live re-check against DB for this user
+      const { data: existing, error: checkErr } = await supabase
+        .from('contacts')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('aplgo_id', sid)
+        .limit(1);
+      if (checkErr) throw checkErr;
+      if (existing && existing.length > 0) {
+        setError(`A contact with aplgo_id ${sid} already exists. Refreshing.`);
+        setReloadTick((t) => t + 1);
+        setCreateTarget(null);
+        setCreating(false);
+        return;
+      }
+      const fullName = norm(createName) || `Upline ${sid}`;
+      const noteTag = `[I2C missing upline placeholder] Created from Sponsor Review for sponsor_id ${sid}`;
+      const { error: insErr } = await supabase.from('contacts').insert({
+        user_id: user.id,
+        full_name: fullName,
+        aplgo_id: sid,
+        sponsor_name: '',
+        leg: '',
+        tree_depth: 0,
+        parent_contact_id: null,
+        additional_notes: noteTag,
+      });
+      if (insErr) throw insErr;
+      setResolutionStatus((s) => ({ ...s, [sid]: 'created' }));
+      setCreateTarget(null);
+      setCreateName('');
+      setReloadTick((t) => t + 1);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setCreating(false);
+    }
+  };
+
   if (authLoading) return null;
   if (!user) return <Navigate to="/auth" replace />;
   if (user.id !== OWNER_ID) {
