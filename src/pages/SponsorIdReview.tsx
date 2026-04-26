@@ -59,6 +59,11 @@ export function SponsorIdReview() {
   const [contacts, setContacts] = useState<ContactLite[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [resolutionStatus, setResolutionStatus] = useState<Record<string, ResolutionStatus>>({});
+  const [createTarget, setCreateTarget] = useState<{ sponsor_id: string; child_count: number } | null>(null);
+  const [createName, setCreateName] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [reloadTick, setReloadTick] = useState(0);
 
   useEffect(() => {
     if (!user) return;
