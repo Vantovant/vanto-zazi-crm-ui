@@ -198,18 +198,18 @@ export function WhatsApp() {
   }, [selectedContact, manualMsg, handleOpenWhatsApp]);
 
   return (
-    <div className="h-[calc(100vh-56px-48px)] flex flex-col">
-      {/* Tab bar */}
-      <div className="flex items-center gap-1 mb-2 px-1">
+    <div className="min-h-[calc(100vh-56px-48px)] md:h-[calc(100vh-56px-48px)] flex flex-col">
+      {/* Tab bar — wraps on mobile so all tabs stay visible */}
+      <div className="flex flex-wrap items-center gap-1.5 mb-2 px-1">
         <button type="button" onClick={() => setActiveTab('contacts')}
-          className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+          className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-colors ${
             activeTab === 'contacts' ? 'bg-green-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
           }`}>
           <MessageCircle className="w-4 h-4" />
           Contacts
         </button>
         <button type="button" onClick={() => setActiveTab('birthdays')}
-          className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+          className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-colors ${
             activeTab === 'birthdays' ? 'bg-pink-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
           }`}>
           <Cake className="w-4 h-4" />
@@ -217,12 +217,12 @@ export function WhatsApp() {
         </button>
         {isAdmin && (
           <button type="button" onClick={() => setActiveTab('maytapi')}
-            className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+            className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-colors ${
               activeTab === 'maytapi' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
             }`}
             title="Admin only — Vanto's Maytapi WhatsApp number">
             <MessageCircle className="w-4 h-4" />
-            Maytapi Inbox
+            <span className="whitespace-nowrap">Maytapi Inbox</span>
             <span className="ml-1 px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30">
               H1
             </span>
@@ -239,9 +239,9 @@ export function WhatsApp() {
           <BirthdayPanel />
         </div>
       ) : (
-    <div className="flex-1 flex rounded-xl overflow-hidden border border-slate-700 bg-slate-800/30">
-      {/* Contact List - Left Panel */}
-      <div className="w-80 border-r border-slate-700 flex flex-col bg-slate-800/50 shrink-0">
+    <div className="flex-1 flex flex-col md:flex-row rounded-xl overflow-hidden border border-slate-700 bg-slate-800/30 min-h-[60vh]">
+      {/* Contact List - Left Panel (full width on mobile, hidden when contact selected) */}
+      <div className={`${selectedContactId ? 'hidden md:flex' : 'flex'} w-full md:w-80 md:border-r border-slate-700 flex-col bg-slate-800/50 shrink-0`}>
         <div className="p-4 border-b border-slate-700">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold text-white flex items-center gap-2">
@@ -312,6 +312,14 @@ export function WhatsApp() {
       {/* Right Panel — Communication Workbench */}
       {selectedContact ? (
         <div className="flex-1 flex flex-col bg-slate-900/50 min-w-0">
+          {/* Mobile Back button */}
+          <button
+            type="button"
+            onClick={() => setSelectedContactId(null)}
+            className="md:hidden flex items-center gap-2 px-4 py-2 text-sm text-slate-300 bg-slate-800/70 border-b border-slate-700 hover:bg-slate-700"
+          >
+            ← Back to contacts
+          </button>
           {/* Header with actions */}
           <div className="px-4 py-3 border-b border-slate-700 bg-slate-800/50 shrink-0">
             <div className="flex items-center justify-between gap-2">
@@ -614,7 +622,7 @@ export function WhatsApp() {
           </div>
         </div>
       ) : (
-        <div className="flex-1 flex items-center justify-center bg-slate-900/30">
+        <div className="hidden md:flex flex-1 items-center justify-center bg-slate-900/30">
           <div className="text-center">
             <MessageCircle className="w-16 h-16 text-slate-600 mx-auto mb-4" />
             <p className="text-slate-400 text-sm">Select a contact to start messaging</p>
