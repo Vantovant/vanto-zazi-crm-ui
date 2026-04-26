@@ -366,9 +366,27 @@ export function MaytapiAuditPanel({ isAdmin }: { isAdmin: boolean | null }) {
               className="mt-1 w-full px-2 py-1.5 text-sm bg-slate-950 border border-slate-600 rounded-md text-slate-100 placeholder:text-slate-500" />
           </label>
         </div>
+        {/* Filter presets — visible filter changes only, no backend, no mutation */}
+        <div className="px-3 pb-3 -mt-1 flex flex-wrap gap-1.5">
+          <span className="text-[10px] uppercase tracking-wide text-slate-500 self-center mr-1">Presets:</span>
+          {[
+            { id: 'today',   label: 'Today' },
+            { id: '7d',      label: 'Last 7 days' },
+            { id: '30d',     label: 'Last 30 days' },
+            { id: 'linked',  label: 'Linked only' },
+            { id: 'ignored', label: 'Ignored only' },
+            { id: 'read',    label: 'Read actions' },
+          ].map(p => (
+            <button
+              key={p.id}
+              onClick={() => applyPreset(p.id as any)}
+              className="text-[11px] px-2 py-1 rounded border border-slate-700 bg-slate-900/40 text-slate-300 hover:text-slate-100 hover:border-slate-500"
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
       </section>
-
-      {/* Audit list */}
       <section className="flex-1 rounded-lg border border-slate-700/70 bg-slate-800/30 overflow-hidden flex flex-col min-h-0">
         <div className="px-3 py-2 border-b border-slate-700/70 bg-slate-900/40 flex items-center justify-between gap-2 flex-wrap">
           <div className="flex flex-col">
