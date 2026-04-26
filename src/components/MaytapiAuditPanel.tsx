@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Loader2, ShieldCheck, Filter, ArrowUpDown, Inbox,
-  Link2, Ban, MailOpen, Mail, Clock, Database,
+  Link2, Ban, MailOpen, Mail, Clock, Database, Download, X,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -185,6 +185,75 @@ export function MaytapiAuditPanel({ isAdmin }: { isAdmin: boolean | null }) {
     setFContact(''); setFActor(''); setOrder('newest');
   };
 
+  // Detail drawer
+  const [detail, setDetail] = useState<AuditRow | null>(null);
+
+  // Filter presets — only mutate visible filter state
+  const applyPreset = (preset: 'today' | '7d' | '30d' | 'linked' | 'ignored' | 'read') => {
+    const today = new Date();
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    if (preset === 'today') {
+      setFFrom(iso(today)); setFTo(iso(today));
+    } else if (preset === '7d') {
+      const from = new Date(today); from.setDate(from.getDate() - 6);
+      setFFrom(iso(from)); setFTo(iso(today));
+    } else if (preset === '30d') {
+      const from = new Date(today); from.setDate(from.getDate() - 29);
+      setFFrom(iso(from)); setFTo(iso(today));
+    } else if (preset === 'linked') {
+      setFAction('linked');
+    } else if (preset === 'ignored') {
+      setFAction('ignored');
+    } else if (preset === 'read') {
+      // Visual hint — switch to marked_read; user can flip to marked_unread via Action dropdown
+      setFAction('marked_read');
+    }
+  };
+
+  // Manual redacted CSV export — current filtered rows only.
+  // No raw phone, no phone_hash, no message body, no payload, no secrets, no IDs.
+  const exportFilteredCsv = () => {
+    if (filtered.length === 0) {
+      alert('No audit records to export for this filter.');
+      return;
+    }
+    const header = [
+      'action',
+      'actor_display_name',
+      'linked_contact_name',
+      'phone_last4',
+      'created_at',
+      'safe_metadata_summary',
+    ];
+    const esc = (v: string) => {
+      const s = (v ?? '').toString();
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const lines = [header.join(',')];
+    for (const r of filtered) {
+      const actor = actorNames[r.actor_user_id] ?? '';
+      const linked = r.linked_contact_id ? (contactNames[r.linked_contact_id] ?? '') : '';
+      lines.push([
+        esc(ACTION_META[r.action]?.label ?? r.action),
+        esc(actor),
+        esc(linked),
+        esc(r.phone_last4 ? `••••${r.phone_last4}` : ''),
+        esc(new Date(r.created_at).toISOString()),
+        esc(safeMeta(r.metadata)),
+      ].join(','));
+    }
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    a.href = url;
+    a.download = `maytapi-audit-${stamp}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   if (isAdmin === null) {
     return (
       <div className="flex items-center justify-center p-10 text-slate-400">
@@ -297,9 +366,27 @@ export function MaytapiAuditPanel({ isAdmin }: { isAdmin: boolean | null }) {
               className="mt-1 w-full px-2 py-1.5 text-sm bg-slate-950 border border-slate-600 rounded-md text-slate-100 placeholder:text-slate-500" />
           </label>
         </div>
+        {/* Filter presets — visible filter changes only, no backend, no mutation */}
+        <div className="px-3 pb-3 -mt-1 flex flex-wrap gap-1.5">
+          <span className="text-[10px] uppercase tracking-wide text-slate-500 self-center mr-1">Presets:</span>
+          {[
+            { id: 'today',   label: 'Today' },
+            { id: '7d',      label: 'Last 7 days' },
+            { id: '30d',     label: 'Last 30 days' },
+            { id: 'linked',  label: 'Linked only' },
+            { id: 'ignored', label: 'Ignored only' },
+            { id: 'read',    label: 'Read actions' },
+          ].map(p => (
+            <button
+              key={p.id}
+              onClick={() => applyPreset(p.id as any)}
+              className="text-[11px] px-2 py-1 rounded border border-slate-700 bg-slate-900/40 text-slate-300 hover:text-slate-100 hover:border-slate-500"
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
       </section>
-
-      {/* Audit list */}
       <section className="flex-1 rounded-lg border border-slate-700/70 bg-slate-800/30 overflow-hidden flex flex-col min-h-0">
         <div className="px-3 py-2 border-b border-slate-700/70 bg-slate-900/40 flex items-center justify-between gap-2 flex-wrap">
           <div className="flex flex-col">
@@ -312,14 +399,24 @@ export function MaytapiAuditPanel({ isAdmin }: { isAdmin: boolean | null }) {
               )}
             </span>
           </div>
-          {(fAction !== 'all' || fLast4 || fContact || fActor || fFrom || fTo) && (
+          <div className="flex items-center gap-1.5 flex-wrap">
             <button
-              onClick={resetFilters}
-              className="text-[11px] px-2 py-1 rounded border border-slate-600 bg-slate-800 text-slate-200 hover:text-white hover:border-slate-500"
+              onClick={exportFilteredCsv}
+              disabled={filtered.length === 0}
+              className="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded border border-emerald-500/40 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Export the currently filtered audit records as a redacted CSV"
             >
-              Clear filters
+              <Download className="w-3 h-3" /> Export filtered audit CSV
             </button>
-          )}
+            {(fAction !== 'all' || fLast4 || fContact || fActor || fFrom || fTo) && (
+              <button
+                onClick={resetFilters}
+                className="text-[11px] px-2 py-1 rounded border border-slate-600 bg-slate-800 text-slate-200 hover:text-white hover:border-slate-500"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
         </div>
         <div className="flex-1 overflow-y-auto">
           {loading && rows.length === 0 ? (
@@ -360,7 +457,11 @@ export function MaytapiAuditPanel({ isAdmin }: { isAdmin: boolean | null }) {
                 return (
                   <li
                     key={r.id}
-                    className="rounded-lg border border-slate-600/70 bg-slate-900/70 shadow-sm hover:border-slate-500 hover:bg-slate-900 transition-colors p-3 sm:p-4"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setDetail(r)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDetail(r); } }}
+                    className="rounded-lg border border-slate-600/70 bg-slate-900/70 shadow-sm hover:border-slate-500 hover:bg-slate-900 transition-colors p-3 sm:p-4 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
                   >
                     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
                       <div className="flex items-start gap-2.5 min-w-0 flex-1">
@@ -404,6 +505,72 @@ export function MaytapiAuditPanel({ isAdmin }: { isAdmin: boolean | null }) {
           )}
         </div>
       </section>
+
+      {/* Audit detail drawer (read-only, redacted) */}
+      {detail && (() => {
+        const meta = ACTION_META[detail.action];
+        const Icon = meta?.icon ?? Inbox;
+        const actor = actorNames[detail.actor_user_id] ?? detail.actor_user_id.slice(0, 8);
+        const linked = detail.linked_contact_id ? contactNames[detail.linked_contact_id] : null;
+        const summary = safeMeta(detail.metadata);
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4"
+            onClick={() => setDetail(null)}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              onClick={(e) => e.stopPropagation()}
+              className="w-full sm:max-w-md bg-slate-900 border border-slate-700 sm:rounded-xl rounded-t-xl shadow-2xl flex flex-col max-h-[90vh]"
+            >
+              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className={`inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-md border font-medium ${meta?.cls ?? ''}`}>
+                    <Icon className="w-3.5 h-3.5" /> {meta?.label ?? detail.action}
+                  </span>
+                  <span className="text-[11px] text-slate-500 truncate">Audit detail (read-only)</span>
+                </div>
+                <button
+                  onClick={() => setDetail(null)}
+                  className="p-1 rounded text-slate-400 hover:text-slate-100 hover:bg-slate-800"
+                  aria-label="Close"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="px-4 py-3 overflow-y-auto text-sm space-y-3">
+                <Field label="Actor / admin" value={actor} />
+                <Field label="Linked contact" value={linked ?? '—'} />
+                <Field
+                  label="Phone"
+                  value={detail.phone_last4 ? `••••${detail.phone_last4}` : '—'}
+                  mono
+                />
+                <Field
+                  label="When"
+                  value={`${relTime(detail.created_at)} · ${new Date(detail.created_at).toLocaleString()}`}
+                />
+                <Field label="Safe metadata" value={summary || '—'} />
+                <Field label="Audit ID" value={detail.id.slice(0, 8) + '…'} mono />
+                <p className="text-[10px] text-slate-500 pt-1 border-t border-slate-800">
+                  Privacy: raw phone, message body, webhook payload, secrets and tokens
+                  are intentionally excluded from this view.
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
+function Field({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-wide text-slate-500">{label}</div>
+      <div className={`mt-0.5 text-slate-100 ${mono ? 'font-mono' : ''} break-words`}>{value}</div>
     </div>
   );
 }
