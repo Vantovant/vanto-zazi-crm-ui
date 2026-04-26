@@ -630,14 +630,14 @@ export function SponsorIdReview() {
   }
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-semibold text-white flex items-center gap-2">
-            <GitBranch className="w-6 h-6 text-teal-400" />
-            Sponsor ID Review
+    <div className="p-3 sm:p-6 space-y-5 sm:space-y-6 max-w-7xl mx-auto w-full overflow-x-hidden">
+      <div className="flex items-start sm:items-center justify-between flex-wrap gap-2">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-lg sm:text-2xl font-semibold text-white flex items-center gap-2">
+            <GitBranch className="w-5 h-5 sm:w-6 sm:h-6 text-teal-400 shrink-0" />
+            <span className="truncate">Sponsor ID Review</span>
           </h1>
-          <p className="text-sm text-slate-400 mt-1">
+          <p className="text-xs sm:text-sm text-slate-400 mt-1">
             Read-only audit. No parent links, depth, or leg values are written.
           </p>
         </div>
@@ -645,10 +645,11 @@ export function SponsorIdReview() {
           type="button"
           onClick={exportCsv}
           disabled={loading || previewRows.length === 0}
-          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-teal-500/10 text-teal-300 border border-teal-500/30 hover:bg-teal-500/20 disabled:opacity-40 text-sm"
+          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-teal-500/10 text-teal-300 border border-teal-500/30 hover:bg-teal-500/20 disabled:opacity-40 text-xs sm:text-sm whitespace-nowrap"
         >
           <Download className="w-4 h-4" />
-          Export sponsor preview CSV
+          <span className="hidden sm:inline">Export sponsor preview CSV</span>
+          <span className="sm:hidden">Export CSV</span>
         </button>
       </div>
 
@@ -1230,11 +1231,11 @@ function Check({ label, value }: { label: string; value: number }) {
 }
 
 function Th({ children }: { children: React.ReactNode }) {
-  return <th className="text-left px-3 py-2 font-medium whitespace-nowrap">{children}</th>;
+  return <th className="text-left px-2 sm:px-3 py-2 font-medium whitespace-nowrap text-xs sm:text-sm">{children}</th>;
 }
 function Td({ children, mono }: { children: React.ReactNode; mono?: boolean }) {
   return (
-    <td className={`px-3 py-2 ${mono ? 'font-mono text-xs' : ''} whitespace-nowrap max-w-[240px] truncate`}>
+    <td className={`px-2 sm:px-3 py-2 ${mono ? 'font-mono text-[11px] sm:text-xs' : 'text-xs sm:text-sm'} whitespace-nowrap max-w-[160px] sm:max-w-[240px] truncate`}>
       {children}
     </td>
   );
