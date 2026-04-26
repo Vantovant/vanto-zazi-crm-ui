@@ -1231,11 +1231,11 @@ function Check({ label, value }: { label: string; value: number }) {
 }
 
 function Th({ children }: { children: React.ReactNode }) {
-  return <th className="text-left px-3 py-2 font-medium whitespace-nowrap">{children}</th>;
+  return <th className="text-left px-2 sm:px-3 py-2 font-medium whitespace-nowrap text-xs sm:text-sm">{children}</th>;
 }
 function Td({ children, mono }: { children: React.ReactNode; mono?: boolean }) {
   return (
-    <td className={`px-3 py-2 ${mono ? 'font-mono text-xs' : ''} whitespace-nowrap max-w-[240px] truncate`}>
+    <td className={`px-2 sm:px-3 py-2 ${mono ? 'font-mono text-[11px] sm:text-xs' : 'text-xs sm:text-sm'} whitespace-nowrap max-w-[160px] sm:max-w-[240px] truncate`}>
       {children}
     </td>
   );
