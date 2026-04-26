@@ -312,6 +312,14 @@ export function WhatsApp() {
       {/* Right Panel — Communication Workbench */}
       {selectedContact ? (
         <div className="flex-1 flex flex-col bg-slate-900/50 min-w-0">
+          {/* Mobile Back button */}
+          <button
+            type="button"
+            onClick={() => setSelectedContactId(null)}
+            className="md:hidden flex items-center gap-2 px-4 py-2 text-sm text-slate-300 bg-slate-800/70 border-b border-slate-700 hover:bg-slate-700"
+          >
+            ← Back to contacts
+          </button>
           {/* Header with actions */}
           <div className="px-4 py-3 border-b border-slate-700 bg-slate-800/50 shrink-0">
             <div className="flex items-center justify-between gap-2">
