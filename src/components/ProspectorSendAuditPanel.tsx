@@ -19,6 +19,7 @@ type SendLogRow = {
   content_length: number | null;
   attempted_at: string;
   error_code: string | null;
+  metadata: Record<string, any> | null;
 };
 
 type ActivityRow = {
@@ -44,22 +45,39 @@ export function ProspectorSendAuditPanel({ zaziActionId, contactId, enabled, pre
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [log, setLog] = useState<SendLogRow | null>(null);
+  const [harnessOnly, setHarnessOnly] = useState(false);
+  const [harnessExcluded, setHarnessExcluded] = useState(false);
   const [activity, setActivity] = useState<ActivityRow | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const isHarness = (r: SendLogRow): boolean => {
+    const m = r.metadata;
+    if (!m || typeof m !== 'object') return false;
+    return m.harness === true || m.harness === 'true';
+  };
 
   const load = async () => {
     setLoading(true);
     setError(null);
     try {
-      // Latest send log for this action (read-only)
+      // E.7 — fetch latest few rows for this action and pick the latest non-harness one.
+      // Harness rows (metadata.harness=true) are simulation logs and must NEVER replace
+      // the real send proof in the audit panel.
       const { data: logs, error: logErr } = await supabase
         .from('prospector_send_log' as any)
-        .select('id, mode, intended_send_type, request_status, response_status_code, maytapi_message_id, content_length, attempted_at, error_code')
+        .select('id, mode, intended_send_type, request_status, response_status_code, maytapi_message_id, content_length, attempted_at, error_code, metadata')
         .eq('zazi_action_id', zaziActionId)
         .order('attempted_at', { ascending: false })
-        .limit(1);
+        .limit(5);
       if (logErr) throw logErr;
-      setLog(((logs as any[]) || [])[0] || null);
+
+      const rows = ((logs as any[]) || []) as SendLogRow[];
+      const realRow = rows.find((r) => !isHarness(r)) || null;
+      const anyHarness = rows.some((r) => isHarness(r));
+
+      setLog(realRow);
+      setHarnessOnly(rows.length > 0 && !realRow && anyHarness);
+      setHarnessExcluded(!!realRow && anyHarness);
 
       // Matching activity by exact zazi_action_id token
       let actQuery = supabase
@@ -166,9 +184,19 @@ export function ProspectorSendAuditPanel({ zaziActionId, contactId, enabled, pre
                     </div>
                   )}
                 </div>
+              ) : harnessOnly ? (
+                <div className="flex items-center gap-2 text-[11px] text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded px-2 py-1">
+                  <Inbox className="w-3 h-3" /> Harness test log only — no real Maytapi send log yet.
+                </div>
               ) : (
                 <div className="flex items-center gap-2 text-[11px] text-slate-400">
                   <Inbox className="w-3 h-3" /> No send log yet (pre-E.2 row, or never sent).
+                </div>
+              )}
+
+              {harnessExcluded && log && (
+                <div className="text-[10px] text-amber-400/80 italic">
+                  Harness log excluded from live send proof.
                 </div>
               )}
 
