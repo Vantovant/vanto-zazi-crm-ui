@@ -81,7 +81,7 @@ function relTime(iso: string): string {
 export function MaytapiInbox() {
   const { user } = useAuth();
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
-  const [tab, setTab] = useState<'inbox' | 'unmatched'>('inbox');
+  const [tab, setTab] = useState<'inbox' | 'unmatched' | 'audit'>('inbox');
 
   const [messages, setMessages] = useState<MsgRow[]>([]);
   const [contactNames, setContactNames] = useState<Record<string, string>>({});
