@@ -734,6 +734,74 @@ export type Database = {
         }
         Relationships: []
       }
+      prospector_send_log: {
+        Row: {
+          attempted_at: string
+          contact_id: string | null
+          content_length: number | null
+          created_at: string
+          error_code: string | null
+          id: string
+          intended_send_type: string
+          maytapi_message_id: string | null
+          metadata: Json
+          mode: string
+          payload_hash: string | null
+          phone_hash: string | null
+          request_status: string
+          responded_at: string | null
+          response_status_code: number | null
+          user_id: string
+          zazi_action_id: string | null
+        }
+        Insert: {
+          attempted_at?: string
+          contact_id?: string | null
+          content_length?: number | null
+          created_at?: string
+          error_code?: string | null
+          id?: string
+          intended_send_type: string
+          maytapi_message_id?: string | null
+          metadata?: Json
+          mode: string
+          payload_hash?: string | null
+          phone_hash?: string | null
+          request_status: string
+          responded_at?: string | null
+          response_status_code?: number | null
+          user_id: string
+          zazi_action_id?: string | null
+        }
+        Update: {
+          attempted_at?: string
+          contact_id?: string | null
+          content_length?: number | null
+          created_at?: string
+          error_code?: string | null
+          id?: string
+          intended_send_type?: string
+          maytapi_message_id?: string | null
+          metadata?: Json
+          mode?: string
+          payload_hash?: string | null
+          phone_hash?: string | null
+          request_status?: string
+          responded_at?: string | null
+          response_status_code?: number | null
+          user_id?: string
+          zazi_action_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prospector_send_log_zazi_action_id_fkey"
+            columns: ["zazi_action_id"]
+            isOneToOne: false
+            referencedRelation: "zazi_actions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_activity: {
         Row: {
           action: string

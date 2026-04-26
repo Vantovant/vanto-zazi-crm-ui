@@ -1,6 +1,23 @@
 // Phase E.0 — Maytapi send 1-on-1 (admin-only, single approved row, controlled test)
+// Phase E.2 — Adds non-blocking observability into prospector_send_log.
 // HARD GUARDS: no batching, no cron, no contact_activities writes, no contacts.lead_type writes.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+import { hashPhone, hashPayload, contentLength } from '../_shared/redact.ts';
+
+// E.2 helper — fire-and-forget log insert. Must NEVER throw or block the send path.
+async function logSendAttempt(
+  admin: ReturnType<typeof createClient>,
+  row: Record<string, unknown>,
+): Promise<void> {
+  try {
+    const { error } = await admin.from('prospector_send_log').insert(row);
+    if (error) {
+      console.warn('[maytapi-send-1to1] prospector_send_log insert failed (non-blocking):', error.message);
+    }
+  } catch (e) {
+    console.warn('[maytapi-send-1to1] prospector_send_log insert threw (non-blocking):', (e as Error).message);
+  }
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -137,6 +154,19 @@ Deno.serve(async (req) => {
     if (!row.contact_id) failures.push('contact_id is null');
 
     if (failures.length > 0) {
+      // E.2 — log blocked attempt (eligibility gate failed)
+      await logSendAttempt(admin, {
+        user_id: row.user_id,
+        contact_id: row.contact_id ?? null,
+        zazi_action_id,
+        attempted_at: new Date().toISOString(),
+        responded_at: new Date().toISOString(),
+        mode: 'test',
+        intended_send_type: 'media',
+        request_status: 'blocked',
+        error_code: 'eligibility_failed',
+        metadata: { failure_count: failures.length, first_failure: failures[0] ?? null },
+      });
       return new Response(JSON.stringify({ error: 'Send guards failed', failures }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -224,6 +254,12 @@ Deno.serve(async (req) => {
     const success = !networkError && upstream! && upstream.ok && (upstreamJson?.success === true);
     const messageId = upstreamJson?.data?.msgId || upstreamJson?.data?.id || null;
 
+    // E.2 — compute safe metadata for prospector_send_log (no raw PII).
+    const phoneHash = await hashPhone(phone);
+    const payloadHash = await hashPayload({ to: phone, type: 'media', text: caption, image: BRANDED_MEDIA_IMAGE });
+    const captionLength = contentLength(caption);
+    const respondedAt = new Date().toISOString();
+
     if (!success) {
       // Failure path — DO NOT mark sent
       const evidence = (row.evidence as any) || {};
@@ -239,6 +275,27 @@ Deno.serve(async (req) => {
       };
       await admin.from('zazi_actions').update({ evidence: newEvidence })
         .eq('id', zazi_action_id);
+
+      // E.2 — log fail attempt (non-blocking)
+      await logSendAttempt(admin, {
+        user_id: row.user_id,
+        contact_id: row.contact_id,
+        zazi_action_id,
+        attempted_at: new Date().toISOString(),
+        responded_at: respondedAt,
+        mode: 'test',
+        intended_send_type: 'media',
+        request_status: 'fail',
+        payload_hash: payloadHash,
+        response_status_code: upstream?.status ?? null,
+        error_code: networkError ? 'network_error' : 'maytapi_error',
+        phone_hash: phoneHash,
+        content_length: captionLength,
+        metadata: {
+          maytapi_success: upstreamJson?.success ?? null,
+          maytapi_message_field: typeof upstreamJson?.message === 'string' ? upstreamJson.message.slice(0, 80) : null,
+        },
+      });
 
       return new Response(JSON.stringify({
         ok: false,
@@ -280,6 +337,24 @@ Deno.serve(async (req) => {
         maytapi_response: sanitizedResponse, message_id: messageId,
       }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
+
+    // E.2 — log ok attempt (non-blocking)
+    await logSendAttempt(admin, {
+      user_id: row.user_id,
+      contact_id: row.contact_id,
+      zazi_action_id,
+      attempted_at: new Date().toISOString(),
+      responded_at: respondedAt,
+      mode: 'test',
+      intended_send_type: 'media',
+      maytapi_message_id: messageId,
+      request_status: 'ok',
+      payload_hash: payloadHash,
+      response_status_code: upstream?.status ?? null,
+      phone_hash: phoneHash,
+      content_length: captionLength,
+      metadata: { sent_by: callerId },
+    });
 
     return new Response(JSON.stringify({
       ok: true, sent: true,
