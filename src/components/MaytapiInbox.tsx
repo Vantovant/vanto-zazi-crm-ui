@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle, CheckCircle2, Inbox, Link2, Loader2,
-  MessageSquare, ShieldCheck, Search,
+  MessageSquare, ShieldCheck, Search, Ban,
 } from 'lucide-react';
+
+// H3: Generic preview always rendered for unmatched rows — never raw body.
+const UNMATCHED_GENERIC_PREVIEW = 'Message received from unknown number.';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -88,6 +91,12 @@ export function MaytapiInbox() {
   const [linkSearch, setLinkSearch] = useState('');
   const [linkResults, setLinkResults] = useState<Array<{ id: string; full_name: string; phone_number: string }>>([]);
   const [linking, setLinking] = useState(false);
+  const [pendingLinkContact, setPendingLinkContact] = useState<{ id: string; full_name: string; phone_number: string } | null>(null);
+
+  // H3: Ignore action + status filter
+  const [ignoreFor, setIgnoreFor] = useState<UnmatchedRow | null>(null);
+  const [ignoring, setIgnoring] = useState(false);
+  const [unmatchedFilter, setUnmatchedFilter] = useState<'open' | 'linked' | 'ignored'>('open');
 
   // Admin check
   useEffect(() => {
@@ -137,7 +146,7 @@ export function MaytapiInbox() {
     const { data } = await supabase
       .from('maytapi_inbound_unmatched' as any)
       .select('id,phone_hash,phone_last4,message_count,last_body_preview,last_seen_at,status')
-      .eq('status', 'open')
+      .eq('status', unmatchedFilter)
       .order('last_seen_at', { ascending: false })
       .limit(200);
     setUnmatched((data ?? []) as unknown as UnmatchedRow[]);
@@ -146,7 +155,8 @@ export function MaytapiInbox() {
 
   useEffect(() => {
     if (isAdmin) { loadMessages(); loadUnmatched(); }
-  }, [isAdmin]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin, unmatchedFilter]);
 
   // Realtime refresh
   useEffect(() => {
@@ -202,24 +212,45 @@ export function MaytapiInbox() {
     return () => { cancelled = true; };
   }, [linkFor, linkSearch]);
 
-  const linkContact = async (contactId: string) => {
-    if (!linkFor || !user) return;
+  const confirmLinkContact = async () => {
+    if (!linkFor || !user || !pendingLinkContact) return;
     setLinking(true);
-    await supabase
+    const { error } = await supabase
       .from('maytapi_inbound_unmatched' as any)
       .update({
         status: 'linked',
-        linked_contact_id: contactId,
+        linked_contact_id: pendingLinkContact.id,
         linked_at: new Date().toISOString(),
         linked_by: user.id,
       })
       .eq('id', linkFor.id);
     setLinking(false);
+    if (error) {
+      alert(`Link failed: ${error.message}`);
+      return;
+    }
     setLinkFor(null);
+    setPendingLinkContact(null);
     setLinkSearch('');
     setLinkResults([]);
     loadUnmatched();
     loadMessages();
+  };
+
+  const confirmIgnore = async () => {
+    if (!ignoreFor) return;
+    setIgnoring(true);
+    const { error } = await supabase
+      .from('maytapi_inbound_unmatched' as any)
+      .update({ status: 'ignored' })
+      .eq('id', ignoreFor.id);
+    setIgnoring(false);
+    if (error) {
+      alert(`Ignore failed: ${error.message}`);
+      return;
+    }
+    setIgnoreFor(null);
+    loadUnmatched();
   };
 
   if (isAdmin === null) {
@@ -381,15 +412,28 @@ export function MaytapiInbox() {
       ) : (
         // Unmatched tab
         <div className="flex-1 flex flex-col mt-3 mx-4 mb-4 rounded-lg border border-slate-700/70 overflow-hidden bg-slate-800/30">
-          <div className="px-3 py-2 border-b border-slate-700/70 text-[11px] uppercase tracking-wide text-slate-500 font-medium flex items-center justify-between">
+          <div className="px-3 py-2 border-b border-slate-700/70 text-[11px] uppercase tracking-wide text-slate-500 font-medium flex items-center justify-between gap-3">
             <span>Unmatched inbound numbers</span>
-            {loadingUn && <Loader2 className="w-3 h-3 animate-spin" />}
+            <div className="flex items-center gap-1">
+              {(['open', 'linked', 'ignored'] as const).map(s => (
+                <button
+                  key={s}
+                  onClick={() => setUnmatchedFilter(s)}
+                  className={`px-2 py-0.5 text-[10px] rounded border ${unmatchedFilter === s
+                    ? 'bg-amber-600/20 border-amber-500/40 text-amber-200'
+                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'}`}
+                >
+                  {s[0].toUpperCase() + s.slice(1)}
+                </button>
+              ))}
+              {loadingUn && <Loader2 className="w-3 h-3 animate-spin ml-1" />}
+            </div>
           </div>
           <div className="flex-1 overflow-y-auto">
             {unmatched.length === 0 ? (
               <div className="flex flex-col items-center justify-center p-10 text-center">
                 <CheckCircle2 className="w-8 h-8 text-emerald-500/60 mb-2" />
-                <p className="text-sm text-slate-300">No unmatched numbers</p>
+                <p className="text-sm text-slate-300">No {unmatchedFilter} unmatched numbers</p>
                 <p className="text-[11px] text-slate-500 mt-1">
                   Inbound from unknown phones will appear here as <span className="font-mono">••••XXXX</span>.
                 </p>
@@ -399,21 +443,38 @@ export function MaytapiInbox() {
                 {unmatched.map(u => (
                   <li key={u.id} className="px-4 py-3 flex items-center justify-between gap-3 hover:bg-slate-700/20">
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-mono text-sm text-slate-100">••••{u.phone_last4}</span>
                         <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700 text-slate-300">{u.message_count} msg{u.message_count === 1 ? '' : 's'}</span>
                         <span className="text-[10px] text-slate-500">{relTime(u.last_seen_at)}</span>
+                        {u.status !== 'open' && (
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded border ${u.status === 'linked'
+                            ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                            : 'bg-slate-700 text-slate-400 border-slate-600'}`}>
+                            {u.status}
+                          </span>
+                        )}
                       </div>
-                      {u.last_body_preview && (
-                        <p className="text-xs text-slate-400 mt-1 truncate">{u.last_body_preview}</p>
-                      )}
+                      <p className="text-xs text-slate-400 mt-1 italic truncate">
+                        {UNMATCHED_GENERIC_PREVIEW}
+                      </p>
                     </div>
-                    <button
-                      onClick={() => setLinkFor(u)}
-                      className="px-3 py-1.5 text-xs rounded-md bg-emerald-600/20 border border-emerald-500/40 text-emerald-200 hover:bg-emerald-600/30 flex items-center gap-1.5 shrink-0"
-                    >
-                      <Link2 className="w-3 h-3" /> Link to contact
-                    </button>
+                    {u.status === 'open' && (
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={() => setLinkFor(u)}
+                          className="px-3 py-1.5 text-xs rounded-md bg-emerald-600/20 border border-emerald-500/40 text-emerald-200 hover:bg-emerald-600/30 flex items-center gap-1.5"
+                        >
+                          <Link2 className="w-3 h-3" /> Link to contact
+                        </button>
+                        <button
+                          onClick={() => setIgnoreFor(u)}
+                          className="px-3 py-1.5 text-xs rounded-md bg-slate-700 border border-slate-600 text-slate-200 hover:bg-slate-600 flex items-center gap-1.5"
+                        >
+                          <Ban className="w-3 h-3" /> Ignore
+                        </button>
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -422,50 +483,116 @@ export function MaytapiInbox() {
         </div>
       )}
 
-      {/* Link-to-contact modal */}
+      {/* Link-to-contact modal (search → confirm) */}
       {linkFor && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => !linking && setLinkFor(null)}>
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => !linking && (setLinkFor(null), setPendingLinkContact(null))}>
           <div className="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-md p-4" onClick={e => e.stopPropagation()}>
             <h3 className="text-sm font-semibold text-slate-100 mb-1">Link unmatched number</h3>
             <p className="text-xs text-slate-400 mb-3">
               <span className="font-mono">••••{linkFor.phone_last4}</span> · {linkFor.message_count} message(s)
             </p>
-            <div className="relative">
-              <Search className="w-4 h-4 absolute left-2.5 top-2.5 text-slate-500" />
-              <input
-                autoFocus
-                value={linkSearch}
-                onChange={e => setLinkSearch(e.target.value)}
-                placeholder="Search by name or phone…"
-                className="w-full pl-8 pr-3 py-2 text-sm bg-slate-900 border border-slate-700 rounded-md text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-emerald-500/50"
-              />
-            </div>
-            <div className="mt-2 max-h-64 overflow-y-auto">
-              {linkResults.length === 0 && linkSearch && (
-                <p className="text-xs text-slate-500 px-1 py-3">No matches.</p>
-              )}
-              {linkResults.map(r => (
-                <button
-                  key={r.id}
-                  onClick={() => linkContact(r.id)}
-                  disabled={linking}
-                  className="w-full text-left px-2 py-2 rounded-md hover:bg-slate-700/50 disabled:opacity-50"
-                >
-                  <div className="text-sm text-slate-100">{r.full_name}</div>
-                  <div className="text-xs text-slate-400">{r.phone_number}</div>
-                </button>
-              ))}
-            </div>
-            <div className="flex justify-end gap-2 mt-3">
+
+            {!pendingLinkContact ? (
+              <>
+                <div className="relative">
+                  <Search className="w-4 h-4 absolute left-2.5 top-2.5 text-slate-500" />
+                  <input
+                    autoFocus
+                    value={linkSearch}
+                    onChange={e => setLinkSearch(e.target.value)}
+                    placeholder="Search existing CRM contacts by name or phone…"
+                    className="w-full pl-8 pr-3 py-2 text-sm bg-slate-900 border border-slate-700 rounded-md text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-emerald-500/50"
+                  />
+                </div>
+                <div className="mt-2 max-h-64 overflow-y-auto">
+                  {linkResults.length === 0 && linkSearch && (
+                    <p className="text-xs text-slate-500 px-1 py-3">No matches.</p>
+                  )}
+                  {linkResults.map(r => (
+                    <button
+                      key={r.id}
+                      onClick={() => setPendingLinkContact(r)}
+                      className="w-full text-left px-2 py-2 rounded-md hover:bg-slate-700/50"
+                    >
+                      <div className="text-sm text-slate-100">{r.full_name}</div>
+                      <div className="text-xs text-slate-400">{r.phone_number}</div>
+                    </button>
+                  ))}
+                </div>
+                <div className="flex justify-end gap-2 mt-3">
+                  <button
+                    onClick={() => setLinkFor(null)}
+                    className="px-3 py-1.5 text-xs rounded-md bg-slate-700 text-slate-200 hover:bg-slate-600"
+                  >Cancel</button>
+                </div>
+                <p className="text-[10px] text-slate-500 mt-2">
+                  No new contact will be created. No old unknown history will be backfilled.
+                  Future messages from this number will attach to the linked contact.
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3 mb-3">
+                  <p className="text-xs text-slate-300 mb-1">Link <span className="font-mono">••••{linkFor.phone_last4}</span> to:</p>
+                  <p className="text-sm font-medium text-slate-100">{pendingLinkContact.full_name}</p>
+                  <p className="text-xs text-slate-400">{pendingLinkContact.phone_number}</p>
+                </div>
+                <ul className="text-[11px] text-slate-400 space-y-1 mb-3 list-disc pl-4">
+                  <li>No new contact created.</li>
+                  <li>No <code>lead_type</code>, <code>leg</code>, <code>tree_depth</code> writes.</li>
+                  <li>No backfill of old unknown messages.</li>
+                  <li>Future inbound from this number will attach to this contact.</li>
+                </ul>
+                <div className="flex justify-end gap-2">
+                  <button
+                    onClick={() => setPendingLinkContact(null)}
+                    disabled={linking}
+                    className="px-3 py-1.5 text-xs rounded-md bg-slate-700 text-slate-200 hover:bg-slate-600 disabled:opacity-50"
+                  >Back</button>
+                  <button
+                    onClick={confirmLinkContact}
+                    disabled={linking}
+                    className="px-3 py-1.5 text-xs rounded-md bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    {linking && <Loader2 className="w-3 h-3 animate-spin" />}
+                    Confirm link
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Ignore confirmation modal */}
+      {ignoreFor && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => !ignoring && setIgnoreFor(null)}>
+          <div className="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-md p-4" onClick={e => e.stopPropagation()}>
+            <h3 className="text-sm font-semibold text-slate-100 mb-1">Ignore unknown number</h3>
+            <p className="text-xs text-slate-400 mb-3">
+              <span className="font-mono">••••{ignoreFor.phone_last4}</span> · {ignoreFor.message_count} message(s)
+            </p>
+            <ul className="text-[11px] text-slate-400 space-y-1 mb-3 list-disc pl-4">
+              <li>This number will be hidden from the open Unmatched list.</li>
+              <li>No CRM contact will be created.</li>
+              <li>No reply, no AI, no auto-anything.</li>
+              <li>Reversible by changing the filter to "Ignored".</li>
+            </ul>
+            <div className="flex justify-end gap-2">
               <button
-                onClick={() => setLinkFor(null)}
-                disabled={linking}
+                onClick={() => setIgnoreFor(null)}
+                disabled={ignoring}
                 className="px-3 py-1.5 text-xs rounded-md bg-slate-700 text-slate-200 hover:bg-slate-600 disabled:opacity-50"
               >Cancel</button>
+              <button
+                onClick={confirmIgnore}
+                disabled={ignoring}
+                className="px-3 py-1.5 text-xs rounded-md bg-amber-600 text-white hover:bg-amber-500 disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {ignoring && <Loader2 className="w-3 h-3 animate-spin" />}
+                Confirm ignore
+              </button>
             </div>
-            <p className="text-[10px] text-slate-500 mt-2">
-              Linking marks this entry as resolved. New messages from this number will attach to the linked contact going forward.
-            </p>
           </div>
         </div>
       )}
