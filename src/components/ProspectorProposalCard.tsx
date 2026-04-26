@@ -506,6 +506,14 @@ export function ProspectorProposalCard({ proposal, onAction, busy = false, isAdm
           )}
         </div>
       )}
+
+      {/* E.4 — Admin-only read-only send audit (visible by default on sent rows) */}
+      <ProspectorSendAuditPanel
+        zaziActionId={proposal.id}
+        contactId={proposal.contact_id}
+        enabled={isAdmin}
+        preload={isSent}
+      />
     </div>
   );
 }
