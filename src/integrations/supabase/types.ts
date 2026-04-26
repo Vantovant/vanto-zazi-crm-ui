@@ -312,6 +312,7 @@ export type Database = {
           level: string
           meeting_time: string
           next_action: string
+          parent_contact_id: string | null
           phone_normalized: string | null
           phone_number: string
           province: string
@@ -319,6 +320,7 @@ export type Database = {
           salutation_title: string
           sponsor_name: string
           state: string
+          tree_depth: number | null
           updated_at: string
           user_id: string
         }
@@ -347,6 +349,7 @@ export type Database = {
           level?: string
           meeting_time?: string
           next_action?: string
+          parent_contact_id?: string | null
           phone_normalized?: string | null
           phone_number?: string
           province?: string
@@ -354,6 +357,7 @@ export type Database = {
           salutation_title?: string
           sponsor_name?: string
           state?: string
+          tree_depth?: number | null
           updated_at?: string
           user_id: string
         }
@@ -382,6 +386,7 @@ export type Database = {
           level?: string
           meeting_time?: string
           next_action?: string
+          parent_contact_id?: string | null
           phone_normalized?: string | null
           phone_number?: string
           province?: string
@@ -389,6 +394,7 @@ export type Database = {
           salutation_title?: string
           sponsor_name?: string
           state?: string
+          tree_depth?: number | null
           updated_at?: string
           user_id?: string
         }
