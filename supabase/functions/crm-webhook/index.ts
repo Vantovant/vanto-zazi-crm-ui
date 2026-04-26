@@ -1,10 +1,24 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { verifyWebhookSecret } from "../_shared/secret-verify.ts";
+import {
+  hashEmail,
+  hashPhone,
+  safePayloadSummary,
+} from "../_shared/redact.ts";
+import {
+  checkIdempotency,
+  recordIdempotency,
+} from "../_shared/idempotency.ts";
+import { checkRateLimit } from "../_shared/rate-limit.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-webhook-secret, x-supabase-client-platform, x-supabase-client-platform-version, x-user-email, x-owner-email",
+    "authorization, x-client-info, apikey, content-type, x-webhook-secret, x-webhook-timestamp, x-idempotency-key, x-supabase-client-platform, x-supabase-client-platform-version, x-user-email, x-owner-email",
 };
+
+const SCOPE = "crm-webhook";
+const RATE_LIMIT_PER_MIN = 60;
 
 /**
  * Resolves a local Zazi user UUID from an email address.
@@ -48,11 +62,11 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // ── Authenticate via shared webhook secret ──────────────────────────────
+  // ── Authenticate via shared webhook secret (dual-secret rotation) ──────
   const incomingSecret = req.headers.get("x-webhook-secret");
-  const expectedSecret = Deno.env.get("WEBHOOK_SECRET");
-
-  if (!incomingSecret || incomingSecret !== expectedSecret) {
+  const secretVersion = verifyWebhookSecret(incomingSecret);
+  if (secretVersion === "invalid") {
+    console.warn(JSON.stringify({ scope: SCOPE, evt: "auth_fail", reason: "invalid_secret" }));
     return new Response(JSON.stringify({ error: "Unauthorized: invalid webhook secret" }), {
       status: 401,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -85,49 +99,94 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-const action = body?.action;
+    const action = body?.action;
 
-// ── Resolve local user by email — NEVER trust external user_id ────────
-// Caller SHOULD send an email, but we also accept it via headers or a safe server-side default.
-const emailFromBody =
-  body?.email ?? body?.user_email ?? body?.owner_email ?? body?.ownerEmail ?? null;
-const emailFromHeader =
-  req.headers.get("x-user-email") ?? req.headers.get("x-owner-email") ?? null;
-const fallbackEmail =
+    // ── Resolve local user by email — NEVER trust external user_id ──────
+    const emailFromBody =
+      body?.email ?? body?.user_email ?? body?.owner_email ?? body?.ownerEmail ?? null;
+    const emailFromHeader =
+      req.headers.get("x-user-email") ?? req.headers.get("x-owner-email") ?? null;
+    const fallbackEmail =
       Deno.env.get("DEFAULT_OWNER_EMAIL") ??
       Deno.env.get("ZAZI_DEFAULT_OWNER_EMAIL") ??
       "vanto@onlinecourseformlm.com";
 
-const email = emailFromBody ?? emailFromHeader ?? fallbackEmail;
+    const email = emailFromBody ?? emailFromHeader ?? fallbackEmail;
 
-if (!email) {
-  return new Response(
-    JSON.stringify({
-      error: "email is required to resolve local user",
-      hint:
-        "Send body.email OR header x-user-email/x-owner-email, or set DEFAULT_OWNER_EMAIL on this function.",
-    }),
-    { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-  );
-}
+    if (!email) {
+      return new Response(
+        JSON.stringify({
+          error: "email is required to resolve local user",
+          hint:
+            "Send body.email OR header x-user-email/x-owner-email, or set DEFAULT_OWNER_EMAIL on this function.",
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
 
-const localUserId = await resolveLocalUserId(supabase, email);
+    // ── Rate limit (per hashed email identity) ─────────────────────────
+    const identityHash = await hashEmail(email);
+    const rl = await checkRateLimit(supabase, SCOPE, identityHash, RATE_LIMIT_PER_MIN, 60);
+    if (!rl.allowed) {
+      console.warn(JSON.stringify({ scope: SCOPE, evt: "rate_limited", identity_hash: identityHash, retry_after: rl.retryAfterSeconds }));
+      return new Response(
+        JSON.stringify({ error: "Rate limit exceeded", retry_after_seconds: rl.retryAfterSeconds }),
+        {
+          status: 429,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+            "Retry-After": String(rl.retryAfterSeconds),
+          },
+        },
+      );
+    }
 
-if (!localUserId) {
-  return new Response(
-    JSON.stringify({ error: `Could not resolve/create local user for email: ${email}` }),
-    { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-  );
-}
+    // ── Idempotency check (caller may send x-idempotency-key) ──────────
+    const idemKey = req.headers.get("x-idempotency-key");
+    const idem = await checkIdempotency(supabase, SCOPE, idemKey, body);
+    if (idem?.hit) {
+      return new Response(JSON.stringify(idem.body), {
+        status: idem.status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
-if (action === "sync_contacts") {
+    // ── Safe, redacted request log ─────────────────────────────────────
+    const safeSummary = await safePayloadSummary(body);
+    console.log(JSON.stringify({
+      scope: SCOPE,
+      evt: "request",
+      secret_version: secretVersion,
+      identity_hash: identityHash,
+      ...safeSummary,
+    }));
+
+    const localUserId = await resolveLocalUserId(supabase, email);
+
+    if (!localUserId) {
+      return new Response(
+        JSON.stringify({ error: `Could not resolve/create local user for email: ${email}` }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // Helper to persist idempotency on every terminal response.
+    const finalize = async (status: number, payload: Record<string, unknown>) => {
+      if (idem && !idem.hit) {
+        await recordIdempotency(supabase, SCOPE, idem.key, idem.requestHash, status, payload);
+      }
+      return new Response(JSON.stringify(payload), {
+        status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    };
+
+    if (action === "sync_contacts") {
       const { contacts: waContacts } = body;
 
       if (!Array.isArray(waContacts) || waContacts.length === 0) {
-        return new Response(JSON.stringify({ error: "No contacts provided" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return finalize(400, { error: "No contacts provided" });
       }
 
       const { data: existing } = await supabase
@@ -175,19 +234,16 @@ if (action === "sync_contacts") {
         }
       }
 
-      return new Response(
-        JSON.stringify({
-          success: true,
-          resolved_user_id: localUserId,
-          created: created.length,
-          matched: matched.length,
-          errors,
-          total: waContacts.length,
-          created_names: created,
-          matched_names: matched,
-        }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return finalize(200, {
+        success: true,
+        resolved_user_id: localUserId,
+        created: created.length,
+        matched: matched.length,
+        errors,
+        total: waContacts.length,
+        created_names: created,
+        matched_names: matched,
+      });
     }
 
     // ── ACTION: log_chat ──────────────────────────────────────────────────
@@ -195,10 +251,7 @@ if (action === "sync_contacts") {
       const { phone, name, message_preview } = body;
 
       if (!phone) {
-        return new Response(JSON.stringify({ error: "phone is required" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return finalize(400, { error: "phone is required" });
       }
 
       const cleanPhone = phone.replace(/\s/g, "");
@@ -220,15 +273,12 @@ if (action === "sync_contacts") {
         notes: message_preview || "",
       });
 
-      return new Response(
-        JSON.stringify({
-          success: true,
-          resolved_user_id: localUserId,
-          contact_id: contact?.id || null,
-          contact_name: contact?.full_name || null,
-        }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return finalize(200, {
+        success: true,
+        resolved_user_id: localUserId,
+        contact_id: contact?.id || null,
+        contact_name: contact?.full_name || null,
+      });
     }
 
     // ── ACTION: upsert_contact ────────────────────────────────────────────
@@ -236,10 +286,7 @@ if (action === "sync_contacts") {
       const { contact } = body;
 
       if (!contact?.full_name) {
-        return new Response(JSON.stringify({ error: "contact.full_name is required" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return finalize(400, { error: "contact.full_name is required" });
       }
 
       const phone = (contact.phone_number || "").replace(/\s/g, "");
@@ -278,15 +325,14 @@ if (action === "sync_contacts") {
           .eq("id", existingId);
 
         if (error) {
-          return new Response(JSON.stringify({ error: error.message }), {
-            status: 500,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
+          return finalize(500, { error: error.message });
         }
-        return new Response(
-          JSON.stringify({ success: true, action: "updated", contact_id: existingId, resolved_user_id: localUserId }),
-          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return finalize(200, {
+          success: true,
+          action: "updated",
+          contact_id: existingId,
+          resolved_user_id: localUserId,
+        });
       } else {
         const { data: inserted, error } = await supabase
           .from("contacts")
@@ -295,22 +341,18 @@ if (action === "sync_contacts") {
           .single();
 
         if (error) {
-          return new Response(JSON.stringify({ error: error.message }), {
-            status: 500,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
+          return finalize(500, { error: error.message });
         }
-        return new Response(
-          JSON.stringify({ success: true, action: "created", contact_id: inserted.id, resolved_user_id: localUserId }),
-          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return finalize(200, {
+          success: true,
+          action: "created",
+          contact_id: inserted.id,
+          resolved_user_id: localUserId,
+        });
       }
     }
 
-    return new Response(JSON.stringify({ error: "Unknown action" }), {
-      status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return finalize(400, { error: "Unknown action" });
   } catch (err) {
     console.error("crm-webhook error:", err);
     return new Response(JSON.stringify({ error: (err as Error).message }), {
