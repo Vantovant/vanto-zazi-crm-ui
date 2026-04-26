@@ -330,8 +330,37 @@ Deno.serve(async (req) => {
     .eq("phone_normalized", phoneNorm)
     .limit(2);
 
-  const matchedContactId =
+  let matchedContactId: string | null =
     matches && matches.length === 1 ? (matches[0] as any).id : null;
+  let matchSource: "phone_normalized" | "linked_gate" | null = matchedContactId
+    ? "phone_normalized"
+    : null;
+  let linkedGateRow:
+    | { id: string; message_count: number; linked_contact_id: string }
+    | null = null;
+
+  // H3A: If no direct contact match, check the manually-linked unmatched gate.
+  // Only status='linked' rows with a linked_contact_id propagate. No backfill,
+  // no contact mutation, no auto-create.
+  if (!matchedContactId) {
+    const { data: gateRow } = await admin
+      .from("maytapi_inbound_unmatched")
+      .select("id, message_count, linked_contact_id, status")
+      .eq("user_id", ownerId)
+      .eq("phone_hash", phHash)
+      .eq("status", "linked")
+      .not("linked_contact_id", "is", null)
+      .maybeSingle();
+    if (gateRow && (gateRow as any).linked_contact_id) {
+      matchedContactId = (gateRow as any).linked_contact_id;
+      matchSource = "linked_gate";
+      linkedGateRow = {
+        id: (gateRow as any).id,
+        message_count: (gateRow as any).message_count,
+        linked_contact_id: (gateRow as any).linked_contact_id,
+      };
+    }
+  }
 
   const msgType: string = m?.type ?? "text";
   const text: string | null = typeof m?.text === "string"
@@ -347,13 +376,19 @@ Deno.serve(async (req) => {
   // H2A: Only persist full message thread for matched CRM contacts.
   // Unknown numbers stay in the masked gate table only — no body, no thread.
   if (matchedContactId) {
+    // H3A privacy rule: phone_e164 is stored ONLY when we are certain about
+    // the identity — either an exact contacts.phone_normalized match, or an
+    // explicit admin-linked gate match. Both qualify; otherwise null.
+    const allowPhoneE164 =
+      matchSource === "phone_normalized" || matchSource === "linked_gate";
+
     const { error: msgErr } = await admin.from("maytapi_messages").insert({
       user_id: ownerId,
       contact_id: matchedContactId,
       direction: "inbound",
       maytapi_message_id: mid,
       phone_hash: phHash,
-      phone_e164: phoneNorm,
+      phone_e164: allowPhoneE164 ? phoneNorm : null,
       phone_last4: ph4,
       conversation_key: phHash,
       body: text,
@@ -373,21 +408,40 @@ Deno.serve(async (req) => {
         return jres(500, { error: "insert_failed" });
       }
     }
+
+    // H3A: If matched via the linked gate, advance audit counters on that row
+    // (last_seen_at and message_count only — trigger enforces immutability of
+    // phone_hash, phone_last4, first_seen_at, last_body_preview, etc.).
+    // No body backfill, no preview rewrite, no historic maytapi_messages.
+    if (matchSource === "linked_gate" && linkedGateRow) {
+      await admin
+        .from("maytapi_inbound_unmatched")
+        .update({
+          message_count: linkedGateRow.message_count + 1,
+          last_seen_at: receivedAt,
+        })
+        .eq("id", linkedGateRow.id);
+    }
   } else {
     // Unmatched: minimal masked gate record only. No body. Generic label.
     const GENERIC_LABEL = "Message received from unknown number.";
     const { data: existing } = await admin
       .from("maytapi_inbound_unmatched")
-      .select("id, message_count")
+      .select("id, message_count, status")
       .eq("user_id", ownerId)
       .eq("phone_hash", phHash)
       .maybeSingle();
     if (existing) {
-      await admin.from("maytapi_inbound_unmatched").update({
-        message_count: (existing as any).message_count + 1,
-        last_seen_at: receivedAt,
-        last_body_preview: GENERIC_LABEL,
-      }).eq("id", (existing as any).id);
+      // Only advance counters on rows still in 'open' state. 'ignored' rows
+      // are intentionally frozen; 'linked' rows are handled in the matched
+      // branch above and never reach here.
+      if ((existing as any).status === "open") {
+        await admin.from("maytapi_inbound_unmatched").update({
+          message_count: (existing as any).message_count + 1,
+          last_seen_at: receivedAt,
+        }).eq("id", (existing as any).id);
+      }
+      // ignored: silently drop, do not advance counters or write body.
     } else {
       await admin.from("maytapi_inbound_unmatched").insert({
         user_id: ownerId,
@@ -398,7 +452,11 @@ Deno.serve(async (req) => {
     }
   }
 
-  const summary = { matched: !!matchedContactId, msg_type: msgType };
+  const summary = {
+    matched: !!matchedContactId,
+    match_source: matchSource,
+    msg_type: msgType,
+  };
   await recordIdempotent(admin, idemKey, 200, summary);
   return jres(200, { ok: true, ...summary });
 });
