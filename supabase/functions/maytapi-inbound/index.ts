@@ -155,13 +155,27 @@ async function resolveOwnerId(
   admin: any,
 ): Promise<string | null> {
   if (cachedOwnerId) return cachedOwnerId;
-  if (!OWNER_EMAIL) return null;
-  const { data } = await admin
+  const emailRaw = (OWNER_EMAIL || "").trim();
+  if (!emailRaw) {
+    console.log("[maytapi-inbound] owner_email_secret_missing");
+    return null;
+  }
+  const emailLower = emailRaw.toLowerCase();
+  // Try case-insensitive match (profiles.email is stored lower in handle_new_user, but be safe)
+  const { data, error } = await admin
     .from("profiles")
-    .select("id")
-    .eq("email", OWNER_EMAIL)
+    .select("id, email")
+    .ilike("email", emailLower)
     .maybeSingle();
-  cachedOwnerId = (data as any)?.id ?? null;
+  if (error) {
+    console.log("[maytapi-inbound] owner_lookup_error", error.code, error.message);
+    return null;
+  }
+  if (!data) {
+    console.log("[maytapi-inbound] owner_not_found_for_email_len", emailLower.length);
+    return null;
+  }
+  cachedOwnerId = (data as any).id;
   return cachedOwnerId;
 }
 
