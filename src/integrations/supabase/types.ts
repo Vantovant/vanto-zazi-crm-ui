@@ -564,6 +564,42 @@ export type Database = {
         }
         Relationships: []
       }
+      maytapi_gate_audit: {
+        Row: {
+          action: string
+          actor_user_id: string
+          created_at: string
+          gate_id: string | null
+          id: string
+          linked_contact_id: string | null
+          metadata: Json
+          phone_last4: string | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          actor_user_id: string
+          created_at?: string
+          gate_id?: string | null
+          id?: string
+          linked_contact_id?: string | null
+          metadata?: Json
+          phone_last4?: string | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string
+          created_at?: string
+          gate_id?: string | null
+          id?: string
+          linked_contact_id?: string | null
+          metadata?: Json
+          phone_last4?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       maytapi_inbound_unmatched: {
         Row: {
           created_at: string
@@ -631,6 +667,8 @@ export type Database = {
           phone_hash: string
           phone_last4: string | null
           raw: Json
+          read_at: string | null
+          read_by: string | null
           received_at: string
           status: string
           user_id: string
@@ -651,6 +689,8 @@ export type Database = {
           phone_hash: string
           phone_last4?: string | null
           raw?: Json
+          read_at?: string | null
+          read_by?: string | null
           received_at?: string
           status?: string
           user_id: string
@@ -671,6 +711,8 @@ export type Database = {
           phone_hash?: string
           phone_last4?: string | null
           raw?: Json
+          read_at?: string | null
+          read_by?: string | null
           received_at?: string
           status?: string
           user_id?: string
@@ -1234,6 +1276,14 @@ export type Database = {
         Returns: boolean
       }
       is_self_profile: { Args: { profile_id: string }; Returns: boolean }
+      mark_maytapi_thread_read: {
+        Args: { p_conversation_key: string }
+        Returns: number
+      }
+      mark_maytapi_thread_unread: {
+        Args: { p_conversation_key: string }
+        Returns: number
+      }
       normalize_email: { Args: { raw: string }; Returns: string }
       normalize_phone: { Args: { raw: string }; Returns: string }
     }
