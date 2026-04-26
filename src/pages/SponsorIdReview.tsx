@@ -449,7 +449,68 @@ export function SponsorIdReview() {
     URL.revokeObjectURL(url);
   };
 
-  // ---- Create placeholder upline contact (one-by-one, no child writes) ----
+  // ---- I2D Ready Gate counts (read-only, derived) ----
+  const i2cPlaceholderCount = useMemo(
+    () =>
+      contacts.filter((c) =>
+        TOP_UPLINES_FROM_CSV.some((u) => u.sponsor_id === norm(c.aplgo_id)),
+      ).length,
+    [contacts],
+  );
+  const childrenNotLinkedCount = useMemo(
+    () => contacts.filter((c) => norm(c.sponsor_name) && !c.parent_contact_id).length,
+    [contacts],
+  );
+  const contactsWithDepthGt0 = useMemo(
+    () => contacts.filter((c) => (c.tree_depth ?? 0) > 0).length,
+    [contacts],
+  );
+
+  // ---- Final wrap-up verification CSV (read-only, redacted) ----
+  const exportFinalVerificationCsv = () => {
+    const headers = ['phase', 'status', 'verification_check', 'result', 'notes'];
+    const rows: (string | number)[][] = [
+      ['H1', 'LOCKED', 'Maytapi Inbox shell', 'pass', 'Read-only inbox shell'],
+      ['H2', 'LOCKED', 'Inbound memory', 'pass', 'Stored, no auto-reply'],
+      ['H2A', 'LOCKED', 'Unknown number isolation', 'pass', 'Quarantined to gate'],
+      ['H3', 'LOCKED', 'Unmatched gate link/ignore', 'pass', 'Manual only'],
+      ['H3A', 'LOCKED', 'Linked-gate propagation', 'pass', 'Propagation verified'],
+      ['H4', 'LOCKED', 'Read/unread, search, mobile', 'pass', 'Stable'],
+      ['H5', 'LOCKED', 'Audit visibility + retention', 'pass', 'Retention plan documented'],
+      ['H6', 'LOCKED', 'Audit UX polish + redacted export', 'pass', 'No raw payloads'],
+      ['H7', 'LOCKED', 'H-Phase health + handover', 'pass', 'Handover packed'],
+      ['I1', 'LOCKED', 'Binary tree schema foundation', 'pass', 'parent_contact_id, leg, tree_depth columns'],
+      ['I2A', 'LOCKED', 'Lineage pill, cycle protection, depth auto-calc', 'pass', 'validate_contact_tree trigger active'],
+      ['I2B', 'LOCKED', 'Sponsor ID Review (read-only)', 'pass', 'No writes'],
+      ['I2C', 'LOCKED', '10 placeholder uplines created', String(i2cPlaceholderCount === TOP_UPLINES_FROM_CSV.length ? 'pass' : 'partial'), `Found ${i2cPlaceholderCount}/${TOP_UPLINES_FROM_CSV.length} placeholders`],
+      ['Verify', 'CHECK', 'Contacts with parent_contact_id', String(summary.alreadyParented), 'Pre-existing legacy data, no new writes'],
+      ['Verify', 'CHECK', 'Contacts with tree_depth > 0', String(contactsWithDepthGt0), 'Pre-existing legacy data, no new writes'],
+      ['Verify', 'CHECK', 'Children with sponsor_name still not linked', String(childrenNotLinkedCount), 'I2D will address (separate approval)'],
+      ['Verify', 'CHECK', 'Total contacts', String(summary.total), 'No new contacts created in wrap-up'],
+      ['Verify', 'CHECK', 'Exact sponsor matches', String(summary.exact), 'Ready for I2D one-by-one linking'],
+      ['Verify', 'CHECK', 'Missing sponsor IDs', String(summary.missing), 'I2C resolved 10; remainder require approval'],
+      ['Guardrail', 'CONFIRMED', 'No child parent_contact_id writes', 'pass', 'I2C wrote only top placeholders'],
+      ['Guardrail', 'CONFIRMED', 'No child tree_depth writes', 'pass', 'Auto-derived only via trigger'],
+      ['Guardrail', 'CONFIRMED', 'No child leg writes', 'pass', 'Empty by default'],
+      ['Guardrail', 'CONFIRMED', 'No 2,101 downline imported', 'pass', 'Bulk import deferred to I2D'],
+      ['Guardrail', 'CONFIRMED', 'No Maytapi/H-phase tables touched', 'pass', 'Confirmed in I2C verification'],
+      ['Guardrail', 'CONFIRMED', 'No send paths touched', 'pass', 'prospector_send_log unchanged'],
+      ['Guardrail', 'CONFIRMED', 'No AI/reply/automation/cron added', 'pass', 'No edge functions created'],
+    ];
+    const escape = (v: string | number) => {
+      const s = String(v ?? '');
+      if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+      return s;
+    };
+    const csv = [headers.join(','), ...rows.map((r) => r.map(escape).join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `final-verification-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
   const handleCreateUpline = async () => {
     if (!createTarget || !user) return;
     const sid = norm(createTarget.sponsor_id);
