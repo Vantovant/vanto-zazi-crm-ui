@@ -154,6 +154,19 @@ Deno.serve(async (req) => {
     if (!row.contact_id) failures.push('contact_id is null');
 
     if (failures.length > 0) {
+      // E.2 — log blocked attempt (eligibility gate failed)
+      await logSendAttempt(admin, {
+        user_id: row.user_id,
+        contact_id: row.contact_id ?? null,
+        zazi_action_id,
+        attempted_at: new Date().toISOString(),
+        responded_at: new Date().toISOString(),
+        mode: 'test',
+        intended_send_type: 'media',
+        request_status: 'blocked',
+        error_code: 'eligibility_failed',
+        metadata: { failure_count: failures.length, first_failure: failures[0] ?? null },
+      });
       return new Response(JSON.stringify({ error: 'Send guards failed', failures }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
