@@ -9,6 +9,7 @@ import {
 const UNMATCHED_GENERIC_PREVIEW = 'Message received from unknown number.';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { MaytapiAuditPanel } from './MaytapiAuditPanel';
 
 /**
  * MAYTAPI INBOX — H4 (operational hardening; still read-only for messages)
@@ -80,7 +81,7 @@ function relTime(iso: string): string {
 export function MaytapiInbox() {
   const { user } = useAuth();
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
-  const [tab, setTab] = useState<'inbox' | 'unmatched'>('inbox');
+  const [tab, setTab] = useState<'inbox' | 'unmatched' | 'audit'>('inbox');
 
   const [messages, setMessages] = useState<MsgRow[]>([]);
   const [contactNames, setContactNames] = useState<Record<string, string>>({});
@@ -381,6 +382,13 @@ export function MaytapiInbox() {
           >
             Unmatched {unmatched.length > 0 && <span className="ml-1 text-[10px] opacity-70">({unmatched.length})</span>}
           </button>
+          <button
+            onClick={() => setTab('audit')}
+            className={`px-3 py-1.5 text-xs rounded-md border ${tab === 'audit' ? 'bg-blue-600/20 border-blue-500/40 text-blue-200' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'}`}
+            title="Read-only audit of link/ignore/read actions"
+          >
+            Audit
+          </button>
         </div>
       </div>
 
@@ -561,7 +569,7 @@ export function MaytapiInbox() {
             )}
           </section>
         </div>
-      ) : (
+      ) : tab === 'unmatched' ? (
         // Unmatched tab
         <div className="flex-1 flex flex-col mt-3 mx-2 sm:mx-4 mb-4 rounded-lg border border-slate-700/70 overflow-hidden bg-slate-800/30">
           <div className="px-3 py-2 border-b border-slate-700/70 text-[11px] uppercase tracking-wide text-slate-500 font-medium flex items-center justify-between gap-3 flex-wrap">
@@ -633,6 +641,9 @@ export function MaytapiInbox() {
             )}
           </div>
         </div>
+      ) : (
+        // Audit tab — H5 read-only admin viewer
+        <MaytapiAuditPanel isAdmin={isAdmin} />
       )}
 
       {/* Link-to-contact modal (search → confirm) */}
