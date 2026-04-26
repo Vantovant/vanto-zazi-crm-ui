@@ -86,7 +86,7 @@ function jres(status: number, payload: unknown) {
 }
 
 async function checkRateLimit(
-  admin: ReturnType<typeof createClient>,
+  admin: any,
   identity: string,
 ): Promise<boolean> {
   const windowStart = new Date(Math.floor(Date.now() / 60000) * 60000)
