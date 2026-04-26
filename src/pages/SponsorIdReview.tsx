@@ -892,3 +892,13 @@ function PreviewBadge({ status }: { status: PreviewStatus }) {
   };
   return <span className={`px-2 py-0.5 rounded border text-xs ${map[status]}`}>{status}</span>;
 }
+
+function ResolutionBadge({ status }: { status: ResolutionStatus }) {
+  const map: Record<ResolutionStatus, string> = {
+    unresolved: 'bg-slate-700/30 text-slate-300 border-slate-600',
+    ready_to_create: 'bg-amber-500/10 text-amber-300 border-amber-500/30',
+    created: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30',
+    skipped: 'bg-slate-700/30 text-slate-400 border-slate-600',
+  };
+  return <span className={`px-2 py-0.5 rounded border text-xs ${map[status]}`}>{status}</span>;
+}
