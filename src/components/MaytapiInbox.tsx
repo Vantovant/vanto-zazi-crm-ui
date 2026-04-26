@@ -422,7 +422,7 @@ export function MaytapiInbox() {
         </div>
       ) : (
         // Unmatched tab
-        <div className="flex-1 flex flex-col mt-3 mx-4 mb-4 rounded-lg border border-slate-700/70 overflow-hidden bg-slate-800/30">
+        <div className="flex-1 flex flex-col mt-3 mx-2 sm:mx-4 mb-4 rounded-lg border border-slate-700/70 overflow-hidden bg-slate-800/30">
           <div className="px-3 py-2 border-b border-slate-700/70 text-[11px] uppercase tracking-wide text-slate-500 font-medium flex items-center justify-between gap-3">
             <span>Unmatched inbound numbers</span>
             <div className="flex items-center gap-1">
@@ -452,7 +452,7 @@ export function MaytapiInbox() {
             ) : (
               <ul className="divide-y divide-slate-700/50">
                 {unmatched.map(u => (
-                  <li key={u.id} className="px-4 py-3 flex items-center justify-between gap-3 hover:bg-slate-700/20">
+                  <li key={u.id} className="px-3 sm:px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 hover:bg-slate-700/20">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-mono text-sm text-slate-100">••••{u.phone_last4}</span>
@@ -471,7 +471,7 @@ export function MaytapiInbox() {
                       </p>
                     </div>
                     {u.status === 'open' && (
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-2 shrink-0 flex-wrap">
                         <button
                           onClick={() => setLinkFor(u)}
                           className="px-3 py-1.5 text-xs rounded-md bg-emerald-600/20 border border-emerald-500/40 text-emerald-200 hover:bg-emerald-600/30 flex items-center gap-1.5"
