@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle, CheckCircle2, Inbox, Link2, Loader2,
-  MessageSquare, ShieldCheck, Search, Ban,
+  MessageSquare, ShieldCheck, Search, Ban, ArrowLeft,
 } from 'lucide-react';
 
 // H3: Generic preview always rendered for unmatched rows — never raw body.
@@ -323,9 +323,10 @@ export function MaytapiInbox() {
 
       {/* Body */}
       {tab === 'inbox' ? (
-        <div className="flex-1 flex min-h-0 mt-3 mx-4 mb-4 rounded-lg border border-slate-700/70 overflow-hidden">
-          {/* Conversation list */}
-          <aside className="w-72 border-r border-slate-700/70 bg-slate-800/40 flex flex-col">
+        <div className="flex-1 flex min-h-0 mt-3 mx-2 sm:mx-4 mb-4 rounded-lg border border-slate-700/70 overflow-hidden">
+          {/* Conversation list — full width on mobile when no thread selected, hidden on mobile when a thread is open */}
+          <aside className={`${selectedKey ? 'hidden md:flex' : 'flex'} w-full md:w-72 md:border-r border-slate-700/70 bg-slate-800/40 flex-col min-w-0`}>
+
             <div className="px-3 py-2 border-b border-slate-700/70 text-[11px] uppercase tracking-wide text-slate-500 font-medium flex items-center justify-between">
               <span>Conversations</span>
               {loadingMsgs && <Loader2 className="w-3 h-3 animate-spin" />}
@@ -364,8 +365,8 @@ export function MaytapiInbox() {
             </div>
           </aside>
 
-          {/* Thread viewer */}
-          <section className="flex-1 flex flex-col bg-slate-900/30 min-w-0">
+          {/* Thread viewer — hidden on mobile until a conversation is selected */}
+          <section className={`${selectedKey ? 'flex' : 'hidden md:flex'} flex-1 flex-col bg-slate-900/30 min-w-0`}>
             {!selectedKey ? (
               <div className="flex-1 flex items-center justify-center">
                 <div className="text-center px-6">
@@ -376,14 +377,24 @@ export function MaytapiInbox() {
               </div>
             ) : (
               <>
-                <div className="px-4 py-2 border-b border-slate-700/70 bg-slate-800/40 text-xs text-slate-300 flex items-center justify-between">
-                  <span>
-                    {(() => {
-                      const c = conversations.find(x => x.conversation_key === selectedKey);
-                      return c?.contact_name ?? `••••${c?.phone_last4 ?? ''}`;
-                    })()}
-                  </span>
-                  <span className="text-[10px] text-slate-500">{threadMessages.length} message{threadMessages.length === 1 ? '' : 's'}</span>
+                <div className="px-3 py-2 border-b border-slate-700/70 bg-slate-800/40 text-xs text-slate-300 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedKey(null)}
+                      className="md:hidden flex items-center gap-1 px-2 py-1 rounded-md bg-slate-700/60 hover:bg-slate-700 text-slate-200 text-[11px] shrink-0"
+                      aria-label="Back to conversations"
+                    >
+                      <ArrowLeft className="w-3 h-3" /> Back
+                    </button>
+                    <span className="truncate">
+                      {(() => {
+                        const c = conversations.find(x => x.conversation_key === selectedKey);
+                        return c?.contact_name ?? `••••${c?.phone_last4 ?? ''}`;
+                      })()}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-slate-500 shrink-0">{threadMessages.length} msg{threadMessages.length === 1 ? '' : 's'}</span>
                 </div>
                 <div className="flex-1 overflow-y-auto p-4 space-y-2">
                   {threadMessages.map(m => (
@@ -411,7 +422,7 @@ export function MaytapiInbox() {
         </div>
       ) : (
         // Unmatched tab
-        <div className="flex-1 flex flex-col mt-3 mx-4 mb-4 rounded-lg border border-slate-700/70 overflow-hidden bg-slate-800/30">
+        <div className="flex-1 flex flex-col mt-3 mx-2 sm:mx-4 mb-4 rounded-lg border border-slate-700/70 overflow-hidden bg-slate-800/30">
           <div className="px-3 py-2 border-b border-slate-700/70 text-[11px] uppercase tracking-wide text-slate-500 font-medium flex items-center justify-between gap-3">
             <span>Unmatched inbound numbers</span>
             <div className="flex items-center gap-1">
@@ -441,7 +452,7 @@ export function MaytapiInbox() {
             ) : (
               <ul className="divide-y divide-slate-700/50">
                 {unmatched.map(u => (
-                  <li key={u.id} className="px-4 py-3 flex items-center justify-between gap-3 hover:bg-slate-700/20">
+                  <li key={u.id} className="px-3 sm:px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 hover:bg-slate-700/20">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-mono text-sm text-slate-100">••••{u.phone_last4}</span>
@@ -460,7 +471,7 @@ export function MaytapiInbox() {
                       </p>
                     </div>
                     {u.status === 'open' && (
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-2 shrink-0 flex-wrap">
                         <button
                           onClick={() => setLinkFor(u)}
                           className="px-3 py-1.5 text-xs rounded-md bg-emerald-600/20 border border-emerald-500/40 text-emerald-200 hover:bg-emerald-600/30 flex items-center gap-1.5"
