@@ -344,36 +344,38 @@ Deno.serve(async (req) => {
     ? new Date(ts * 1000).toISOString()
     : new Date().toISOString();
 
-  // Insert into maytapi_messages
-  const { error: msgErr } = await admin.from("maytapi_messages").insert({
-    user_id: ownerId,
-    contact_id: matchedContactId,
-    direction: "inbound",
-    maytapi_message_id: mid,
-    phone_hash: phHash,
-    phone_e164: matchedContactId ? phoneNorm : null,
-    phone_last4: ph4,
-    conversation_key: phHash,
-    body: text,
-    body_preview: preview(text),
-    media_type: mediaMime,
-    media_url: mediaUrl,
-    status: "received",
-    received_at: receivedAt,
-    raw: redactRaw(body),
-  });
+  // H2A: Only persist full message thread for matched CRM contacts.
+  // Unknown numbers stay in the masked gate table only — no body, no thread.
+  if (matchedContactId) {
+    const { error: msgErr } = await admin.from("maytapi_messages").insert({
+      user_id: ownerId,
+      contact_id: matchedContactId,
+      direction: "inbound",
+      maytapi_message_id: mid,
+      phone_hash: phHash,
+      phone_e164: phoneNorm,
+      phone_last4: ph4,
+      conversation_key: phHash,
+      body: text,
+      body_preview: preview(text),
+      media_type: mediaMime,
+      media_url: mediaUrl,
+      status: "received",
+      received_at: receivedAt,
+      raw: redactRaw(body),
+    });
 
-  if (msgErr) {
-    // Likely unique-violation replay; treat as no-op success
-    if (!String(msgErr.message).includes("duplicate key")) {
-      console.log("[maytapi-inbound] insert_error", msgErr.code);
-      await recordIdempotent(admin, idemKey, 500, { error: "insert_failed" });
-      return jres(500, { error: "insert_failed" });
+    if (msgErr) {
+      // Likely unique-violation replay; treat as no-op success
+      if (!String(msgErr.message).includes("duplicate key")) {
+        console.log("[maytapi-inbound] insert_error", msgErr.code);
+        await recordIdempotent(admin, idemKey, 500, { error: "insert_failed" });
+        return jres(500, { error: "insert_failed" });
+      }
     }
-  }
-
-  // Unmatched: upsert review queue
-  if (!matchedContactId) {
+  } else {
+    // Unmatched: minimal masked gate record only. No body. Generic label.
+    const GENERIC_LABEL = "Message received from unknown number.";
     const { data: existing } = await admin
       .from("maytapi_inbound_unmatched")
       .select("id, message_count")
@@ -384,14 +386,14 @@ Deno.serve(async (req) => {
       await admin.from("maytapi_inbound_unmatched").update({
         message_count: (existing as any).message_count + 1,
         last_seen_at: receivedAt,
-        last_body_preview: preview(text),
+        last_body_preview: GENERIC_LABEL,
       }).eq("id", (existing as any).id);
     } else {
       await admin.from("maytapi_inbound_unmatched").insert({
         user_id: ownerId,
         phone_hash: phHash,
         phone_last4: ph4,
-        last_body_preview: preview(text),
+        last_body_preview: GENERIC_LABEL,
       });
     }
   }
