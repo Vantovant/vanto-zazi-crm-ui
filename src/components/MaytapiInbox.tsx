@@ -403,28 +403,30 @@ export function MaytapiInbox() {
         <div className="flex-1 flex flex-col md:flex-row min-h-0 mt-3 mx-2 sm:mx-4 mb-4 rounded-lg border border-slate-700/70 overflow-hidden">
           {/* Conversation list */}
           <aside className={`${selectedKey ? 'hidden md:flex' : 'flex'} w-full md:w-80 md:border-r border-slate-700/70 bg-slate-800/40 flex-col min-w-0`}>
-            <div className="px-3 py-2 border-b border-slate-700/70 flex flex-col gap-2">
+            <div className="px-3 pt-2 pb-3 border-b border-slate-700/70 flex flex-col gap-2 sticky top-0 z-10 bg-slate-900/95 backdrop-blur">
               <div className="text-[11px] uppercase tracking-wide text-slate-500 font-medium flex items-center justify-between">
                 <span>Conversations</span>
                 {loadingMsgs && <Loader2 className="w-3 h-3 animate-spin" />}
               </div>
+              {/* H4: Conversation search — matched CRM only (never exposes unknown bodies/phones) */}
               <div className="relative">
-                <Search className="w-3.5 h-3.5 absolute left-2 top-2 text-slate-500" />
+                <Search className="w-4 h-4 absolute left-2.5 top-2.5 text-slate-400 pointer-events-none" />
                 <input
                   type="search"
                   value={convSearch}
                   onChange={e => setConvSearch(e.target.value)}
                   placeholder="Search name, message, last4…"
-                  className="w-full pl-7 pr-7 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-md text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-emerald-500/40"
+                  aria-label="Search conversations"
+                  className="w-full pl-9 pr-8 py-2 text-sm bg-slate-950 border border-slate-600 rounded-md text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/30"
                 />
                 {convSearch && (
                   <button
                     type="button"
                     onClick={() => setConvSearch('')}
-                    className="absolute right-1.5 top-1.5 p-0.5 text-slate-500 hover:text-slate-200"
+                    className="absolute right-2 top-2 p-0.5 text-slate-400 hover:text-slate-100"
                     aria-label="Clear search"
                   >
-                    <X className="w-3 h-3" />
+                    <X className="w-4 h-4" />
                   </button>
                 )}
               </div>
