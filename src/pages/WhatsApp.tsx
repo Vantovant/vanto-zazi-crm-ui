@@ -198,18 +198,18 @@ export function WhatsApp() {
   }, [selectedContact, manualMsg, handleOpenWhatsApp]);
 
   return (
-    <div className="h-[calc(100vh-56px-48px)] flex flex-col">
-      {/* Tab bar */}
-      <div className="flex items-center gap-1 mb-2 px-1">
+    <div className="min-h-[calc(100vh-56px-48px)] md:h-[calc(100vh-56px-48px)] flex flex-col">
+      {/* Tab bar — wraps on mobile so all tabs stay visible */}
+      <div className="flex flex-wrap items-center gap-1.5 mb-2 px-1">
         <button type="button" onClick={() => setActiveTab('contacts')}
-          className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+          className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-colors ${
             activeTab === 'contacts' ? 'bg-green-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
           }`}>
           <MessageCircle className="w-4 h-4" />
           Contacts
         </button>
         <button type="button" onClick={() => setActiveTab('birthdays')}
-          className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+          className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-colors ${
             activeTab === 'birthdays' ? 'bg-pink-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
           }`}>
           <Cake className="w-4 h-4" />
@@ -217,12 +217,12 @@ export function WhatsApp() {
         </button>
         {isAdmin && (
           <button type="button" onClick={() => setActiveTab('maytapi')}
-            className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+            className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-lg transition-colors ${
               activeTab === 'maytapi' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
             }`}
             title="Admin only — Vanto's Maytapi WhatsApp number">
             <MessageCircle className="w-4 h-4" />
-            Maytapi Inbox
+            <span className="whitespace-nowrap">Maytapi Inbox</span>
             <span className="ml-1 px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30">
               H1
             </span>
