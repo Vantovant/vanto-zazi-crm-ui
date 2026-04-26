@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Loader2, ShieldCheck, Filter, ArrowUpDown, Inbox,
-  Link2, Ban, MailOpen, Mail, Clock, Database, Download, X,
+  Link2, Ban, MailOpen, Mail, Clock, Database, Download, X, ChevronDown, ChevronRight, MousePointerClick,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
