@@ -185,6 +185,75 @@ export function MaytapiAuditPanel({ isAdmin }: { isAdmin: boolean | null }) {
     setFContact(''); setFActor(''); setOrder('newest');
   };
 
+  // Detail drawer
+  const [detail, setDetail] = useState<AuditRow | null>(null);
+
+  // Filter presets — only mutate visible filter state
+  const applyPreset = (preset: 'today' | '7d' | '30d' | 'linked' | 'ignored' | 'read') => {
+    const today = new Date();
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    if (preset === 'today') {
+      setFFrom(iso(today)); setFTo(iso(today));
+    } else if (preset === '7d') {
+      const from = new Date(today); from.setDate(from.getDate() - 6);
+      setFFrom(iso(from)); setFTo(iso(today));
+    } else if (preset === '30d') {
+      const from = new Date(today); from.setDate(from.getDate() - 29);
+      setFFrom(iso(from)); setFTo(iso(today));
+    } else if (preset === 'linked') {
+      setFAction('linked');
+    } else if (preset === 'ignored') {
+      setFAction('ignored');
+    } else if (preset === 'read') {
+      // Visual hint — switch to marked_read; user can flip to marked_unread via Action dropdown
+      setFAction('marked_read');
+    }
+  };
+
+  // Manual redacted CSV export — current filtered rows only.
+  // No raw phone, no phone_hash, no message body, no payload, no secrets, no IDs.
+  const exportFilteredCsv = () => {
+    if (filtered.length === 0) {
+      alert('No audit records to export for this filter.');
+      return;
+    }
+    const header = [
+      'action',
+      'actor_display_name',
+      'linked_contact_name',
+      'phone_last4',
+      'created_at',
+      'safe_metadata_summary',
+    ];
+    const esc = (v: string) => {
+      const s = (v ?? '').toString();
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const lines = [header.join(',')];
+    for (const r of filtered) {
+      const actor = actorNames[r.actor_user_id] ?? '';
+      const linked = r.linked_contact_id ? (contactNames[r.linked_contact_id] ?? '') : '';
+      lines.push([
+        esc(ACTION_META[r.action]?.label ?? r.action),
+        esc(actor),
+        esc(linked),
+        esc(r.phone_last4 ? `••••${r.phone_last4}` : ''),
+        esc(new Date(r.created_at).toISOString()),
+        esc(safeMeta(r.metadata)),
+      ].join(','));
+    }
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    a.href = url;
+    a.download = `maytapi-audit-${stamp}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   if (isAdmin === null) {
     return (
       <div className="flex items-center justify-center p-10 text-slate-400">
