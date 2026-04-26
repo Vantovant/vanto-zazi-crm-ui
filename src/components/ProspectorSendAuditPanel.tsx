@@ -184,9 +184,19 @@ export function ProspectorSendAuditPanel({ zaziActionId, contactId, enabled, pre
                     </div>
                   )}
                 </div>
+              ) : harnessOnly ? (
+                <div className="flex items-center gap-2 text-[11px] text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded px-2 py-1">
+                  <Inbox className="w-3 h-3" /> Harness test log only — no real Maytapi send log yet.
+                </div>
               ) : (
                 <div className="flex items-center gap-2 text-[11px] text-slate-400">
                   <Inbox className="w-3 h-3" /> No send log yet (pre-E.2 row, or never sent).
+                </div>
+              )}
+
+              {harnessExcluded && log && (
+                <div className="text-[10px] text-amber-400/80 italic">
+                  Harness log excluded from live send proof.
                 </div>
               )}
 
