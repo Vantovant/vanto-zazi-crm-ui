@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle, CheckCircle2, Inbox, Link2, Loader2,
   MessageSquare, ShieldCheck, Search, Ban, ArrowLeft,
+  MailOpen, Mail, X,
 } from 'lucide-react';
 
 // H3: Generic preview always rendered for unmatched rows — never raw body.
@@ -10,20 +11,21 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
 /**
- * MAYTAPI INBOX — H2 (read-only viewer + unmatched review queue, admin-only)
+ * MAYTAPI INBOX — H4 (operational hardening; still read-only for messages)
  *
- * Renders inbound + outbound message history for Vanto's Maytapi number from
- * `maytapi_messages` (admin-only RLS) and the unmatched review queue from
- * `maytapi_inbound_unmatched`.
+ * H1/H2/H2A/H3/H3A locks remain intact. H4 only adds:
+ *  - read/unread state on inbound messages (via RPC)
+ *  - conversation search (matched CRM only — never exposes unknown bodies/phones)
+ *  - safe gate audit visibility (handled server-side via trigger)
+ *  - mobile polish + improved empty/health states
  *
- * Locked behaviour preserved:
+ * Still locked:
  *  - No reply box, no AI suggestion, no auto-reply, no Send All, no cron, no
  *    production-mode flip.
  *  - All sends still flow through `maytapi-send-1to1` unchanged.
  *  - No writes to `prospector_send_log`, `zazi_actions`, `contact_activities`,
  *    `contacts.lead_type`, `contacts.leg`, `parent_contact_id`, or `tree_depth`.
- *  - Body text is rendered ONLY inside this viewer; never exported to audit
- *    panels, dashboards, or telemetry.
+ *  - Unknown numbers stay masked (••••XXXX) and gated.
  */
 
 type MsgRow = {
@@ -39,6 +41,7 @@ type MsgRow = {
   phone_last4: string | null;
   media_type: string | null;
   zazi_action_id: string | null;
+  read_at: string | null;
 };
 
 type ConvSummary = {
@@ -49,6 +52,7 @@ type ConvSummary = {
   last_preview: string | null;
   last_at: string;
   last_direction: 'inbound' | 'outbound';
+  unread_count: number;
 };
 
 type UnmatchedRow = {
@@ -98,6 +102,10 @@ export function MaytapiInbox() {
   const [ignoring, setIgnoring] = useState(false);
   const [unmatchedFilter, setUnmatchedFilter] = useState<'open' | 'linked' | 'ignored'>('open');
 
+  // H4: Conversation search (matched CRM only)
+  const [convSearch, setConvSearch] = useState('');
+  const [markingUnread, setMarkingUnread] = useState(false);
+
   // Admin check
   useEffect(() => {
     let cancelled = false;
@@ -119,7 +127,7 @@ export function MaytapiInbox() {
     setLoadingMsgs(true);
     const { data } = await supabase
       .from('maytapi_messages' as any)
-      .select('id,direction,body,body_preview,received_at,status,contact_id,conversation_key,phone_e164,phone_last4,media_type,zazi_action_id')
+      .select('id,direction,body,body_preview,received_at,status,contact_id,conversation_key,phone_e164,phone_last4,media_type,zazi_action_id,read_at')
       .order('received_at', { ascending: false })
       .limit(500);
     const rows = (data ?? []) as unknown as MsgRow[];
@@ -169,10 +177,14 @@ export function MaytapiInbox() {
     return () => { supabase.removeChannel(ch); };
   }, [isAdmin]);
 
-  // Conversation summaries (latest per key)
+  // Conversation summaries (latest per key) + unread counts
   const conversations = useMemo<ConvSummary[]>(() => {
     const seen = new Map<string, ConvSummary>();
+    const unreadByKey = new Map<string, number>();
     for (const m of messages) {
+      if (m.direction === 'inbound' && !m.read_at) {
+        unreadByKey.set(m.conversation_key, (unreadByKey.get(m.conversation_key) ?? 0) + 1);
+      }
       if (seen.has(m.conversation_key)) continue;
       seen.set(m.conversation_key, {
         conversation_key: m.conversation_key,
@@ -182,10 +194,41 @@ export function MaytapiInbox() {
         last_preview: m.body_preview,
         last_at: m.received_at,
         last_direction: m.direction,
+        unread_count: 0,
       });
+    }
+    for (const [k, n] of unreadByKey) {
+      const c = seen.get(k);
+      if (c) c.unread_count = n;
     }
     return Array.from(seen.values());
   }, [messages, contactNames]);
+
+  // H4: Filter conversations by search query (matched CRM bodies + names + last4).
+  // Unknown / unmatched numbers are NOT in this list (they live in the gate),
+  // so search cannot expose unknown bodies or raw phones.
+  const filteredConversations = useMemo(() => {
+    const q = convSearch.trim().toLowerCase();
+    if (!q) return conversations;
+    const matchingKeys = new Set<string>();
+    for (const m of messages) {
+      if (!m.contact_id) continue; // Only matched CRM threads are searchable.
+      const hay = `${m.body ?? ''} ${m.body_preview ?? ''}`.toLowerCase();
+      if (hay.includes(q)) matchingKeys.add(m.conversation_key);
+    }
+    return conversations.filter(c => {
+      if (!c.contact_id) return false; // never expose unmatched here
+      if ((c.contact_name ?? '').toLowerCase().includes(q)) return true;
+      if ((c.phone_last4 ?? '').includes(q)) return true;
+      if (matchingKeys.has(c.conversation_key)) return true;
+      return false;
+    });
+  }, [conversations, messages, convSearch]);
+
+  const totalUnread = useMemo(
+    () => conversations.reduce((n, c) => n + c.unread_count, 0),
+    [conversations],
+  );
 
   const threadMessages = useMemo(() => {
     if (!selectedKey) return [];
@@ -194,6 +237,35 @@ export function MaytapiInbox() {
       .slice()
       .sort((a, b) => new Date(a.received_at).getTime() - new Date(b.received_at).getTime());
   }, [messages, selectedKey]);
+
+  // H4: Mark inbound messages read when a thread is opened.
+  useEffect(() => {
+    if (!selectedKey || !isAdmin) return;
+    const hasUnread = messages.some(
+      m => m.conversation_key === selectedKey && m.direction === 'inbound' && !m.read_at,
+    );
+    if (!hasUnread) return;
+    let cancelled = false;
+    (async () => {
+      const { error } = await supabase.rpc('mark_maytapi_thread_read' as any, {
+        p_conversation_key: selectedKey,
+      });
+      if (!cancelled && !error) loadMessages();
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedKey, isAdmin]);
+
+  const markCurrentUnread = async () => {
+    if (!selectedKey) return;
+    setMarkingUnread(true);
+    const { error } = await supabase.rpc('mark_maytapi_thread_unread' as any, {
+      p_conversation_key: selectedKey,
+    });
+    setMarkingUnread(false);
+    if (error) { alert(`Mark unread failed: ${error.message}`); return; }
+    loadMessages();
+  };
 
   // Contact search for unmatched linking
   useEffect(() => {
@@ -283,6 +355,11 @@ export function MaytapiInbox() {
                 <h2 className="text-sm font-semibold text-slate-100">Maytapi Inbox</h2>
                 <span className="px-2 py-0.5 rounded-md text-[10px] font-medium uppercase tracking-wide bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Maytapi</span>
                 <span className="px-2 py-0.5 rounded-md text-[10px] font-medium uppercase tracking-wide bg-slate-700 text-slate-300 border border-slate-600">Admin only</span>
+                {totalUnread > 0 && (
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-blue-500/20 text-blue-200 border border-blue-500/30">
+                    {totalUnread} unread
+                  </span>
+                )}
               </div>
               <p className="text-xs text-slate-400 mt-0.5 truncate">Conversation history for Vanto's WhatsApp number</p>
             </div>
@@ -291,7 +368,7 @@ export function MaytapiInbox() {
         </div>
 
         {/* Sub-tabs */}
-        <div className="flex gap-1 mt-3">
+        <div className="flex flex-wrap gap-1 mt-3">
           <button
             onClick={() => setTab('inbox')}
             className={`px-3 py-1.5 text-xs rounded-md border ${tab === 'inbox' ? 'bg-emerald-600/20 border-emerald-500/40 text-emerald-200' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'}`}
@@ -312,7 +389,7 @@ export function MaytapiInbox() {
         {hasInbound ? <ShieldCheck className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" /> : <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />}
         <div className={`text-xs ${hasInbound ? 'text-emerald-200' : 'text-amber-200'}`}>
           <span className="font-medium">
-            {hasInbound ? 'Inbound connected (test).' : 'Awaiting first inbound message — webhook deployed, no traffic yet.'}
+            {hasInbound ? 'Webhook connected.' : 'Webhook connected, awaiting messages.'}
           </span>{' '}
           <span className="opacity-80">
             Read-only viewer. Reply box, AI suggestions, auto-reply and Send All are intentionally disabled.
@@ -323,46 +400,89 @@ export function MaytapiInbox() {
 
       {/* Body */}
       {tab === 'inbox' ? (
-        <div className="flex-1 flex min-h-0 mt-3 mx-2 sm:mx-4 mb-4 rounded-lg border border-slate-700/70 overflow-hidden">
-          {/* Conversation list — full width on mobile when no thread selected, hidden on mobile when a thread is open */}
-          <aside className={`${selectedKey ? 'hidden md:flex' : 'flex'} w-full md:w-72 md:border-r border-slate-700/70 bg-slate-800/40 flex-col min-w-0`}>
-
-            <div className="px-3 py-2 border-b border-slate-700/70 text-[11px] uppercase tracking-wide text-slate-500 font-medium flex items-center justify-between">
-              <span>Conversations</span>
-              {loadingMsgs && <Loader2 className="w-3 h-3 animate-spin" />}
+        <div className="flex-1 flex flex-col md:flex-row min-h-0 mt-3 mx-2 sm:mx-4 mb-4 rounded-lg border border-slate-700/70 overflow-hidden">
+          {/* Conversation list */}
+          <aside className={`${selectedKey ? 'hidden md:flex' : 'flex'} w-full md:w-80 md:border-r border-slate-700/70 bg-slate-800/40 flex-col min-w-0`}>
+            <div className="px-3 py-2 border-b border-slate-700/70 flex flex-col gap-2">
+              <div className="text-[11px] uppercase tracking-wide text-slate-500 font-medium flex items-center justify-between">
+                <span>Conversations</span>
+                {loadingMsgs && <Loader2 className="w-3 h-3 animate-spin" />}
+              </div>
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 absolute left-2 top-2 text-slate-500" />
+                <input
+                  type="search"
+                  value={convSearch}
+                  onChange={e => setConvSearch(e.target.value)}
+                  placeholder="Search name, message, last4…"
+                  className="w-full pl-7 pr-7 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-md text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-emerald-500/40"
+                />
+                {convSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setConvSearch('')}
+                    className="absolute right-1.5 top-1.5 p-0.5 text-slate-500 hover:text-slate-200"
+                    aria-label="Clear search"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
             </div>
             <div className="flex-1 overflow-y-auto">
               {conversations.length === 0 ? (
                 <div className="flex flex-col items-center justify-center p-6 text-center h-full">
                   <Inbox className="w-8 h-8 text-slate-600 mb-2" />
-                  <p className="text-sm text-slate-300">No Maytapi conversations yet</p>
+                  <p className="text-sm text-slate-300">No matched conversations</p>
                   <p className="text-[11px] text-slate-500 mt-1">
                     They will appear here as inbound messages arrive.
                   </p>
                 </div>
+              ) : filteredConversations.length === 0 ? (
+                <div className="flex flex-col items-center justify-center p-6 text-center h-full">
+                  <Search className="w-7 h-7 text-slate-600 mb-2" />
+                  <p className="text-sm text-slate-300">Search returned no results</p>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Try a different name, last 4 digits, or message text.
+                  </p>
+                </div>
               ) : (
-                conversations.map(c => (
+                filteredConversations.map(c => (
                   <button
                     key={c.conversation_key}
                     onClick={() => setSelectedKey(c.conversation_key)}
                     className={`w-full text-left px-3 py-2.5 border-b border-slate-700/50 hover:bg-slate-700/30 transition ${selectedKey === c.conversation_key ? 'bg-slate-700/40' : ''}`}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-medium text-slate-100 truncate">
+                      <span className={`text-sm truncate ${c.unread_count > 0 ? 'font-semibold text-white' : 'font-medium text-slate-100'}`}>
                         {c.contact_name ?? `••••${c.phone_last4 ?? ''}`}
                       </span>
-                      <span className="text-[10px] text-slate-500 shrink-0">{relTime(c.last_at)}</span>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {c.unread_count > 0 && (
+                          <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-blue-500 text-white text-[10px] font-semibold flex items-center justify-center">
+                            {c.unread_count}
+                          </span>
+                        )}
+                        <span className="text-[10px] text-slate-500">{relTime(c.last_at)}</span>
+                      </div>
                     </div>
                     <div className="flex items-center gap-1.5 mt-0.5">
                       <span className={`text-[10px] uppercase tracking-wide ${c.last_direction === 'inbound' ? 'text-emerald-400' : 'text-blue-400'}`}>
                         {c.last_direction === 'inbound' ? '← in' : '→ out'}
                       </span>
-                      <span className="text-xs text-slate-400 truncate">{c.last_preview ?? '(no preview)'}</span>
+                      <span className={`text-xs truncate ${c.unread_count > 0 ? 'text-slate-200' : 'text-slate-400'}`}>
+                        {c.last_preview ?? '(no preview)'}
+                      </span>
                     </div>
                   </button>
                 ))
               )}
             </div>
+            {totalUnread === 0 && conversations.length > 0 && !convSearch && (
+              <div className="px-3 py-1.5 border-t border-slate-700/70 text-[10px] text-slate-500 text-center">
+                No unread messages
+              </div>
+            )}
           </aside>
 
           {/* Thread viewer — hidden on mobile until a conversation is selected */}
@@ -394,21 +514,40 @@ export function MaytapiInbox() {
                       })()}
                     </span>
                   </div>
-                  <span className="text-[10px] text-slate-500 shrink-0">{threadMessages.length} msg{threadMessages.length === 1 ? '' : 's'}</span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={markCurrentUnread}
+                      disabled={markingUnread}
+                      className="flex items-center gap-1 px-2 py-1 rounded-md bg-slate-700/60 hover:bg-slate-700 text-slate-200 text-[11px] disabled:opacity-50"
+                      title="Mark conversation unread"
+                    >
+                      {markingUnread
+                        ? <Loader2 className="w-3 h-3 animate-spin" />
+                        : <Mail className="w-3 h-3" />}
+                      <span className="hidden sm:inline">Mark unread</span>
+                    </button>
+                    <span className="text-[10px] text-slate-500">{threadMessages.length} msg{threadMessages.length === 1 ? '' : 's'}</span>
+                  </div>
                 </div>
                 <div className="flex-1 overflow-y-auto p-4 space-y-2">
                   {threadMessages.map(m => (
                     <div key={m.id} className={`flex ${m.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[75%] rounded-lg px-3 py-2 text-sm ${m.direction === 'outbound' ? 'bg-blue-600/20 border border-blue-500/30 text-blue-100' : 'bg-slate-700/50 border border-slate-600/50 text-slate-100'}`}>
+                      <div className={`max-w-[85%] sm:max-w-[75%] rounded-lg px-3 py-2 text-sm ${m.direction === 'outbound' ? 'bg-blue-600/20 border border-blue-500/30 text-blue-100' : 'bg-slate-700/50 border border-slate-600/50 text-slate-100'}`}>
                         {m.body ? (
                           <p className="whitespace-pre-wrap break-words">{m.body}</p>
                         ) : (
                           <p className="italic text-slate-400 text-xs">{m.media_type ? `[${m.media_type}]` : '(no body)'}</p>
                         )}
-                        <div className="text-[10px] text-slate-400 mt-1 flex items-center gap-2">
+                        <div className="text-[10px] text-slate-400 mt-1 flex items-center gap-2 flex-wrap">
                           <span>{new Date(m.received_at).toLocaleString()}</span>
                           {m.direction === 'outbound' && m.zazi_action_id && (
                             <span className="px-1 rounded bg-blue-500/20 text-blue-300">Zazi</span>
+                          )}
+                          {m.direction === 'inbound' && m.read_at && (
+                            <span className="px-1 rounded bg-slate-600/40 text-slate-300 inline-flex items-center gap-0.5">
+                              <MailOpen className="w-2.5 h-2.5" /> read
+                            </span>
                           )}
                           <span className="opacity-60">{m.status}</span>
                         </div>
@@ -423,9 +562,9 @@ export function MaytapiInbox() {
       ) : (
         // Unmatched tab
         <div className="flex-1 flex flex-col mt-3 mx-2 sm:mx-4 mb-4 rounded-lg border border-slate-700/70 overflow-hidden bg-slate-800/30">
-          <div className="px-3 py-2 border-b border-slate-700/70 text-[11px] uppercase tracking-wide text-slate-500 font-medium flex items-center justify-between gap-3">
+          <div className="px-3 py-2 border-b border-slate-700/70 text-[11px] uppercase tracking-wide text-slate-500 font-medium flex items-center justify-between gap-3 flex-wrap">
             <span>Unmatched inbound numbers</span>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 flex-wrap">
               {(['open', 'linked', 'ignored'] as const).map(s => (
                 <button
                   key={s}
