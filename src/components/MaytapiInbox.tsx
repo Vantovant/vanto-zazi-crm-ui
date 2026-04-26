@@ -212,24 +212,45 @@ export function MaytapiInbox() {
     return () => { cancelled = true; };
   }, [linkFor, linkSearch]);
 
-  const linkContact = async (contactId: string) => {
-    if (!linkFor || !user) return;
+  const confirmLinkContact = async () => {
+    if (!linkFor || !user || !pendingLinkContact) return;
     setLinking(true);
-    await supabase
+    const { error } = await supabase
       .from('maytapi_inbound_unmatched' as any)
       .update({
         status: 'linked',
-        linked_contact_id: contactId,
+        linked_contact_id: pendingLinkContact.id,
         linked_at: new Date().toISOString(),
         linked_by: user.id,
       })
       .eq('id', linkFor.id);
     setLinking(false);
+    if (error) {
+      alert(`Link failed: ${error.message}`);
+      return;
+    }
     setLinkFor(null);
+    setPendingLinkContact(null);
     setLinkSearch('');
     setLinkResults([]);
     loadUnmatched();
     loadMessages();
+  };
+
+  const confirmIgnore = async () => {
+    if (!ignoreFor) return;
+    setIgnoring(true);
+    const { error } = await supabase
+      .from('maytapi_inbound_unmatched' as any)
+      .update({ status: 'ignored' })
+      .eq('id', ignoreFor.id);
+    setIgnoring(false);
+    if (error) {
+      alert(`Ignore failed: ${error.message}`);
+      return;
+    }
+    setIgnoreFor(null);
+    loadUnmatched();
   };
 
   if (isAdmin === null) {
