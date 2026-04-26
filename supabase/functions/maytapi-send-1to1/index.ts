@@ -201,9 +201,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ---- Input ----
+    // ---- Input (E.6: simulation flags removed; live function accepts only zazi_action_id + test_mode) ----
     const body = await req.json().catch(() => ({}));
-    const { zazi_action_id, test_mode, force_transient_simulation, force_permanent_simulation, force_timeout_simulation } = body || {};
+    const { zazi_action_id, test_mode } = body || {};
     if (!zazi_action_id || typeof zazi_action_id !== 'string') {
       return new Response(JSON.stringify({ error: 'zazi_action_id required' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -305,7 +305,7 @@ Deno.serve(async (req) => {
       text: caption,
     };
 
-    // E.5 — bounded retry loop (admin-only synthetic simulation flags allowed because route is admin-gated)
+    // E.5 — bounded retry loop (E.6: no synthetic simulation flags; live function only)
     let attempts = 0;
     let last: AttemptOutcome | null = null;
     let timeBudgetExhausted = false;
@@ -324,29 +324,7 @@ Deno.serve(async (req) => {
       const perAttempt = Math.min(PER_ATTEMPT_TIMEOUT_MS, remaining - 100);
 
       attempts = i + 1;
-
-      // Synthetic test injection (admin-only path; never auto-triggered)
-      if (force_permanent_simulation && i === 0) {
-        last = {
-          ok: false, status: 400, responseJson: { success: false }, responseText: '',
-          networkError: null, timedOut: false,
-          errorClass: 'permanent', shouldRetry: false, safeErrorCode: 'maytapi_4xx',
-        };
-      } else if (force_timeout_simulation) {
-        last = {
-          ok: false, status: null, responseJson: null, responseText: '',
-          networkError: null, timedOut: true,
-          errorClass: 'timeout', shouldRetry: true, safeErrorCode: 'timeout',
-        };
-      } else if (force_transient_simulation && i === 0) {
-        last = {
-          ok: false, status: 503, responseJson: { success: false }, responseText: '',
-          networkError: null, timedOut: false,
-          errorClass: 'transient', shouldRetry: true, safeErrorCode: 'maytapi_5xx',
-        };
-      } else {
-        last = await attemptMaytapiSend(sendUrl, apiToken, payload, perAttempt);
-      }
+      last = await attemptMaytapiSend(sendUrl, apiToken, payload, perAttempt);
 
       if (last.ok) break;
       if (!last.shouldRetry) break;
