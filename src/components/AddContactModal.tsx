@@ -178,7 +178,11 @@ export function AddContactModal({ onClose }: AddContactModalProps) {
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-1.5">Leg</label>
-                <input type="text" value={form.Leg} onChange={e => update('Leg', e.target.value)} placeholder="e.g. Left, Right" className="w-full px-4 py-2.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500 placeholder:text-slate-500" />
+                <select value={form.Leg} onChange={e => update('Leg', e.target.value)} className="w-full px-4 py-2.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500">
+                  <option value="">Unplaced</option>
+                  <option value="L">L (Left)</option>
+                  <option value="R">R (Right)</option>
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-1.5">Level</label>
