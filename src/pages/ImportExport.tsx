@@ -937,7 +937,7 @@ export function ImportExport() {
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       {([
                         { key: 'sponsor_name', label: 'Sponsor', placeholder: 'e.g. John Smith' },
-                        { key: 'leg', label: 'Leg', placeholder: 'e.g. Left, Right, Leg 1' },
+                        { key: 'leg', label: 'Leg', placeholder: '', isLegSelect: true },
                         { key: 'level', label: 'Level', placeholder: 'e.g. Level 1, Gold' },
                         { key: 'country', label: 'Country', placeholder: 'e.g. South Africa' },
                         { key: 'province', label: 'Province', placeholder: 'e.g. Gauteng' },
@@ -946,13 +946,25 @@ export function ImportExport() {
                       ] as const).map(tag => (
                         <div key={tag.key}>
                           <label className="block text-xs text-slate-400 mb-1">{tag.label}</label>
-                          <input
-                            type="text"
-                            value={smartTags[tag.key]}
-                            onChange={(e) => updateSmartTag(tag.key, e.target.value)}
-                            placeholder={tag.placeholder}
-                            className="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-700 rounded-lg text-slate-300 focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500"
-                          />
+                          {('isLegSelect' in tag && tag.isLegSelect) ? (
+                            <select
+                              value={smartTags[tag.key]}
+                              onChange={(e) => updateSmartTag(tag.key, e.target.value)}
+                              className="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-700 rounded-lg text-slate-300 focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500"
+                            >
+                              <option value="">Unplaced</option>
+                              <option value="L">L (Left)</option>
+                              <option value="R">R (Right)</option>
+                            </select>
+                          ) : (
+                            <input
+                              type="text"
+                              value={smartTags[tag.key]}
+                              onChange={(e) => updateSmartTag(tag.key, e.target.value)}
+                              placeholder={tag.placeholder}
+                              className="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-700 rounded-lg text-slate-300 focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500"
+                            />
+                          )}
                         </div>
                       ))}
                     </div>
