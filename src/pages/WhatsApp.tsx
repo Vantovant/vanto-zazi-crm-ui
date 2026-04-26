@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   Search,
   Phone,
@@ -20,6 +20,8 @@ import {
   ChevronUp,
 } from 'lucide-react';
 import { BirthdayPanel } from '@/components/BirthdayPanel';
+import { MaytapiInbox } from '@/components/MaytapiInbox';
+import { useAuth } from '@/contexts/AuthContext';
 import { LogActivityModal } from '../components/LogActivityModal';
 import { AddFollowUpModal } from '../components/AddFollowUpModal';
 import { MessageTemplatePicker } from '../components/MessageTemplatePicker';
@@ -48,8 +50,25 @@ const activityTypeIcons: Record<string, string> = {
 
 export function WhatsApp() {
   const { contacts } = useCrm();
+  const { user } = useAuth();
   const { logActivity, getContactActivities, daysSinceLastActivity } = useContactActivities();
-  const [activeTab, setActiveTab] = useState<'contacts' | 'birthdays'>('contacts');
+  const [activeTab, setActiveTab] = useState<'contacts' | 'birthdays' | 'maytapi'>('contacts');
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!user) { if (!cancelled) setIsAdmin(false); return; }
+      const { data } = await supabase
+        .from('user_roles' as any)
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('role', 'admin')
+        .maybeSingle();
+      if (!cancelled) setIsAdmin(!!data);
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [showLogActivity, setShowLogActivity] = useState(false);
@@ -196,9 +215,26 @@ export function WhatsApp() {
           <Cake className="w-4 h-4" />
           Birthdays
         </button>
+        {isAdmin && (
+          <button type="button" onClick={() => setActiveTab('maytapi')}
+            className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+              activeTab === 'maytapi' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+            }`}
+            title="Admin only — Vanto's Maytapi WhatsApp number">
+            <MessageCircle className="w-4 h-4" />
+            Maytapi Inbox
+            <span className="ml-1 px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30">
+              H1
+            </span>
+          </button>
+        )}
       </div>
 
-      {activeTab === 'birthdays' ? (
+      {activeTab === 'maytapi' ? (
+        <div className="flex-1 overflow-hidden px-1 flex flex-col">
+          <MaytapiInbox />
+        </div>
+      ) : activeTab === 'birthdays' ? (
         <div className="flex-1 overflow-y-auto px-1">
           <BirthdayPanel />
         </div>
