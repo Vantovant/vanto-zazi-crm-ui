@@ -382,6 +382,13 @@ export function MaytapiInbox() {
           >
             Unmatched {unmatched.length > 0 && <span className="ml-1 text-[10px] opacity-70">({unmatched.length})</span>}
           </button>
+          <button
+            onClick={() => setTab('audit')}
+            className={`px-3 py-1.5 text-xs rounded-md border ${tab === 'audit' ? 'bg-blue-600/20 border-blue-500/40 text-blue-200' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'}`}
+            title="Read-only audit of link/ignore/read actions"
+          >
+            Audit
+          </button>
         </div>
       </div>
 
