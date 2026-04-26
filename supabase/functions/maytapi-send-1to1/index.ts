@@ -201,9 +201,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ---- Input ----
+    // ---- Input (E.6: simulation flags removed; live function accepts only zazi_action_id + test_mode) ----
     const body = await req.json().catch(() => ({}));
-    const { zazi_action_id, test_mode, force_transient_simulation, force_permanent_simulation, force_timeout_simulation } = body || {};
+    const { zazi_action_id, test_mode } = body || {};
     if (!zazi_action_id || typeof zazi_action_id !== 'string') {
       return new Response(JSON.stringify({ error: 'zazi_action_id required' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
