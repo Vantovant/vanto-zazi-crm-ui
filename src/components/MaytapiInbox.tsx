@@ -641,6 +641,9 @@ export function MaytapiInbox() {
             )}
           </div>
         </div>
+      ) : (
+        // Audit tab — H5 read-only admin viewer
+        <MaytapiAuditPanel isAdmin={isAdmin} />
       )}
 
       {/* Link-to-contact modal (search → confirm) */}
