@@ -101,9 +101,10 @@ interface Props {
   proposal: ProspectorProposal;
   onAction: (action: ProposalAction) => Promise<void> | void;
   busy?: boolean;
+  isAdmin?: boolean;
 }
 
-export function ProspectorProposalCard({ proposal, onAction, busy = false }: Props) {
+export function ProspectorProposalCard({ proposal, onAction, busy = false, isAdmin = false }: Props) {
   const [showEvidence, setShowEvidence] = useState(false);
   const [mode, setMode] = useState<'view' | 'edit' | 'reject' | 'snooze'>('view');
   const [editText, setEditText] = useState(proposal.proposed_message || '');
