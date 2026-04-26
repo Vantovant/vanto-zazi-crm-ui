@@ -84,6 +84,10 @@ export function MaytapiAuditPanel({ isAdmin }: { isAdmin: boolean | null }) {
   const [fActor, setFActor] = useState<string>('');
   const [order, setOrder] = useState<SortOrder>('newest');
 
+  // Collapsible sections — collapsed by default so Audit Records is visible immediately
+  const [showRetention, setShowRetention] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+
   const loadAudit = async () => {
     setLoading(true);
     let q = supabase
