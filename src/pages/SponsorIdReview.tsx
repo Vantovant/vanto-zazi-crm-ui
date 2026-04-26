@@ -79,7 +79,10 @@ export function SponsorIdReview() {
   const [createTarget, setCreateTarget] = useState<{ sponsor_id: string; child_count: number } | null>(null);
   const [createName, setCreateName] = useState('');
   const [creating, setCreating] = useState(false);
-  const [reloadTick, setReloadTick] = useState(0);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkRunning, setBulkRunning] = useState(false);
+  const [bulkResult, setBulkResult] = useState<{ created: string[]; skipped: string[]; failed: { id: string; reason: string }[] } | null>(null);
+  const [bulkOverrides, setBulkOverrides] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!user) return;
