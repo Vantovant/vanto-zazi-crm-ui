@@ -234,19 +234,16 @@ Deno.serve(async (req) => {
         }
       }
 
-      return new Response(
-        JSON.stringify({
-          success: true,
-          resolved_user_id: localUserId,
-          created: created.length,
-          matched: matched.length,
-          errors,
-          total: waContacts.length,
-          created_names: created,
-          matched_names: matched,
-        }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return finalize(200, {
+        success: true,
+        resolved_user_id: localUserId,
+        created: created.length,
+        matched: matched.length,
+        errors,
+        total: waContacts.length,
+        created_names: created,
+        matched_names: matched,
+      });
     }
 
     // ── ACTION: log_chat ──────────────────────────────────────────────────
@@ -254,10 +251,7 @@ Deno.serve(async (req) => {
       const { phone, name, message_preview } = body;
 
       if (!phone) {
-        return new Response(JSON.stringify({ error: "phone is required" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return finalize(400, { error: "phone is required" });
       }
 
       const cleanPhone = phone.replace(/\s/g, "");
@@ -279,15 +273,12 @@ Deno.serve(async (req) => {
         notes: message_preview || "",
       });
 
-      return new Response(
-        JSON.stringify({
-          success: true,
-          resolved_user_id: localUserId,
-          contact_id: contact?.id || null,
-          contact_name: contact?.full_name || null,
-        }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return finalize(200, {
+        success: true,
+        resolved_user_id: localUserId,
+        contact_id: contact?.id || null,
+        contact_name: contact?.full_name || null,
+      });
     }
 
     // ── ACTION: upsert_contact ────────────────────────────────────────────
@@ -295,10 +286,7 @@ Deno.serve(async (req) => {
       const { contact } = body;
 
       if (!contact?.full_name) {
-        return new Response(JSON.stringify({ error: "contact.full_name is required" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return finalize(400, { error: "contact.full_name is required" });
       }
 
       const phone = (contact.phone_number || "").replace(/\s/g, "");
@@ -337,15 +325,14 @@ Deno.serve(async (req) => {
           .eq("id", existingId);
 
         if (error) {
-          return new Response(JSON.stringify({ error: error.message }), {
-            status: 500,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
+          return finalize(500, { error: error.message });
         }
-        return new Response(
-          JSON.stringify({ success: true, action: "updated", contact_id: existingId, resolved_user_id: localUserId }),
-          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return finalize(200, {
+          success: true,
+          action: "updated",
+          contact_id: existingId,
+          resolved_user_id: localUserId,
+        });
       } else {
         const { data: inserted, error } = await supabase
           .from("contacts")
@@ -354,22 +341,18 @@ Deno.serve(async (req) => {
           .single();
 
         if (error) {
-          return new Response(JSON.stringify({ error: error.message }), {
-            status: 500,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
+          return finalize(500, { error: error.message });
         }
-        return new Response(
-          JSON.stringify({ success: true, action: "created", contact_id: inserted.id, resolved_user_id: localUserId }),
-          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return finalize(200, {
+          success: true,
+          action: "created",
+          contact_id: inserted.id,
+          resolved_user_id: localUserId,
+        });
       }
     }
 
-    return new Response(JSON.stringify({ error: "Unknown action" }), {
-      status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return finalize(400, { error: "Unknown action" });
   } catch (err) {
     console.error("crm-webhook error:", err);
     return new Response(JSON.stringify({ error: (err as Error).message }), {
