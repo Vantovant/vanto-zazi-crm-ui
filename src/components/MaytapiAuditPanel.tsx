@@ -350,7 +350,7 @@ export function MaytapiAuditPanel({ isAdmin }: { isAdmin: boolean | null }) {
               </button>
             </div>
           ) : (
-            <ul className="divide-y divide-slate-700/50">
+            <ul className="flex flex-col gap-2.5 p-3 sm:p-4 pb-32">
               {filtered.map(r => {
                 const meta = ACTION_META[r.action];
                 const Icon = meta.icon;
@@ -358,39 +358,43 @@ export function MaytapiAuditPanel({ isAdmin }: { isAdmin: boolean | null }) {
                 const linked = r.linked_contact_id ? contactNames[r.linked_contact_id] : null;
                 const summary = safeMeta(r.metadata);
                 return (
-                  <li key={r.id} className="px-3 sm:px-4 py-3 hover:bg-slate-700/20">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                      <div className="flex items-start gap-2 min-w-0">
-                        <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded border shrink-0 ${meta.cls}`}>
-                          <Icon className="w-3 h-3" /> {meta.label}
+                  <li
+                    key={r.id}
+                    className="rounded-lg border border-slate-600/70 bg-slate-900/70 shadow-sm hover:border-slate-500 hover:bg-slate-900 transition-colors p-3 sm:p-4"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                      <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                        <span className={`inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-md border shrink-0 font-medium ${meta.cls}`}>
+                          <Icon className="w-3.5 h-3.5" /> {meta.label}
                         </span>
-                        <div className="min-w-0 text-sm text-slate-200">
+                        <div className="min-w-0 text-sm text-slate-100 flex-1">
                           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                            <span className="text-slate-300">by</span>
-                            <span className="font-medium text-slate-100 truncate">{actor}</span>
+                            <span className="text-slate-400">by</span>
+                            <span className="font-semibold text-slate-50 truncate">{actor}</span>
                             {r.phone_last4 && (
                               <>
-                                <span className="text-slate-500">·</span>
-                                <span className="font-mono text-slate-200">••••{r.phone_last4}</span>
+                                <span className="text-slate-600">·</span>
+                                <span className="font-mono text-slate-100 bg-slate-800/80 px-1.5 py-0.5 rounded text-xs">••••{r.phone_last4}</span>
                               </>
                             )}
                             {linked && (
                               <>
-                                <span className="text-slate-500">→</span>
-                                <span className="text-emerald-300 truncate">{linked}</span>
+                                <span className="text-slate-600">→</span>
+                                <span className="text-emerald-300 font-medium truncate">{linked}</span>
                               </>
                             )}
                           </div>
                           {summary && (
-                            <div className="text-[11px] text-slate-500 mt-0.5">{summary}</div>
+                            <div className="text-[12px] text-slate-400 mt-1.5">{summary}</div>
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-1.5 text-[11px] text-slate-500 shrink-0">
-                        <Clock className="w-3 h-3" />
-                        <span>{relTime(r.created_at)}</span>
-                        <span className="hidden sm:inline">·</span>
-                        <span className="hidden sm:inline">{new Date(r.created_at).toLocaleString()}</span>
+                      <div className="flex items-center gap-1.5 text-[11px] text-slate-400 shrink-0 sm:flex-col sm:items-end sm:gap-0.5">
+                        <div className="flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          <span className="font-medium text-slate-300">{relTime(r.created_at)}</span>
+                        </div>
+                        <span className="text-[10px] text-slate-500">{new Date(r.created_at).toLocaleString()}</span>
                       </div>
                     </div>
                   </li>
