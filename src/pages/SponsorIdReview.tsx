@@ -825,7 +825,138 @@ export function SponsorIdReview() {
               Read-only. No automatic fixes are applied.
             </p>
           </section>
+
+          {/* Bulk Create Top Uplines from CSV (Option A — I2C bulk exception) */}
+          <section>
+            <h2 className="text-sm font-semibold text-slate-300 mb-2 uppercase tracking-wide">
+              Bulk Create Top Uplines from CSV
+            </h2>
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
+              <p className="text-sm text-amber-200 mb-2">
+                Source: <span className="font-mono text-xs">{TOP_UPLINE_CSV_SOURCE}</span> · 10 top sponsor IDs above your downline cut.
+              </p>
+              <p className="text-xs text-slate-400 mb-3">
+                Creates placeholder upline contacts only. <strong>No child linking.</strong> No <code>parent_contact_id</code>, <code>leg</code>, or <code>tree_depth</code> writes on existing contacts. Existing aplgo_id matches are skipped.
+              </p>
+              <div className="overflow-x-auto rounded border border-slate-800 mb-3">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-900 text-slate-400">
+                    <tr>
+                      <Th>Sponsor ID</Th>
+                      <Th>Children in your DB</Th>
+                      <Th>Already exists?</Th>
+                      <Th>Name override (optional)</Th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-slate-300">
+                    {TOP_UPLINES_FROM_CSV.map((u) => {
+                      const sid = u.sponsor_id;
+                      const childCount = contacts.filter((c) => norm(c.sponsor_name) === sid).length;
+                      const exists = contacts.some((c) => norm(c.aplgo_id) === sid);
+                      return (
+                        <tr key={sid} className="border-t border-slate-800">
+                          <Td mono>{sid}</Td>
+                          <Td>{childCount}</Td>
+                          <Td>
+                            {exists ? (
+                              <span className="px-2 py-0.5 rounded border text-xs bg-slate-700/30 text-slate-400 border-slate-600">
+                                exists — will skip
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded border text-xs bg-emerald-500/10 text-emerald-300 border-emerald-500/30">
+                                will create
+                              </span>
+                            )}
+                          </Td>
+                          <Td>
+                            <input
+                              type="text"
+                              disabled={exists || bulkRunning}
+                              value={bulkOverrides[sid] || ''}
+                              onChange={(e) => setBulkOverrides((m) => ({ ...m, [sid]: e.target.value }))}
+                              placeholder={`Upline ${sid}`}
+                              className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-white placeholder:text-slate-500 disabled:opacity-50"
+                            />
+                          </Td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <button
+                type="button"
+                onClick={() => setBulkOpen(true)}
+                disabled={bulkRunning}
+                className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-sm font-semibold disabled:opacity-50"
+              >
+                Bulk create from CSV…
+              </button>
+              {bulkResult && (
+                <div className="mt-3 text-xs text-slate-300 space-y-1">
+                  <div>Created: <span className="text-emerald-300">{bulkResult.created.length}</span> ({bulkResult.created.join(', ') || '—'})</div>
+                  <div>Skipped (already existed): <span className="text-slate-400">{bulkResult.skipped.length}</span> ({bulkResult.skipped.join(', ') || '—'})</div>
+                  <div>Failed: <span className="text-red-300">{bulkResult.failed.length}</span></div>
+                  {bulkResult.failed.map((f) => (
+                    <div key={f.id} className="pl-4 text-red-300">• {f.id}: {f.reason}</div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
         </>
+      )}
+
+      {/* Bulk Create Confirmation Modal */}
+      {bulkOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true">
+          <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-xl w-full max-w-md p-5">
+            <div className="flex items-start justify-between mb-3">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <UserPlus className="w-5 h-5 text-amber-400" />
+                Bulk create top uplines
+              </h3>
+              <button
+                type="button"
+                onClick={() => setBulkOpen(false)}
+                className="text-slate-400 hover:text-white"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-sm text-slate-300 mb-3">
+              You are about to create up to <strong>{TOP_UPLINES_FROM_CSV.length}</strong> placeholder upline contacts from <span className="font-mono text-xs">{TOP_UPLINE_CSV_SOURCE}</span>.
+            </p>
+            <ul className="text-xs text-slate-400 space-y-1 mb-4 list-disc pl-5">
+              <li>Existing aplgo_id matches will be skipped automatically.</li>
+              <li>No child contacts will be linked.</li>
+              <li>No <code>parent_contact_id</code>, <code>leg</code>, or <code>tree_depth</code> writes on any other contact.</li>
+              <li>Each placeholder gets <code>tree_depth=0</code>, <code>parent_contact_id=null</code>, <code>leg=''</code>.</li>
+            </ul>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setBulkOpen(false)}
+                disabled={bulkRunning}
+                className="px-3 py-1.5 rounded border border-slate-600 text-slate-300 hover:bg-slate-800 text-sm disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  await handleBulkCreateTopUplines();
+                  setBulkOpen(false);
+                }}
+                disabled={bulkRunning}
+                className="px-3 py-1.5 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold text-sm disabled:opacity-50"
+              >
+                {bulkRunning ? 'Creating…' : 'Confirm bulk create'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Create Upline Confirmation Modal */}
