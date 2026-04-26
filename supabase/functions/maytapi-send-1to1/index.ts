@@ -367,14 +367,20 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       if (settings?.prospector_write_activity_on_send === true) {
+        // Exact-id idempotency: search for the exact current zazi_action_id,
+        // bounded by ' | ' on the right so a uuid that is a prefix of another
+        // cannot collide. Scoped by user_id AND contact_id when available.
         const marker = `zazi_action_id=${zazi_action_id}`;
-        const { data: existing } = await admin
+        const boundedMarker = `${marker} |`;
+        let existingQuery = admin
           .from('contact_activities')
           .select('id')
           .eq('user_id', row.user_id)
-          .ilike('notes', `%${marker}%`)
-          .limit(1)
-          .maybeSingle();
+          .or(`notes.ilike.%${boundedMarker}%,notes.ilike.%${marker}`);
+        if (row.contact_id) {
+          existingQuery = existingQuery.eq('contact_id', row.contact_id);
+        }
+        const { data: existing } = await existingQuery.limit(1).maybeSingle();
 
         if (!existing) {
           const safeNotes = [
