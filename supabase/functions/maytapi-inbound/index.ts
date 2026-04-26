@@ -117,7 +117,7 @@ async function checkRateLimit(
 }
 
 async function checkIdempotent(
-  admin: ReturnType<typeof createClient>,
+  admin: any,
   key: string,
 ): Promise<{ replay: boolean; status?: number; summary?: any }> {
   const { data } = await admin
@@ -137,7 +137,7 @@ async function checkIdempotent(
 }
 
 async function recordIdempotent(
-  admin: ReturnType<typeof createClient>,
+  admin: any,
   key: string,
   status: number,
   summary: any,
@@ -152,7 +152,7 @@ async function recordIdempotent(
 
 let cachedOwnerId: string | null = null;
 async function resolveOwnerId(
-  admin: ReturnType<typeof createClient>,
+  admin: any,
 ): Promise<string | null> {
   if (cachedOwnerId) return cachedOwnerId;
   if (!OWNER_EMAIL) return null;
