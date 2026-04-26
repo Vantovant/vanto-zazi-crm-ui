@@ -91,6 +91,12 @@ export function MaytapiInbox() {
   const [linkSearch, setLinkSearch] = useState('');
   const [linkResults, setLinkResults] = useState<Array<{ id: string; full_name: string; phone_number: string }>>([]);
   const [linking, setLinking] = useState(false);
+  const [pendingLinkContact, setPendingLinkContact] = useState<{ id: string; full_name: string; phone_number: string } | null>(null);
+
+  // H3: Ignore action + status filter
+  const [ignoreFor, setIgnoreFor] = useState<UnmatchedRow | null>(null);
+  const [ignoring, setIgnoring] = useState(false);
+  const [unmatchedFilter, setUnmatchedFilter] = useState<'open' | 'linked' | 'ignored'>('open');
 
   // Admin check
   useEffect(() => {
