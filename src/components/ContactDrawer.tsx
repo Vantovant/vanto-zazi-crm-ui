@@ -408,6 +408,34 @@ export function ContactDrawer({ prospect: initialProspect, onClose, onOpenTempla
                   </div>
                 </div>
 
+                {/* I2A: Read-only Lineage Pill (no edit, no parent linking UI) */}
+                <div className="rounded-lg border border-slate-700 bg-slate-800/40 p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-semibold text-slate-300 uppercase tracking-wide">Lineage</p>
+                    <span className="text-[10px] text-slate-500 italic">read-only</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <p className="text-slate-500">Tree Depth</p>
+                      <p className="text-slate-200 font-medium">{lineage?.tree_depth ?? 0} / 13</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500">Leg</p>
+                      <p className="text-slate-200 font-medium">
+                        {prospect.Leg === 'L' ? 'L (Left)' : prospect.Leg === 'R' ? 'R (Right)' : 'Unplaced'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500">Parent / Upline</p>
+                      <p className="text-slate-200 font-medium truncate">{lineage?.parent_name ?? '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500">Children</p>
+                      <p className="text-slate-200 font-medium">{lineage?.children_count ?? 0}</p>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center">
                     <Award className="w-4 h-4 text-slate-400" />
