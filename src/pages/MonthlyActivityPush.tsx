@@ -23,6 +23,7 @@ import {
   compareMonthKeys,
   getActivityEntryKey,
   extractAppreciationEntryKey,
+  extractMaytapiMessageId,
 } from '@/utils/monthlyActivityKey';
 import type { Prospect } from '@/data/mockData';
 
@@ -74,15 +75,20 @@ export function MonthlyActivityPush() {
   const [optimisticDone, setOptimisticDone] = useState<Set<string>>(new Set());
 
   // Build entry-scoped Done set from contact_activities log markers (M2 truth).
-  const doneEntryKeys = useMemo(() => {
+  // Track separately which entries were sent via Maytapi (have [maytapi_message:...] marker)
+  // — used purely cosmetically to render a "Sent via Maytapi" badge.
+  const { doneEntryKeys, viaMaytapiEntryKeys } = useMemo(() => {
     const keys = new Set<string>();
+    const viaMaytapi = new Set<string>();
     for (const a of activities) {
       if (a.activity_type !== 'whatsapp') continue;
       if (!a.summary || !/activity appreciation/i.test(a.summary)) continue;
       const k = extractAppreciationEntryKey(a);
-      if (k) keys.add(k);
+      if (!k) continue;
+      keys.add(k);
+      if (extractMaytapiMessageId(a)) viaMaytapi.add(k);
     }
-    return keys;
+    return { doneEntryKeys: keys, viaMaytapiEntryKeys: viaMaytapi };
   }, [activities]);
 
   const isEntryDone = useCallback(
@@ -139,9 +145,10 @@ export function MonthlyActivityPush() {
       if (done) status = 'done';
       else if (needsReview) status = 'needs_review';
       else status = 'pending';
-      return { order: o, contact, entryKey, status, possibleDuplicate };
+      const sentViaMaytapi = done && !!entryKey && viaMaytapiEntryKeys.has(entryKey);
+      return { order: o, contact, entryKey, status, possibleDuplicate, sentViaMaytapi };
     });
-  }, [allMonthOrders, contacts, isEntryDone, getEntryForContact]);
+  }, [allMonthOrders, contacts, isEntryDone, getEntryForContact, viaMaytapiEntryKeys]);
 
   // MP0.1: count Waiting Room entries flagged as possible duplicates from imports.
   const possibleDuplicateCount = useMemo(
@@ -399,6 +406,7 @@ interface RowShape {
   entryKey: string;
   status: 'done' | 'pending' | 'needs_review';
   possibleDuplicate?: boolean;
+  sentViaMaytapi?: boolean;
 }
 
 function Section({
@@ -475,7 +483,7 @@ function RowItem({
   onSkip: () => void;
   hideSkip?: boolean;
 }) {
-  const { order, contact, entryKey, status, possibleDuplicate } = row;
+  const { order, contact, entryKey, status, possibleDuplicate, sentViaMaytapi } = row;
   const statusBadge =
     status === 'done'
       ? 'bg-emerald-500/20 text-emerald-300'
@@ -500,6 +508,14 @@ function RowItem({
             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusBadge}`}>
               {statusLabel}
             </span>
+            {sentViaMaytapi && (
+              <span
+                className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30"
+                title="MP1: This appreciation was sent via Maytapi (real message_id present in activity log)"
+              >
+                ⚡ Sent via Maytapi
+              </span>
+            )}
             {possibleDuplicate && (
               <span
                 className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30"
