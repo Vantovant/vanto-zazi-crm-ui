@@ -1,11 +1,14 @@
 import { useState, useMemo } from 'react';
 import {
   X, ClipboardPaste, Loader2, Check, Sparkles, MessageCircle, AlertTriangle,
-  Calendar, Users,
+  Calendar, Users, ShieldAlert,
 } from 'lucide-react';
 import { useCrm } from '@/contexts/CrmContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useWaitingRoom } from '@/hooks/useWaitingRoom';
 import { parseMonthlyActivityReport, type MonthlyActivityRow } from '@/utils/monthlyActivityParser';
+import { normalizeActivityMonth } from '@/utils/monthlyActivityKey';
+import { supabase } from '@/integrations/supabase/client';
 import type { Prospect } from '@/data/mockData';
 
 interface MatchedRow extends MonthlyActivityRow {
@@ -32,13 +35,14 @@ function getCurrentMonthYear() {
 export function MonthlyActivityPasteModal({ onClose, onComplete }: MonthlyActivityPasteModalProps) {
   const { contacts, addOrder, refetchOrders } = useCrm();
   const { user } = useAuth();
+  const { addToWaitingRoom } = useWaitingRoom();
   const [pastedText, setPastedText] = useState('');
   const [activityMonth, setActivityMonth] = useState(getCurrentMonthYear());
   const [step, setStep] = useState<'input' | 'preview' | 'done'>('input');
   const [matchedRows, setMatchedRows] = useState<MatchedRow[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [result, setResult] = useState({ created: 0, skipped: 0 });
+  const [result, setResult] = useState({ created: 0, skipped: 0, flagged: 0 });
 
   const handleParse = () => {
     if (!pastedText.trim()) { setError('Please paste monthly activity data.'); return; }
@@ -85,14 +89,84 @@ export function MonthlyActivityPasteModal({ onClose, onComplete }: MonthlyActivi
     setError('');
     let created = 0;
     let skipped = 0;
+    let flagged = 0;
+
+    // ── MP0.1 stable signature + within-batch occurrence ──
+    // sig = user|monthKey|aplgoUserId|amount|displayedLevel|actualLevel
+    // dedupe_key = ma|{sig}|#{occurrence_within_this_paste}
+    // Cross-batch repeats default to skipped or Needs Review (never auto-promote).
+    const monthKey = normalizeActivityMonth(activityMonth) || activityMonth.replace(/\s/g, '');
+    const buildSig = (row: typeof selectedRows[number]) =>
+      [
+        user.id,
+        monthKey,
+        row.userId,
+        row.amount,
+        row.displayedLevel || 'x',
+        row.actualLevel || 'x',
+      ].join('|').toLowerCase();
+
+    // Pre-fetch existing dedupe_keys for this user + this month to detect
+    // ambiguous later repeats BEFORE attempting insert.
+    const sigPrefix = `ma|${[user.id, monthKey].join('|').toLowerCase()}|`;
+    let existingKeys = new Set<string>();
+    try {
+      const { data: existing } = await (supabase.from('orders') as any)
+        .select('dedupe_key')
+        .eq('user_id', user.id)
+        .eq('source', 'monthly-activity-paste')
+        .like('dedupe_key', `${sigPrefix}%`);
+      if (Array.isArray(existing)) {
+        existingKeys = new Set(existing.map((r: any) => String(r.dedupe_key || '').toLowerCase()));
+      }
+    } catch (e) {
+      console.warn('[MP0.1] could not pre-fetch existing dedupe keys; will rely on DB unique index', e);
+    }
+
+    // Count identical signatures within THIS paste (proof-of-same-report-twin).
+    const sigCountInBatch = new Map<string, number>();
+    for (const r of selectedRows) {
+      const s = buildSig(r);
+      sigCountInBatch.set(s, (sigCountInBatch.get(s) || 0) + 1);
+    }
+
+    const occurrenceCursor = new Map<string, number>(); // sig -> next occurrence # in this paste
+    const monthSlug = activityMonth.replace(/\s/g, '');
 
     for (let i = 0; i < selectedRows.length; i++) {
       const row = selectedRows[i];
       if (!row.contact) continue;
-      // M2: include amount + level + row index so multiple distinct entries
-      // for the same person/month are NOT collapsed into one orderId.
-      const monthSlug = activityMonth.replace(/\s/g, '');
-      const entrySig = `${row.amount}-${row.displayedLevel || 'x'}-${row.actualLevel || 'x'}-${i}`;
+
+      const sig = buildSig(row);
+      const occ = (occurrenceCursor.get(sig) || 0) + 1;
+      occurrenceCursor.set(sig, occ);
+
+      const dedupeKey = `ma|${sig}|#${occ}`;
+      const firstKey = `ma|${sig}|#1`;
+
+      // Same-report proof: any sig appearing >=2 times IN THIS PASTE is legitimate
+      // repeat (rule §2). Otherwise, if this is occ#>=2 and no twin exists in this
+      // paste, AND #1 already exists in DB → ambiguous later repeat → Needs Review (rule §4).
+      const sameReportTwin = (sigCountInBatch.get(sig) || 0) >= 2;
+      const firstAlreadyExists = existingKeys.has(firstKey);
+
+      if (occ >= 2 && !sameReportTwin && firstAlreadyExists) {
+        // Ambiguous later repeat — DO NOT insert into orders. Route to Needs Review.
+        await addToWaitingRoom({
+          contact_id: String(row.contact.id),
+          issue_type: 'follow_up_correction',
+          issue_note:
+            `Possible duplicate Monthly Activity entry — owner approval required. ` +
+            `Month: ${activityMonth}. Amount: R${row.amount}. ` +
+            `Level: ${row.displayedLevel}/${row.actualLevel}. ` +
+            `Signature already exists from a previous import; this paste did not contain a same-report twin.`,
+          priority: 'medium',
+        });
+        flagged++;
+        continue;
+      }
+
+      const entrySig = `${row.amount}-${row.displayedLevel || 'x'}-${row.actualLevel || 'x'}-occ${occ}`;
       const res = await addOrder({
         orderId: `MA-${row.userId}-${monthSlug}-${entrySig}`,
         contactName: row.contact.FullName,
@@ -107,12 +181,15 @@ export function MonthlyActivityPasteModal({ onClose, onComplete }: MonthlyActivi
         pvAmount: 0,
         source: 'monthly-activity-paste',
         salesChannel: 'Online',
+        dedupe_key: dedupeKey,
       });
-      if (res) created++; else skipped++;
+      if (res && (res as any).duplicate) skipped++;
+      else if (res) created++;
+      else skipped++;
     }
 
     await refetchOrders();
-    setResult({ created, skipped });
+    setResult({ created, skipped, flagged });
     setSaving(false);
     setStep('done');
 
@@ -296,13 +373,22 @@ export function MonthlyActivityPasteModal({ onClose, onComplete }: MonthlyActivi
               <div className="py-8 text-center space-y-3">
                 <Check className="w-12 h-12 text-emerald-400 mx-auto" />
                 <h3 className="text-lg font-semibold text-white">Import Complete</h3>
-                <div className="flex justify-center gap-4 text-sm">
+                <div className="flex justify-center gap-4 text-sm flex-wrap">
                   <span className="text-emerald-400">{result.created} Created</span>
-                  <span className="text-slate-400">{result.skipped} Skipped</span>
+                  <span className="text-slate-400">{result.skipped} Duplicate-skipped</span>
+                  <span className="text-amber-400">{result.flagged} Flagged for Review</span>
                 </div>
                 <p className="text-sm text-slate-400">
-                  Month: {activityMonth} · Use the Activities page to send thank-you messages.
+                  Month: {activityMonth} · Use the Activities or Monthly Activity Push page to send thank-you messages.
                 </p>
+                {result.flagged > 0 && (
+                  <div className="mx-auto max-w-md p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 text-left">
+                    <ShieldAlert className="w-4 h-4 inline mr-1.5" />
+                    <strong>{result.flagged}</strong> row(s) matched an existing entry from a previous import without
+                    a same-report twin. They were sent to <strong>Needs Review</strong> (Waiting Room) and were NOT
+                    inserted as send-ready entries. Owner approval required.
+                  </div>
+                )}
               </div>
             )}
 

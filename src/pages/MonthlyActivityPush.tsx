@@ -59,7 +59,7 @@ export function MonthlyActivityPush() {
   const { user, loading: authLoading } = useAuth();
   const { contacts, orders } = useCrm();
   const { activities } = useContactActivities();
-  const { addToWaitingRoom, getEntryForContact } = useWaitingRoom();
+  const { addToWaitingRoom, getEntryForContact, openEntries } = useWaitingRoom();
 
   const [selectedMonthKey, setSelectedMonthKey] = useState<string>('');
   const [search, setSearch] = useState('');
@@ -125,7 +125,7 @@ export function MonthlyActivityPush() {
   }, [orders, selectedMonthKey]);
 
   // Decorate each order with its contact, status, and entry key.
-  const decoratedRows = useMemo(() => {
+  const decoratedRows: RowShape[] = useMemo(() => {
     return allMonthOrders.map((o: any) => {
       const contact = o.contactId
         ? contacts.find((c: any) => String(c.id) === String(o.contactId))
@@ -133,14 +133,21 @@ export function MonthlyActivityPush() {
       const entryKey = getActivityEntryKey(o, contact);
       const done = isEntryDone(o, contact);
       const wrEntry = contact ? getEntryForContact(String(contact.id)) : undefined;
+      const possibleDuplicate = !!wrEntry && /possible duplicate/i.test(wrEntry.issue_note || '');
       const needsReview = !done && (!contact || !!wrEntry);
       let status: 'done' | 'pending' | 'needs_review';
       if (done) status = 'done';
       else if (needsReview) status = 'needs_review';
       else status = 'pending';
-      return { order: o, contact, entryKey, status };
+      return { order: o, contact, entryKey, status, possibleDuplicate };
     });
   }, [allMonthOrders, contacts, isEntryDone, getEntryForContact]);
+
+  // MP0.1: count Waiting Room entries flagged as possible duplicates from imports.
+  const possibleDuplicateCount = useMemo(
+    () => openEntries.filter((e) => /possible duplicate/i.test(e.issue_note || '')).length,
+    [openEntries],
+  );
 
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -255,6 +262,23 @@ export function MonthlyActivityPush() {
         <SummaryCard icon={CheckCircle} label="Done" value={counts.done} tone="emerald" />
         <SummaryCard icon={AlertCircle} label="Needs Review" value={counts.needs} tone="rose" />
       </div>
+
+      {/* MP0.1 — Duplicate warning banner (only when flagged > 0) */}
+      {possibleDuplicateCount > 0 && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200 flex items-start gap-3">
+          <ShieldAlert className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+          <div className="min-w-0">
+            <div className="font-semibold text-amber-100">
+              {possibleDuplicateCount} possible duplicate import{possibleDuplicateCount === 1 ? '' : 's'} flagged
+            </div>
+            <div className="text-xs text-amber-200/80 mt-0.5">
+              These rows were NOT inserted as send-ready entries. They were routed to Needs Review (Waiting Room)
+              because the same signature already exists from a previous import without a same-report twin. Owner
+              approval required before they can be appreciated.
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Search */}
       <div className="relative">
@@ -374,6 +398,7 @@ interface RowShape {
   contact: any | undefined;
   entryKey: string;
   status: 'done' | 'pending' | 'needs_review';
+  possibleDuplicate?: boolean;
 }
 
 function Section({
@@ -450,7 +475,7 @@ function RowItem({
   onSkip: () => void;
   hideSkip?: boolean;
 }) {
-  const { order, contact, entryKey, status } = row;
+  const { order, contact, entryKey, status, possibleDuplicate } = row;
   const statusBadge =
     status === 'done'
       ? 'bg-emerald-500/20 text-emerald-300'
@@ -475,6 +500,14 @@ function RowItem({
             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusBadge}`}>
               {statusLabel}
             </span>
+            {possibleDuplicate && (
+              <span
+                className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                title="Flagged by MP0.1: same signature exists from a previous import without same-report twin"
+              >
+                ⚠ possible duplicate
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-3 mt-1 text-[10px] text-slate-500 flex-wrap">
             <span>{monthShown}</span>

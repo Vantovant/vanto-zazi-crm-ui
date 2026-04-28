@@ -69,12 +69,20 @@ export function useOrders() {
     fetchOrders();
   }, [fetchOrders]);
 
-  const addOrder = async (order: Omit<Order, 'id'> & { contact_id?: string }) => {
+  const addOrder = async (
+    order: Omit<Order, 'id'> & {
+      contact_id?: string;
+      /** MP0.1 — explicit dedupe_key override (preferred for monthly-activity-paste). */
+      dedupe_key?: string | null;
+    },
+  ) => {
     if (!user) return null;
 
-    // Compute dedupe_key for paste-imported orders
-    let dedupe_key: string | null = null;
-    if (order.source === 'backoffice-paste') {
+    // Compute dedupe_key for paste-imported orders.
+    // MP0.1: callers may now supply an explicit, position-independent dedupe_key
+    // (e.g. monthly-activity-paste signature + within-batch occurrence).
+    let dedupe_key: string | null = order.dedupe_key ?? null;
+    if (!dedupe_key && order.source === 'backoffice-paste') {
       const parts = [
         (order.contactName || '').trim().toLowerCase(),
         (order.product || '').trim().toLowerCase(),
@@ -86,10 +94,8 @@ export function useOrders() {
         (order.source || 'manual').trim().toLowerCase(),
       ].join('|');
       dedupe_key = parts;
-    } else if (order.source === 'monthly-activity-paste') {
-      // M2: orderId already encodes month + userId + amount + level + row index,
-      // so a re-paste of the exact same report is blocked, while a truly distinct
-      // second entry (different amount / level / row) is allowed.
+    } else if (!dedupe_key && order.source === 'monthly-activity-paste') {
+      // Legacy fallback if caller did not supply an explicit MP0.1 key.
       dedupe_key = `ma|${(order.orderId || '').trim().toLowerCase()}`;
     }
 
@@ -116,10 +122,11 @@ export function useOrders() {
       .select()
       .single();
     if (error) {
-      // If duplicate key violation, treat as success (idempotent)
+      // MP0.1: surface duplicate-skip as a typed result so callers can count
+      // and route ambiguous repeats to Needs Review.
       if (error.code === '23505' && dedupe_key) {
-        console.log('[useOrders] Duplicate order skipped by DB constraint');
-        return { id: 'duplicate-skipped' };
+        console.log('[useOrders] Duplicate order skipped by DB constraint', { dedupe_key });
+        return { id: 'duplicate-skipped', duplicate: true } as { id: string; duplicate: true };
       }
       console.error('Error adding order:', error);
       return null;
