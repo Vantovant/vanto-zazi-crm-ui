@@ -36,7 +36,7 @@ function normalizePhone(raw: string): string {
 }
 
 export function Mp1PilotSettingsCard() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -50,17 +50,20 @@ export function Mp1PilotSettingsCard() {
   const [error, setError] = useState<string | null>(null);
   const [savedFlash, setSavedFlash] = useState<string | null>(null);
 
-  // Verify admin role (defence-in-depth alongside OWNER_ID gate on parent page)
+  // Verify admin role (defence-in-depth alongside OWNER_ID gate on parent page).
+  // Wait for AuthContext to finish hydrating before deciding, so a hard reload
+  // does not cause a "no user yet -> isAdmin=false" race that hides the card.
   useEffect(() => {
+    if (authLoading) return; // wait for session hydration
     let cancelled = false;
     (async () => {
-      if (!user) { setIsAdmin(false); return; }
+      if (!user) { if (!cancelled) setIsAdmin(false); return; }
       const { data } = await (supabase.from('user_roles') as any)
         .select('role').eq('user_id', user.id).eq('role', 'admin').maybeSingle();
       if (!cancelled) setIsAdmin(!!data);
     })();
     return () => { cancelled = true; };
-  }, [user]);
+  }, [authLoading, user?.id]);
 
   const loadSettings = useCallback(async () => {
     if (!user) return;
@@ -190,9 +193,19 @@ export function Mp1PilotSettingsCard() {
     }
   };
 
-  // Defence-in-depth: hide entirely if not OWNER + admin
+  // Defence-in-depth: wait for auth hydration, then gate to OWNER + admin.
+  if (authLoading) return null;
   if (!user || user.id !== OWNER_ID) return null;
-  if (isAdmin === null) return null;
+  if (isAdmin === null) {
+    return (
+      <div className="bg-slate-800/50 border border-purple-500/30 rounded-xl p-5">
+        <div className="flex items-center gap-2 text-slate-400 text-sm">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          Checking MP1 Pilot Settings access…
+        </div>
+      </div>
+    );
+  }
   if (!isAdmin) return null;
 
   return (
