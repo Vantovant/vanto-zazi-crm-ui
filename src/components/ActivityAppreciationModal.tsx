@@ -12,7 +12,7 @@ import { useContactActivities } from '@/hooks/useContactActivities';
 import { useCrm } from '@/contexts/CrmContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { normalizeActivityMonth } from '@/utils/monthlyActivityKey';
+import { normalizeActivityMonth, getActivityEntryKey } from '@/utils/monthlyActivityKey';
 
 export type AppreciationTone = 'warm' | 'royal' | 'leadership' | 'professional';
 
@@ -22,6 +22,7 @@ interface ActivityOrder {
   contactName: string;
   amount: number;
   product: string;
+  dedupe_key?: string | null;
 }
 
 interface SingleEntry {
@@ -34,7 +35,13 @@ interface ActivityAppreciationModalProps {
   entries: SingleEntry[];
   initialIndex?: number;
   onClose: () => void;
-  onAppreciated?: (info: { contactId: string | null; aplgoId: string | null; month: string; monthKey: string }) => void;
+  onAppreciated?: (info: {
+    contactId: string | null;
+    aplgoId: string | null;
+    month: string;
+    monthKey: string;
+    entryKey: string;
+  }) => void;
 }
 
 const APLGO_BRAND_URL = 'https://crm.onlinecourseformlm.com/aplgo.html';
