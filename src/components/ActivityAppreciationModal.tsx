@@ -102,6 +102,16 @@ export function ActivityAppreciationModal({
   const [logging, setLogging] = useState(false);
   const [logSuccess, setLogSuccess] = useState(false);
 
+  // ── MP1 (Maytapi pilot) state ────────────────────────────────────────────
+  const { gate, evaluateGate, send: sendViaMaytapi } = useMaytapiAppreciationSend();
+  const [mp1GateReason, setMp1GateReason] = useState<GateBlockReason | undefined>(undefined);
+  const [mp1GateDetail, setMp1GateDetail] = useState<string | undefined>(undefined);
+  const [mp1Allowed, setMp1Allowed] = useState(false);
+  const [mp1Confirming, setMp1Confirming] = useState(false);
+  const [mp1Sending, setMp1Sending] = useState(false);
+  const [mp1Error, setMp1Error] = useState<string | null>(null);
+  const [mp1Success, setMp1Success] = useState<string | null>(null);
+
   const entry = entries[currentIndex];
   const isBulk = entries.length > 1;
 
@@ -125,7 +135,45 @@ export function ActivityAppreciationModal({
     setEditedMessage(message);
     setLogSuccess(false);
     setCopied(false);
+    setMp1Error(null);
+    setMp1Success(null);
   }, [message, currentIndex]);
+
+  // Compute current entry's MP1 args + run gate evaluation reactively.
+  const mp1Args = useMemo(() => {
+    if (!entry) return null;
+    const monthKey = normalizeActivityMonth(entry.month);
+    const entryKey = getActivityEntryKey(entry.order, entry.contact);
+    const contactIdRaw = entry.contact.id ? String(entry.contact.id) : '';
+    const phoneNormalized = String((entry.contact as any).phone_normalized || (entry.contact as any).PhoneNumber || '')
+      .replace(/[^0-9]/g, '');
+    return {
+      contactId: contactIdRaw,
+      contactName: entry.contact.FullName || '',
+      phoneNormalized,
+      communicationStatus: String((entry.contact as any).CommunicationStatus || ''),
+      monthKey,
+      entryKey,
+      finalMessage: editedMessage,
+    };
+  }, [entry, editedMessage]);
+
+  useEffect(() => {
+    if (!mp1Args || gate.loading) {
+      setMp1Allowed(false);
+      setMp1GateReason(undefined);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const r = await evaluateGate(mp1Args);
+      if (cancelled) return;
+      setMp1Allowed(r.allowed);
+      setMp1GateReason(r.reason);
+      setMp1GateDetail(r.detail);
+    })();
+    return () => { cancelled = true; };
+  }, [mp1Args, gate, evaluateGate]);
 
   const handleCopy = useCallback(() => {
     navigator.clipboard.writeText(editedMessage);
@@ -149,11 +197,9 @@ export function ActivityAppreciationModal({
     const monthKey = normalizeActivityMonth(entry.month);
     const aplgoId = (entry.contact.APLGoID || '').toString().trim() || null;
     const contactIdRaw = entry.contact.id ? String(entry.contact.id) : '';
-    // Only pass a real contact_id (UUID-shaped); fallback rows use the order id and must NOT be logged as a contact link.
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(contactIdRaw);
     const contactIdForLog = isUuid ? contactIdRaw : undefined;
 
-    // M2: entry-scoped marker so each activity order/entry has its own Done state.
     const entryKey = getActivityEntryKey(entry.order, entry.contact);
     const monthMarker = monthKey ? ` [monthly_activity_appreciation:${monthKey}]` : '';
     const entryMarker = entryKey ? ` [monthly_activity_appreciation_entry:${entryKey}]` : '';
@@ -179,13 +225,37 @@ export function ActivityAppreciationModal({
       entryKey,
     });
 
-    // Auto-advance in bulk mode
     if (isBulk && currentIndex < entries.length - 1) {
       setTimeout(() => {
         setCurrentIndex(i => i + 1);
       }, 1500);
     }
   }, [entry, editedMessage, logActivity, updateContact, onAppreciated, isBulk, currentIndex, entries.length]);
+
+  // ── MP1 confirm + send ──────────────────────────────────────────────────
+  const handleMp1Confirm = useCallback(async () => {
+    if (!entry || !mp1Args) return;
+    setMp1Sending(true);
+    setMp1Error(null);
+    const result = await sendViaMaytapi(mp1Args);
+    setMp1Sending(false);
+    setMp1Confirming(false);
+    if (!result.ok) {
+      setMp1Error(result.reason || result.error_code || 'send_failed');
+      return;
+    }
+    setMp1Success(result.maytapi_message_id || 'sent');
+    onAppreciated?.({
+      contactId: mp1Args.contactId,
+      aplgoId: (entry.contact.APLGoID || '').toString().trim() || null,
+      month: entry.month,
+      monthKey: mp1Args.monthKey,
+      entryKey: mp1Args.entryKey,
+    });
+    if (isBulk && currentIndex < entries.length - 1) {
+      setTimeout(() => setCurrentIndex(i => i + 1), 1500);
+    }
+  }, [entry, mp1Args, sendViaMaytapi, onAppreciated, isBulk, currentIndex, entries.length]);
 
   if (!entry) return null;
 
