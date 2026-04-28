@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   X, MessageCircle, Copy, Check, ExternalLink, Send,
   Loader2, Sparkles, Crown, Heart, Briefcase, Award,
-  ChevronLeft, ChevronRight, Users,
+  ChevronLeft, ChevronRight, Users, Zap, ShieldAlert,
 } from 'lucide-react';
 import aplgoLogo from '@/assets/aplgo-logo.png';
 import type { Prospect } from '@/data/mockData';
@@ -13,6 +13,11 @@ import { useCrm } from '@/contexts/CrmContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { normalizeActivityMonth, getActivityEntryKey } from '@/utils/monthlyActivityKey';
+import {
+  useMaytapiAppreciationSend,
+  gateReasonLabel,
+  type GateBlockReason,
+} from '@/hooks/useMaytapiAppreciationSend';
 
 export type AppreciationTone = 'warm' | 'royal' | 'leadership' | 'professional';
 
@@ -97,6 +102,16 @@ export function ActivityAppreciationModal({
   const [logging, setLogging] = useState(false);
   const [logSuccess, setLogSuccess] = useState(false);
 
+  // ── MP1 (Maytapi pilot) state ────────────────────────────────────────────
+  const { gate, evaluateGate, send: sendViaMaytapi } = useMaytapiAppreciationSend();
+  const [mp1GateReason, setMp1GateReason] = useState<GateBlockReason | undefined>(undefined);
+  const [mp1GateDetail, setMp1GateDetail] = useState<string | undefined>(undefined);
+  const [mp1Allowed, setMp1Allowed] = useState(false);
+  const [mp1Confirming, setMp1Confirming] = useState(false);
+  const [mp1Sending, setMp1Sending] = useState(false);
+  const [mp1Error, setMp1Error] = useState<string | null>(null);
+  const [mp1Success, setMp1Success] = useState<string | null>(null);
+
   const entry = entries[currentIndex];
   const isBulk = entries.length > 1;
 
@@ -120,7 +135,45 @@ export function ActivityAppreciationModal({
     setEditedMessage(message);
     setLogSuccess(false);
     setCopied(false);
+    setMp1Error(null);
+    setMp1Success(null);
   }, [message, currentIndex]);
+
+  // Compute current entry's MP1 args + run gate evaluation reactively.
+  const mp1Args = useMemo(() => {
+    if (!entry) return null;
+    const monthKey = normalizeActivityMonth(entry.month);
+    const entryKey = getActivityEntryKey(entry.order, entry.contact);
+    const contactIdRaw = entry.contact.id ? String(entry.contact.id) : '';
+    const phoneNormalized = String((entry.contact as any).phone_normalized || (entry.contact as any).PhoneNumber || '')
+      .replace(/[^0-9]/g, '');
+    return {
+      contactId: contactIdRaw,
+      contactName: entry.contact.FullName || '',
+      phoneNormalized,
+      communicationStatus: String((entry.contact as any).CommunicationStatus || ''),
+      monthKey,
+      entryKey,
+      finalMessage: editedMessage,
+    };
+  }, [entry, editedMessage]);
+
+  useEffect(() => {
+    if (!mp1Args || gate.loading) {
+      setMp1Allowed(false);
+      setMp1GateReason(undefined);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const r = await evaluateGate(mp1Args);
+      if (cancelled) return;
+      setMp1Allowed(r.allowed);
+      setMp1GateReason(r.reason);
+      setMp1GateDetail(r.detail);
+    })();
+    return () => { cancelled = true; };
+  }, [mp1Args, gate, evaluateGate]);
 
   const handleCopy = useCallback(() => {
     navigator.clipboard.writeText(editedMessage);
@@ -144,11 +197,9 @@ export function ActivityAppreciationModal({
     const monthKey = normalizeActivityMonth(entry.month);
     const aplgoId = (entry.contact.APLGoID || '').toString().trim() || null;
     const contactIdRaw = entry.contact.id ? String(entry.contact.id) : '';
-    // Only pass a real contact_id (UUID-shaped); fallback rows use the order id and must NOT be logged as a contact link.
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(contactIdRaw);
     const contactIdForLog = isUuid ? contactIdRaw : undefined;
 
-    // M2: entry-scoped marker so each activity order/entry has its own Done state.
     const entryKey = getActivityEntryKey(entry.order, entry.contact);
     const monthMarker = monthKey ? ` [monthly_activity_appreciation:${monthKey}]` : '';
     const entryMarker = entryKey ? ` [monthly_activity_appreciation_entry:${entryKey}]` : '';
@@ -174,13 +225,37 @@ export function ActivityAppreciationModal({
       entryKey,
     });
 
-    // Auto-advance in bulk mode
     if (isBulk && currentIndex < entries.length - 1) {
       setTimeout(() => {
         setCurrentIndex(i => i + 1);
       }, 1500);
     }
   }, [entry, editedMessage, logActivity, updateContact, onAppreciated, isBulk, currentIndex, entries.length]);
+
+  // ── MP1 confirm + send ──────────────────────────────────────────────────
+  const handleMp1Confirm = useCallback(async () => {
+    if (!entry || !mp1Args) return;
+    setMp1Sending(true);
+    setMp1Error(null);
+    const result = await sendViaMaytapi(mp1Args);
+    setMp1Sending(false);
+    setMp1Confirming(false);
+    if (!result.ok) {
+      setMp1Error(result.reason || result.error_code || 'send_failed');
+      return;
+    }
+    setMp1Success(result.maytapi_message_id || 'sent');
+    onAppreciated?.({
+      contactId: mp1Args.contactId,
+      aplgoId: (entry.contact.APLGoID || '').toString().trim() || null,
+      month: entry.month,
+      monthKey: mp1Args.monthKey,
+      entryKey: mp1Args.entryKey,
+    });
+    if (isBulk && currentIndex < entries.length - 1) {
+      setTimeout(() => setCurrentIndex(i => i + 1), 1500);
+    }
+  }, [entry, mp1Args, sendViaMaytapi, onAppreciated, isBulk, currentIndex, entries.length]);
 
   if (!entry) return null;
 
@@ -291,7 +366,84 @@ export function ActivityAppreciationModal({
                   Send & Log
                 </button>
               </div>
+
+              {/* MP1 — Send via Maytapi (admin-only pilot, one-by-one) */}
+              {gate.isAdmin && (
+                <div className="pt-2 border-t border-slate-700/60 mt-1">
+                  {mp1Success ? (
+                    <div className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm bg-purple-500/15 border border-purple-500/30 rounded-lg text-purple-200">
+                      <Check className="w-4 h-4 text-purple-300" />
+                      Sent via Maytapi · msg <span className="font-mono text-[11px]">{mp1Success.slice(-10)}</span>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={!mp1Allowed || mp1Sending || gate.loading}
+                      onClick={() => { setMp1Error(null); setMp1Confirming(true); }}
+                      title={!mp1Allowed ? gateReasonLabel(mp1GateReason, mp1GateDetail) : 'Send this entry directly via Maytapi'}
+                      className="w-full flex items-center justify-center gap-1.5 px-4 py-2.5 text-sm font-medium bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+                    >
+                      {mp1Sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+                      {mp1Sending ? 'Sending via Maytapi…' : 'Send via Maytapi (pilot)'}
+                    </button>
+                  )}
+                  {!mp1Allowed && !mp1Success && !gate.loading && (
+                    <p className="mt-1.5 text-[11px] text-slate-500 flex items-center gap-1">
+                      <ShieldAlert className="w-3 h-3" />
+                      {gateReasonLabel(mp1GateReason, mp1GateDetail)}
+                    </p>
+                  )}
+                  {mp1Error && (
+                    <p className="mt-1.5 text-[11px] text-rose-300 flex items-center gap-1">
+                      <ShieldAlert className="w-3 h-3" />
+                      Send failed: {mp1Error}. Entry stays Pending — try again later.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
+          )}
+
+          {/* MP1 — Confirm dialog */}
+          {mp1Confirming && entry && mp1Args && (
+            <>
+              <div className="fixed inset-0 bg-black/70 z-[60]" onClick={() => !mp1Sending && setMp1Confirming(false)} />
+              <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+                <div className="bg-slate-900 border border-purple-500/40 rounded-xl shadow-2xl w-full max-w-md p-5 space-y-3" onClick={e => e.stopPropagation()}>
+                  <div className="flex items-center gap-2">
+                    <Zap className="w-5 h-5 text-purple-400" />
+                    <h3 className="text-base font-semibold text-white">Confirm Maytapi send</h3>
+                  </div>
+                  <div className="text-xs text-slate-300 space-y-1.5 bg-slate-800/60 border border-slate-700 rounded-lg p-3">
+                    <div><span className="text-slate-500">Contact:</span> <span className="text-white font-medium">{mp1Args.contactName}</span></div>
+                    <div><span className="text-slate-500">Phone:</span> <span className="font-mono text-white">****{mp1Args.phoneNormalized.slice(-4)}</span></div>
+                    <div><span className="text-slate-500">Entry:</span> <span className="font-mono text-white">…{mp1Args.entryKey.slice(-12)}</span></div>
+                    <div><span className="text-slate-500">Month:</span> <span className="text-white">{mp1Args.monthKey}</span></div>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-400 mb-1">Final message preview</label>
+                    <pre className="text-[11px] whitespace-pre-wrap bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-slate-200 max-h-48 overflow-y-auto">{mp1Args.finalMessage}</pre>
+                  </div>
+                  <p className="text-[11px] text-amber-300/90 flex items-start gap-1">
+                    <ShieldAlert className="w-3.5 h-3.5 shrink-0 mt-px" />
+                    This will send ONE WhatsApp message via Maytapi to the masked number above. No retry, no queue.
+                  </p>
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <button type="button" disabled={mp1Sending}
+                      onClick={() => setMp1Confirming(false)}
+                      className="px-4 py-2 text-sm bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-200 rounded-lg">
+                      Cancel
+                    </button>
+                    <button type="button" disabled={mp1Sending}
+                      onClick={handleMp1Confirm}
+                      className="flex items-center justify-center gap-1.5 px-4 py-2 text-sm font-medium bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white rounded-lg">
+                      {mp1Sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+                      {mp1Sending ? 'Sending…' : 'Confirm send'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </>
           )}
 
           {/* Bulk Navigation Footer */}

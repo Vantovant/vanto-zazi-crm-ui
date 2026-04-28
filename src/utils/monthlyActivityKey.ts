@@ -219,3 +219,18 @@ export function extractAppreciationEntryKey(activity: {
   if (m && m[1]) return m[1].trim();
   return '';
 }
+
+/**
+ * MP1 — Extract Maytapi message id from a contact_activities log row, if marker present.
+ * Used purely cosmetically to render a "Sent via Maytapi" badge.
+ * Returns "" if no marker found.
+ */
+export function extractMaytapiMessageId(activity: {
+  summary?: string | null;
+  notes?: string | null;
+}): string {
+  const haystack = `${activity.notes || ''}\n${activity.summary || ''}`;
+  const m = haystack.match(/\[maytapi_message:([^\]]+)\]/i);
+  if (m && m[1]) return m[1].trim();
+  return '';
+}
