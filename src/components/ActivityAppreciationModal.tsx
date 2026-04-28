@@ -108,6 +108,7 @@ export function ActivityAppreciationModal({
   const [mp1GateReason, setMp1GateReason] = useState<GateBlockReason | undefined>(undefined);
   const [mp1GateDetail, setMp1GateDetail] = useState<string | undefined>(undefined);
   const [mp1Allowed, setMp1Allowed] = useState(false);
+  const [mp1AllowedBy, setMp1AllowedBy] = useState<GateAllowedBy | undefined>(undefined);
   const [mp1Confirming, setMp1Confirming] = useState(false);
   const [mp1Sending, setMp1Sending] = useState(false);
   const [mp1Error, setMp1Error] = useState<string | null>(null);
