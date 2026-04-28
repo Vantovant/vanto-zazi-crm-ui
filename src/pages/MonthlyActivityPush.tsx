@@ -263,6 +263,23 @@ export function MonthlyActivityPush() {
         <SummaryCard icon={AlertCircle} label="Needs Review" value={counts.needs} tone="rose" />
       </div>
 
+      {/* MP0.1 — Duplicate warning banner (only when flagged > 0) */}
+      {possibleDuplicateCount > 0 && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200 flex items-start gap-3">
+          <ShieldAlert className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+          <div className="min-w-0">
+            <div className="font-semibold text-amber-100">
+              {possibleDuplicateCount} possible duplicate import{possibleDuplicateCount === 1 ? '' : 's'} flagged
+            </div>
+            <div className="text-xs text-amber-200/80 mt-0.5">
+              These rows were NOT inserted as send-ready entries. They were routed to Needs Review (Waiting Room)
+              because the same signature already exists from a previous import without a same-report twin. Owner
+              approval required before they can be appreciated.
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
