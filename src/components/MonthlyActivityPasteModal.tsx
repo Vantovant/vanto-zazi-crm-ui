@@ -149,17 +149,13 @@ export function MonthlyActivityPasteModal({ onClose, onComplete }: MonthlyActivi
       const sameReportTwin = sigCountThisPaste >= 2;
 
       // MP0.1 corrected duplicate branches.
+      // Order matters: check ambiguous single-row repeat BEFORE exact-key skip,
+      // so a lone re-paste of an existing signature is routed to Needs Review
+      // (rule §1 + §4: safer default), and the duplicate banner/badge can fire.
       //
-      // Case A — exact key already in DB (identical or reordered re-paste):
-      //   skip as duplicate. Never insert, never flag.
-      if (thisKeyAlreadyExists) {
-        skipped++;
-        continue;
-      }
-
       // Case B — occ === 1, sig already in DB, AND this paste contains only ONE
-      // row of this sig (no same-report twin proof). This is an ambiguous later
-      // repeat introduced without proof → Needs Review (rule §1, §3, §4).
+      // row of this sig (no same-report twin proof). Ambiguous later repeat
+      // (identical / partial / single-row re-paste) → Needs Review.
       if (occ === 1 && firstAlreadyExists && !sameReportTwin) {
         await addToWaitingRoom({
           contact_id: String(row.contact.id),
@@ -175,10 +171,17 @@ export function MonthlyActivityPasteModal({ onClose, onComplete }: MonthlyActivi
         continue;
       }
 
+      // Case A — exact key already in DB (shuffled/full re-paste of a sig that
+      // had a twin in the original report). Skip silently as duplicate.
+      if (thisKeyAlreadyExists) {
+        skipped++;
+        continue;
+      }
+
       // Case C — occ >= 2 with same-report twin proof in current paste.
       //   The pasted report itself contains both rows together (rule §2), so the
       //   new occurrence may be inserted. (If its exact key already existed,
-      //   Case A already skipped it above.)
+      //   Case A skipped it above.)
       //
       // Case D — occ === 1 and firstKey not in DB → normal first insert.
       // Both fall through to the addOrder() call below.
