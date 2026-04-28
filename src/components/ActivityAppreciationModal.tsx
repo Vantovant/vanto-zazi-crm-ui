@@ -367,8 +367,9 @@ export function ActivityAppreciationModal({
                 </button>
               </div>
 
-              {/* MP1 — Send via Maytapi (admin-only pilot, one-by-one) */}
-              {gate.isAdmin && (
+              {/* MP1 — Send via Maytapi (pilot, one-by-one). Always shown once gate has loaded;
+                   disabled with reason when blocked (admin-only, Maytapi disabled, allowlist, etc.). */}
+              {!gate.loading && (
                 <div className="pt-2 border-t border-slate-700/60 mt-1">
                   {mp1Success ? (
                     <div className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm bg-purple-500/15 border border-purple-500/30 rounded-lg text-purple-200">
