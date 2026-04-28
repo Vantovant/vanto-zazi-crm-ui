@@ -86,10 +86,15 @@ export function MonthlyActivityPasteModal({ onClose, onComplete }: MonthlyActivi
     let created = 0;
     let skipped = 0;
 
-    for (const row of selectedRows) {
+    for (let i = 0; i < selectedRows.length; i++) {
+      const row = selectedRows[i];
       if (!row.contact) continue;
+      // M2: include amount + level + row index so multiple distinct entries
+      // for the same person/month are NOT collapsed into one orderId.
+      const monthSlug = activityMonth.replace(/\s/g, '');
+      const entrySig = `${row.amount}-${row.displayedLevel || 'x'}-${row.actualLevel || 'x'}-${i}`;
       const res = await addOrder({
-        orderId: `MA-${row.userId}-${activityMonth.replace(/\s/g, '')}`,
+        orderId: `MA-${row.userId}-${monthSlug}-${entrySig}`,
         contactName: row.contact.FullName,
         contact_id: String(row.contact.id),
         product: `Monthly Activity - ${activityMonth}`,
