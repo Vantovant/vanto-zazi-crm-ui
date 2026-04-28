@@ -262,9 +262,16 @@ export function useMaytapiAppreciationSend() {
     }
 
     const okFromFn = !!(invokeData && (invokeData as any).ok && (invokeData as any).sent !== false);
-    const messageId: string | null = (invokeData as any)?.maytapi_response?.message_id
-      || (invokeData as any)?.message_id
-      || null;
+    // VERIFIED RESPONSE SHAPE (maytapi-send-1to1 line 506-512):
+    //   { ok: true, sent: true, zazi_action_id, message_id, retry_attempts, maytapi_response, test_mode }
+    // The authoritative ID is the top-level `message_id` (built from data.msgId ?? data.id).
+    // Fallbacks are defensive only and must never override a real top-level id.
+    const rawData = invokeData as any;
+    const messageId: string | null =
+      (typeof rawData?.message_id === 'string' && rawData.message_id) ||
+      (typeof rawData?.maytapi_response?.data?.msgId === 'string' && rawData.maytapi_response.data.msgId) ||
+      (typeof rawData?.maytapi_response?.data?.id === 'string' && rawData.maytapi_response.data.id) ||
+      null;
 
     if (!okFromFn) {
       const errCode = (invokeData as any)?.error_code || (invokeData as any)?.error || 'unknown_error';
@@ -288,16 +295,36 @@ export function useMaytapiAppreciationSend() {
       return { ok: false, error_code: errCode, http_status: httpStatus, reason: errCode };
     }
 
-    // 3. Success — write Done marker (entry stays Pending until this row exists)
+    // 3. Success path — REQUIRE a real Maytapi message ID before writing the Done marker.
+    //    If Maytapi returned ok=true but no usable id, treat as Needs Review:
+    //    keep entry Pending, mark zazi_actions as draft so user can retry.
+    if (!messageId) {
+      await (supabase.from('zazi_actions') as any)
+        .update({
+          status: 'draft',
+          evidence: {
+            ...evidence,
+            mp1: {
+              ...evidence.mp1,
+              failed_at: new Date().toISOString(),
+              failure_kind: 'missing_message_id',
+              failure_detail: 'maytapi-send-1to1 returned ok but no message_id',
+            },
+          },
+        })
+        .eq('id', zaziActionId);
+      return { ok: false, reason: 'missing_message_id' };
+    }
+
     const monthMarker = `[monthly_activity_appreciation:${args.monthKey}]`;
     const entryMarker = `[monthly_activity_appreciation_entry:${args.entryKey}]`;
-    const msgMarker = messageId ? `[maytapi_message:${messageId}]` : '';
+    const msgMarker = `[maytapi_message:${messageId}]`;
     await (supabase.from('contact_activities') as any).insert({
       user_id: user.id,
       contact_id: args.contactId,
       activity_type: 'whatsapp',
-      summary: `Sent monthly activity appreciation message via Maytapi — Month: ${args.monthKey} | ${monthMarker} ${entryMarker} ${msgMarker}`.trim(),
-      notes: `${args.finalMessage}\n\n${monthMarker} ${entryMarker} ${msgMarker}`.trim(),
+      summary: `Sent monthly activity appreciation message via Maytapi — Month: ${args.monthKey} | ${monthMarker} ${entryMarker} ${msgMarker}`,
+      notes: `${args.finalMessage}\n\n${monthMarker} ${entryMarker} ${msgMarker}`,
       next_action: '',
     });
 
