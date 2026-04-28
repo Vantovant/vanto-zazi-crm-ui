@@ -133,14 +133,21 @@ export function MonthlyActivityPush() {
       const entryKey = getActivityEntryKey(o, contact);
       const done = isEntryDone(o, contact);
       const wrEntry = contact ? getEntryForContact(String(contact.id)) : undefined;
+      const possibleDuplicate = !!wrEntry && /possible duplicate/i.test(wrEntry.issue_note || '');
       const needsReview = !done && (!contact || !!wrEntry);
       let status: 'done' | 'pending' | 'needs_review';
       if (done) status = 'done';
       else if (needsReview) status = 'needs_review';
       else status = 'pending';
-      return { order: o, contact, entryKey, status };
+      return { order: o, contact, entryKey, status, possibleDuplicate };
     });
   }, [allMonthOrders, contacts, isEntryDone, getEntryForContact]);
+
+  // MP0.1: count Waiting Room entries flagged as possible duplicates from imports.
+  const possibleDuplicateCount = useMemo(
+    () => openEntries.filter((e) => /possible duplicate/i.test(e.issue_note || '')).length,
+    [openEntries],
+  );
 
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
