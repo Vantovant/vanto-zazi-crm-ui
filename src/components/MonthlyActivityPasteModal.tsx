@@ -373,13 +373,22 @@ export function MonthlyActivityPasteModal({ onClose, onComplete }: MonthlyActivi
               <div className="py-8 text-center space-y-3">
                 <Check className="w-12 h-12 text-emerald-400 mx-auto" />
                 <h3 className="text-lg font-semibold text-white">Import Complete</h3>
-                <div className="flex justify-center gap-4 text-sm">
+                <div className="flex justify-center gap-4 text-sm flex-wrap">
                   <span className="text-emerald-400">{result.created} Created</span>
-                  <span className="text-slate-400">{result.skipped} Skipped</span>
+                  <span className="text-slate-400">{result.skipped} Duplicate-skipped</span>
+                  <span className="text-amber-400">{result.flagged} Flagged for Review</span>
                 </div>
                 <p className="text-sm text-slate-400">
-                  Month: {activityMonth} · Use the Activities page to send thank-you messages.
+                  Month: {activityMonth} · Use the Activities or Monthly Activity Push page to send thank-you messages.
                 </p>
+                {result.flagged > 0 && (
+                  <div className="mx-auto max-w-md p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 text-left">
+                    <ShieldAlert className="w-4 h-4 inline mr-1.5" />
+                    <strong>{result.flagged}</strong> row(s) matched an existing entry from a previous import without
+                    a same-report twin. They were sent to <strong>Needs Review</strong> (Waiting Room) and were NOT
+                    inserted as send-ready entries. Owner approval required.
+                  </div>
+                )}
               </div>
             )}
 
