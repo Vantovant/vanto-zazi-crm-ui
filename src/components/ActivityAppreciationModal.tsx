@@ -103,7 +103,7 @@ export function ActivityAppreciationModal({
   const [logSuccess, setLogSuccess] = useState(false);
 
   // ── MP1 (Maytapi pilot) state ────────────────────────────────────────────
-  const { gate, evaluateGate, send: sendViaMaytapi } = useMaytapiAppreciationSend();
+  const { gate, evaluateGate, send: sendViaMaytapi, refreshGate } = useMaytapiAppreciationSend();
   const [mp1GateReason, setMp1GateReason] = useState<GateBlockReason | undefined>(undefined);
   const [mp1GateDetail, setMp1GateDetail] = useState<string | undefined>(undefined);
   const [mp1Allowed, setMp1Allowed] = useState(false);
@@ -111,6 +111,13 @@ export function ActivityAppreciationModal({
   const [mp1Sending, setMp1Sending] = useState(false);
   const [mp1Error, setMp1Error] = useState<string | null>(null);
   const [mp1Success, setMp1Success] = useState<string | null>(null);
+
+  // MP1.1 — small allowlist convenience helper state. NEVER triggers a send,
+  // NEVER calls maytapi-send-1to1, NEVER creates zazi_actions, NEVER auto-imports.
+  const [mp11Working, setMp11Working] = useState(false);
+  const [mp11Error, setMp11Error] = useState<string | null>(null);
+  const [mp11Flash, setMp11Flash] = useState<string | null>(null);
+  const MP11_MAX_ALLOWLIST = 5;
 
   const entry = entries[currentIndex];
   const isBulk = entries.length > 1;
