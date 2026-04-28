@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   X, MessageCircle, Copy, Check, ExternalLink, Send,
   Loader2, Sparkles, Crown, Heart, Briefcase, Award,
-  ChevronLeft, ChevronRight, Users,
+  ChevronLeft, ChevronRight, Users, Zap, ShieldAlert,
 } from 'lucide-react';
 import aplgoLogo from '@/assets/aplgo-logo.png';
 import type { Prospect } from '@/data/mockData';
@@ -13,6 +13,11 @@ import { useCrm } from '@/contexts/CrmContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { normalizeActivityMonth, getActivityEntryKey } from '@/utils/monthlyActivityKey';
+import {
+  useMaytapiAppreciationSend,
+  gateReasonLabel,
+  type GateBlockReason,
+} from '@/hooks/useMaytapiAppreciationSend';
 
 export type AppreciationTone = 'warm' | 'royal' | 'leadership' | 'professional';
 
