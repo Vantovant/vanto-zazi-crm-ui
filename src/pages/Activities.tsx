@@ -463,7 +463,7 @@ export function Activities() {
             <div className="divide-y divide-slate-700/50">
               {filteredOrders.map((order) => {
                 const contact = contacts.find(c => String(c.id) === order.contactId);
-                const isAppreciated = order.contactId ? allAppreciatedIds.has(order.contactId) : false;
+                const isAppreciated = isAppreciatedFor(latestMonthKey, order.contactId, contact?.APLGoID);
                 // Build fallback contact for appreciation when no linked contact
                 const fallbackContact = (contact || {
                   id: order.id,
