@@ -1,11 +1,14 @@
 import { useState, useMemo } from 'react';
 import {
   X, ClipboardPaste, Loader2, Check, Sparkles, MessageCircle, AlertTriangle,
-  Calendar, Users,
+  Calendar, Users, ShieldAlert,
 } from 'lucide-react';
 import { useCrm } from '@/contexts/CrmContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useWaitingRoom } from '@/hooks/useWaitingRoom';
 import { parseMonthlyActivityReport, type MonthlyActivityRow } from '@/utils/monthlyActivityParser';
+import { normalizeActivityMonth } from '@/utils/monthlyActivityKey';
+import { supabase } from '@/integrations/supabase/client';
 import type { Prospect } from '@/data/mockData';
 
 interface MatchedRow extends MonthlyActivityRow {
