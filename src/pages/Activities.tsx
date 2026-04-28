@@ -307,7 +307,7 @@ export function Activities() {
       const cId = order.contactId;
       const contact = cId ? contacts.find(c => String(c.id) === cId) : undefined;
       const aplgo = contact?.APLGoID || '';
-      const isAppreciated = isAppreciatedFor(latestMonthKey, cId, aplgo);
+      const isAppreciated = isEntryAppreciated(order, contact);
       // Status filter
       if (activityPaidFilter === 'appreciated' && !isAppreciated) return false;
       if (activityPaidFilter === 'not_appreciated' && isAppreciated) return false;
@@ -323,7 +323,7 @@ export function Activities() {
 
     const appreciatedCount = latestOrders.filter(o => {
       const contact = o.contactId ? contacts.find(c => String(c.id) === o.contactId) : undefined;
-      return isAppreciatedFor(latestMonthKey, o.contactId, contact?.APLGoID);
+      return isEntryAppreciated(o, contact);
     }).length;
     const notAppreciatedCount = latestOrders.length - appreciatedCount;
 
