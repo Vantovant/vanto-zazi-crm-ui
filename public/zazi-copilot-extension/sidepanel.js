@@ -276,6 +276,7 @@ function renderContext(ctx) {
   $('aiIndicator').classList.add('hidden');
 
   renderMessages(ctx.messages || []);
+  prefillFieldNotes(contact);
 
   if (contact?.id) {
     loadTimeline(contact.id);
@@ -722,6 +723,183 @@ $('submitCreateBtn')?.addEventListener('click', async () => {
 
   $('submitCreateBtn').disabled = false;
   $('submitCreateBtn').textContent = 'Create & Link';
+});
+
+// ===== FIELD NOTES =====
+function prefillFieldNotes(contact) {
+  if (!contact) return;
+  const lt = $('fnLeadType'); if (lt && contact.lead_type) lt.value = contact.lead_type;
+  const tp = $('fnTemp'); if (tp && contact.lead_temperature) tp.value = contact.lead_temperature;
+}
+
+function fnShowStatus(msg, isError = false) {
+  const el = $('fnStatus');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'fn-status' + (isError ? ' error' : '');
+  el.classList.remove('hidden');
+  setTimeout(() => el.classList.add('hidden'), 3500);
+}
+
+function fnCollect() {
+  return {
+    source: $('fnSource')?.value || '',
+    reason: $('fnReason')?.value || '',
+    leadType: $('fnLeadType')?.value || '',
+    temperature: $('fnTemp')?.value || '',
+    nextAction: $('fnNextAction')?.value || '',
+    notes: $('fnNotes')?.value?.trim() || '',
+  };
+}
+
+function fnFormatNote(f) {
+  return [
+    'Field Note — Zazi Copilot',
+    `Lead Type: ${f.leadType || '—'}`,
+    `Temperature: ${f.temperature || '—'}`,
+    `Source / Met Where: ${f.source || '—'}`,
+    `Reason: ${f.reason || '—'}`,
+    `Next Action: ${f.nextAction || '—'}`,
+    '',
+    'Notes:',
+    f.notes || '(none)',
+  ].join('\n');
+}
+
+function fnRequireContact() {
+  if (!currentContext?.contact?.id) {
+    fnShowStatus('⚠️ No CRM contact linked. Match or create a contact first.', true);
+    return false;
+  }
+  return true;
+}
+
+function fnRequireSomething(f) {
+  if (!f.notes && !f.source && !f.reason && !f.nextAction) {
+    fnShowStatus('⚠️ Add some notes or pick a field first.', true);
+    return false;
+  }
+  return true;
+}
+
+// SAVE NOTES — append to contact.additional_notes (no message sent)
+$('fnSaveNotesBtn')?.addEventListener('click', async () => {
+  if (!fnRequireContact()) return;
+  const f = fnCollect();
+  if (!fnRequireSomething(f)) return;
+
+  const stamp = new Date().toLocaleString('en-ZA', { dateStyle: 'short', timeStyle: 'short' });
+  const block = `\n\n[${stamp}]\n${fnFormatNote(f)}`;
+  const existing = currentContext.contact.additional_notes || '';
+  const merged = (existing + block).slice(-8000); // safety cap
+
+  $('fnSaveNotesBtn').disabled = true;
+  const res = await chrome.runtime.sendMessage({
+    type: 'UPDATE_CONTACT',
+    contactId: currentContext.contact.id,
+    updates: { additional_notes: merged },
+  });
+  $('fnSaveNotesBtn').disabled = false;
+
+  if (res?.success && res.contact) {
+    currentContext.contact = res.contact;
+    fnShowStatus('✅ Notes saved to contact.');
+    $('fnNotes').value = '';
+  } else {
+    fnShowStatus('❌ ' + (res?.error || 'Save failed'), true);
+  }
+});
+
+// SAVE + LOG ACTIVITY — creates contact_activities row (no message sent)
+$('fnSaveLogBtn')?.addEventListener('click', async () => {
+  if (!fnRequireContact()) return;
+  const f = fnCollect();
+  if (!fnRequireSomething(f)) return;
+
+  const summaryParts = [];
+  if (f.leadType) summaryParts.push(`LeadType: ${f.leadType}`);
+  if (f.source) summaryParts.push(`Source: ${f.source}`);
+  if (f.reason) summaryParts.push(`Reason: ${f.reason}`);
+  if (f.nextAction) summaryParts.push(`Next: ${f.nextAction}`);
+  const summary = `Field Note — ${summaryParts.join(' · ') || 'note'}`;
+
+  $('fnSaveLogBtn').disabled = true;
+  const res = await chrome.runtime.sendMessage({
+    type: 'LOG_ACTIVITY',
+    params: {
+      contact_id: currentContext.contact.id,
+      activity_type: 'follow_up_note',
+      summary,
+      notes: fnFormatNote(f),
+      next_action: f.nextAction || '',
+    },
+  });
+  $('fnSaveLogBtn').disabled = false;
+
+  if (res?.success) {
+    fnShowStatus('✅ Activity logged.');
+    $('fnNotes').value = '';
+    if (currentContext.contact?.id) loadTimeline(currentContext.contact.id);
+  } else {
+    fnShowStatus('❌ ' + (res?.error || 'Log failed'), true);
+  }
+});
+
+// SAVE + UPDATE CONTACT — updates lead_type, temperature, next_action, notes (no message sent)
+$('fnSaveUpdateBtn')?.addEventListener('click', async () => {
+  if (!fnRequireContact()) return;
+  const f = fnCollect();
+  if (!fnRequireSomething(f) && !f.leadType && !f.temperature) return;
+
+  const updates = {};
+  if (f.leadType) updates.lead_type = f.leadType;
+  if (f.temperature) updates.lead_temperature = f.temperature;
+  if (f.nextAction) {
+    updates.next_action = f.nextAction;
+    updates.action_taken = f.nextAction;
+  }
+  if (f.notes || f.source || f.reason) {
+    const stamp = new Date().toLocaleString('en-ZA', { dateStyle: 'short', timeStyle: 'short' });
+    const block = `\n\n[${stamp}]\n${fnFormatNote(f)}`;
+    const existing = currentContext.contact.additional_notes || '';
+    updates.additional_notes = (existing + block).slice(-8000);
+  }
+
+  $('fnSaveUpdateBtn').disabled = true;
+  const res = await chrome.runtime.sendMessage({
+    type: 'UPDATE_CONTACT',
+    contactId: currentContext.contact.id,
+    updates,
+  });
+
+  // Also log a lightweight activity so the change is auditable
+  if (res?.success) {
+    await chrome.runtime.sendMessage({
+      type: 'LOG_ACTIVITY',
+      params: {
+        contact_id: currentContext.contact.id,
+        activity_type: 'follow_up_note',
+        summary: `Contact updated via Field Notes (${[f.leadType, f.temperature].filter(Boolean).join(' / ') || 'fields'})`,
+        notes: fnFormatNote(f),
+        next_action: f.nextAction || '',
+      },
+    });
+  }
+  $('fnSaveUpdateBtn').disabled = false;
+
+  if (res?.success && res.contact) {
+    currentContext.contact = res.contact;
+    const channelKey = getLastKnownContextKey(currentContext.channel || 'whatsapp');
+    await chrome.storage.local.set({
+      current_context: currentContext,
+      [channelKey]: currentContext,
+    });
+    renderContext(currentContext);
+    fnShowStatus('✅ Contact updated.');
+    $('fnNotes').value = '';
+  } else {
+    fnShowStatus('❌ ' + (res?.error || 'Update failed'), true);
+  }
 });
 
 // ===== HELPERS =====

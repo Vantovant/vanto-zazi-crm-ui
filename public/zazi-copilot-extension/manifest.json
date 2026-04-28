@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Zazi Follow-Up Copilot",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Intelligent follow-up assistant for Vanto Zazi CRM — WhatsApp & Gmail",
   "permissions": [
     "storage",
