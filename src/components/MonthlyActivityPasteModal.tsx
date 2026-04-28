@@ -89,14 +89,84 @@ export function MonthlyActivityPasteModal({ onClose, onComplete }: MonthlyActivi
     setError('');
     let created = 0;
     let skipped = 0;
+    let flagged = 0;
+
+    // ── MP0.1 stable signature + within-batch occurrence ──
+    // sig = user|monthKey|aplgoUserId|amount|displayedLevel|actualLevel
+    // dedupe_key = ma|{sig}|#{occurrence_within_this_paste}
+    // Cross-batch repeats default to skipped or Needs Review (never auto-promote).
+    const monthKey = normalizeActivityMonth(activityMonth) || activityMonth.replace(/\s/g, '');
+    const buildSig = (row: typeof selectedRows[number]) =>
+      [
+        user.id,
+        monthKey,
+        row.userId,
+        row.amount,
+        row.displayedLevel || 'x',
+        row.actualLevel || 'x',
+      ].join('|').toLowerCase();
+
+    // Pre-fetch existing dedupe_keys for this user + this month to detect
+    // ambiguous later repeats BEFORE attempting insert.
+    const sigPrefix = `ma|${[user.id, monthKey].join('|').toLowerCase()}|`;
+    let existingKeys = new Set<string>();
+    try {
+      const { data: existing } = await (supabase.from('orders') as any)
+        .select('dedupe_key')
+        .eq('user_id', user.id)
+        .eq('source', 'monthly-activity-paste')
+        .like('dedupe_key', `${sigPrefix}%`);
+      if (Array.isArray(existing)) {
+        existingKeys = new Set(existing.map((r: any) => String(r.dedupe_key || '').toLowerCase()));
+      }
+    } catch (e) {
+      console.warn('[MP0.1] could not pre-fetch existing dedupe keys; will rely on DB unique index', e);
+    }
+
+    // Count identical signatures within THIS paste (proof-of-same-report-twin).
+    const sigCountInBatch = new Map<string, number>();
+    for (const r of selectedRows) {
+      const s = buildSig(r);
+      sigCountInBatch.set(s, (sigCountInBatch.get(s) || 0) + 1);
+    }
+
+    const occurrenceCursor = new Map<string, number>(); // sig -> next occurrence # in this paste
+    const monthSlug = activityMonth.replace(/\s/g, '');
 
     for (let i = 0; i < selectedRows.length; i++) {
       const row = selectedRows[i];
       if (!row.contact) continue;
-      // M2: include amount + level + row index so multiple distinct entries
-      // for the same person/month are NOT collapsed into one orderId.
-      const monthSlug = activityMonth.replace(/\s/g, '');
-      const entrySig = `${row.amount}-${row.displayedLevel || 'x'}-${row.actualLevel || 'x'}-${i}`;
+
+      const sig = buildSig(row);
+      const occ = (occurrenceCursor.get(sig) || 0) + 1;
+      occurrenceCursor.set(sig, occ);
+
+      const dedupeKey = `ma|${sig}|#${occ}`;
+      const firstKey = `ma|${sig}|#1`;
+
+      // Same-report proof: any sig appearing >=2 times IN THIS PASTE is legitimate
+      // repeat (rule §2). Otherwise, if this is occ#>=2 and no twin exists in this
+      // paste, AND #1 already exists in DB → ambiguous later repeat → Needs Review (rule §4).
+      const sameReportTwin = (sigCountInBatch.get(sig) || 0) >= 2;
+      const firstAlreadyExists = existingKeys.has(firstKey);
+
+      if (occ >= 2 && !sameReportTwin && firstAlreadyExists) {
+        // Ambiguous later repeat — DO NOT insert into orders. Route to Needs Review.
+        await addToWaitingRoom({
+          contact_id: String(row.contact.id),
+          issue_type: 'follow_up_correction',
+          issue_note:
+            `Possible duplicate Monthly Activity entry — owner approval required. ` +
+            `Month: ${activityMonth}. Amount: R${row.amount}. ` +
+            `Level: ${row.displayedLevel}/${row.actualLevel}. ` +
+            `Signature already exists from a previous import; this paste did not contain a same-report twin.`,
+          priority: 'medium',
+        });
+        flagged++;
+        continue;
+      }
+
+      const entrySig = `${row.amount}-${row.displayedLevel || 'x'}-${row.actualLevel || 'x'}-occ${occ}`;
       const res = await addOrder({
         orderId: `MA-${row.userId}-${monthSlug}-${entrySig}`,
         contactName: row.contact.FullName,
@@ -111,12 +181,15 @@ export function MonthlyActivityPasteModal({ onClose, onComplete }: MonthlyActivi
         pvAmount: 0,
         source: 'monthly-activity-paste',
         salesChannel: 'Online',
+        dedupe_key: dedupeKey,
       });
-      if (res) created++; else skipped++;
+      if (res && (res as any).duplicate) skipped++;
+      else if (res) created++;
+      else skipped++;
     }
 
     await refetchOrders();
-    setResult({ created, skipped });
+    setResult({ created, skipped, flagged });
     setSaving(false);
     setStep('done');
 
