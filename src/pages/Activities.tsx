@@ -36,6 +36,13 @@ import { useWaitingRoom, ISSUE_TYPE_LABELS } from '@/hooks/useWaitingRoom';
 import { supabase } from '@/integrations/supabase/client';
 import ReactMarkdown from 'react-markdown';
 import type { Prospect } from '@/data/mockData';
+import {
+  normalizeActivityMonth,
+  monthLabel,
+  appreciationStatusKey,
+  extractAppreciationMonth,
+  compareMonthKeys,
+} from '@/utils/monthlyActivityKey';
 
 const activityTypeIcons: Record<string, typeof MessageCircle> = {
   whatsapp: MessageCircle,
