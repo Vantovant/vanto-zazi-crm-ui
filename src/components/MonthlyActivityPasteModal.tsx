@@ -143,15 +143,24 @@ export function MonthlyActivityPasteModal({ onClose, onComplete }: MonthlyActivi
 
       const dedupeKey = `ma|${sig}|#${occ}`;
       const firstKey = `ma|${sig}|#1`;
-
-      // Same-report proof: any sig appearing >=2 times IN THIS PASTE is legitimate
-      // repeat (rule §2). Otherwise, if this is occ#>=2 and no twin exists in this
-      // paste, AND #1 already exists in DB → ambiguous later repeat → Needs Review (rule §4).
-      const sameReportTwin = (sigCountInBatch.get(sig) || 0) >= 2;
+      const thisKeyAlreadyExists = existingKeys.has(dedupeKey);
       const firstAlreadyExists = existingKeys.has(firstKey);
+      const sigCountThisPaste = sigCountInBatch.get(sig) || 0;
+      const sameReportTwin = sigCountThisPaste >= 2;
 
-      if (occ >= 2 && !sameReportTwin && firstAlreadyExists) {
-        // Ambiguous later repeat — DO NOT insert into orders. Route to Needs Review.
+      // MP0.1 corrected duplicate branches.
+      //
+      // Case A — exact key already in DB (identical or reordered re-paste):
+      //   skip as duplicate. Never insert, never flag.
+      if (thisKeyAlreadyExists) {
+        skipped++;
+        continue;
+      }
+
+      // Case B — occ === 1, sig already in DB, AND this paste contains only ONE
+      // row of this sig (no same-report twin proof). This is an ambiguous later
+      // repeat introduced without proof → Needs Review (rule §1, §3, §4).
+      if (occ === 1 && firstAlreadyExists && !sameReportTwin) {
         await addToWaitingRoom({
           contact_id: String(row.contact.id),
           issue_type: 'follow_up_correction',
@@ -159,12 +168,20 @@ export function MonthlyActivityPasteModal({ onClose, onComplete }: MonthlyActivi
             `Possible duplicate Monthly Activity entry — owner approval required. ` +
             `Month: ${activityMonth}. Amount: R${row.amount}. ` +
             `Level: ${row.displayedLevel}/${row.actualLevel}. ` +
-            `Signature already exists from a previous import; this paste did not contain a same-report twin.`,
+            `Signature already exists from a previous import and this paste did not contain a same-report twin.`,
           priority: 'medium',
         });
         flagged++;
         continue;
       }
+
+      // Case C — occ >= 2 with same-report twin proof in current paste.
+      //   The pasted report itself contains both rows together (rule §2), so the
+      //   new occurrence may be inserted. (If its exact key already existed,
+      //   Case A already skipped it above.)
+      //
+      // Case D — occ === 1 and firstKey not in DB → normal first insert.
+      // Both fall through to the addOrder() call below.
 
       const entrySig = `${row.amount}-${row.displayedLevel || 'x'}-${row.actualLevel || 'x'}-occ${occ}`;
       const res = await addOrder({
