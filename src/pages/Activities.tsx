@@ -378,12 +378,24 @@ export function Activities() {
       <div className="bg-slate-800/50 border border-emerald-500/20 rounded-xl overflow-hidden">
         <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-slate-700">
           <div className="flex items-center justify-between flex-wrap gap-2">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Crown className="w-4 h-4 text-emerald-400" />
               <h3 className="font-semibold text-white text-sm sm:text-base">
                 {latestMonth ? `Activity Paid — ${latestMonth}` : 'Activity Paid'}
               </h3>
               <span className="text-xs text-emerald-400 font-medium">{latestOrders.length}</span>
+              {monthOptions.length > 0 && (
+                <select
+                  value={effectiveMonthKey}
+                  onChange={e => { setSelectedMonthKey(e.target.value); setSelectedActivityRows(new Set()); }}
+                  className="ml-1 px-2 py-1 text-[11px] bg-slate-900 border border-slate-700 rounded-md text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
+                  title="Select activity month"
+                >
+                  {monthOptions.map(opt => (
+                    <option key={opt.key} value={opt.key}>{opt.label} ({opt.count})</option>
+                  ))}
+                </select>
+              )}
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               <div className="flex bg-slate-900 rounded-lg p-0.5 text-[10px]">
