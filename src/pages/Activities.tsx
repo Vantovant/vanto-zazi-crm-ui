@@ -121,11 +121,11 @@ export function Activities() {
   const [goalsPeriod, setGoalsPeriod] = useState<'today' | 'week'>('today');
   const [wrFilter, setWrFilter] = useState<'all' | 'high' | 'resolved'>('all');
 
-  // Activity Appreciation state — month-scoped (M1)
+  // Activity Appreciation state — entry-scoped (M2)
   const [appreciationEntries, setAppreciationEntries] = useState<ActivityAppreciationEntry[] | null>(null);
   const [appreciationIndex, setAppreciationIndex] = useState(0);
-  // Optimistic month-scoped marks: keys = appreciationStatusKey(monthKey, contactId|aplgoId)
-  const [appreciatedKeys, setAppreciatedKeys] = useState<Set<string>>(new Set());
+  // Optimistic entry-scoped marks: keys = getActivityEntryKey(order, contact)
+  const [appreciatedEntryKeys, setAppreciatedEntryKeys] = useState<Set<string>>(new Set());
   const [activityPaidFilter, setActivityPaidFilter] = useState<'all' | 'not_appreciated' | 'appreciated'>('all');
   const [selectedActivityRows, setSelectedActivityRows] = useState<Set<string>>(new Set());
   const [activityPaidSearch, setActivityPaidSearch] = useState('');
@@ -133,37 +133,25 @@ export function Activities() {
   const [selectedMonthKey, setSelectedMonthKey] = useState<string>('');
 
 
-  // Detect appreciated (contact, month) pairs from activity log.
-  // Status is now MONTH-SCOPED — last month's "Done" never bleeds into this month.
-  const appreciatedKeysFromLog = useMemo(() => {
+  // M2: Detect appreciated ENTRY keys from log (entry-scoped, not month/person-scoped).
+  // Legacy logs (month-only marker, no entry marker) are intentionally ignored here
+  // so we never falsely mark new entries Done. They remain in history for audit.
+  const appreciatedEntryKeysFromLog = useMemo(() => {
     const keys = new Set<string>();
     for (const a of activities) {
       if (a.activity_type !== 'whatsapp') continue;
       if (!a.summary || !/activity appreciation/i.test(a.summary)) continue;
-      const monthKey = extractAppreciationMonth(a);
-      if (!monthKey) continue;
-      if (a.contact_id) keys.add(appreciationStatusKey(monthKey, a.contact_id));
-      // Also index by APLGoID parsed from summary so fallback contacts (no contact_id) still flip to Done.
-      const aplgoMatch = a.summary.match(/User ID:\s*([A-Za-z0-9_-]+)/i);
-      if (aplgoMatch && aplgoMatch[1] && aplgoMatch[1] !== 'N/A') {
-        keys.add(appreciationStatusKey(monthKey, aplgoMatch[1]));
-      }
+      const entryKey = extractAppreciationEntryKey(a);
+      if (entryKey) keys.add(entryKey);
     }
     return keys;
   }, [activities]);
 
-  const isAppreciatedFor = useCallback((monthKey: string, contactId: string | null | undefined, aplgoId?: string | null) => {
-    if (!monthKey) return false;
-    if (contactId) {
-      const k = appreciationStatusKey(monthKey, contactId);
-      if (appreciatedKeysFromLog.has(k) || appreciatedKeys.has(k)) return true;
-    }
-    if (aplgoId) {
-      const k = appreciationStatusKey(monthKey, aplgoId);
-      if (appreciatedKeysFromLog.has(k) || appreciatedKeys.has(k)) return true;
-    }
-    return false;
-  }, [appreciatedKeysFromLog, appreciatedKeys]);
+  const isEntryAppreciated = useCallback((order: any, contact?: any) => {
+    const k = getActivityEntryKey(order, contact);
+    if (!k) return false;
+    return appreciatedEntryKeysFromLog.has(k) || appreciatedEntryKeys.has(k);
+  }, [appreciatedEntryKeysFromLog, appreciatedEntryKeys]);
 
 
   const LEAD_TYPE_ORDER = ['Prospect', 'Registered_Nopurchase', 'Purchase_Nostatus', 'Purchase_Status', 'Expired', 'Customer', 'Distributor'] as const;
