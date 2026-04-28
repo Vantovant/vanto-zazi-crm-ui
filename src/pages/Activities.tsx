@@ -36,6 +36,13 @@ import { useWaitingRoom, ISSUE_TYPE_LABELS } from '@/hooks/useWaitingRoom';
 import { supabase } from '@/integrations/supabase/client';
 import ReactMarkdown from 'react-markdown';
 import type { Prospect } from '@/data/mockData';
+import {
+  normalizeActivityMonth,
+  monthLabel,
+  appreciationStatusKey,
+  extractAppreciationMonth,
+  compareMonthKeys,
+} from '@/utils/monthlyActivityKey';
 
 const activityTypeIcons: Record<string, typeof MessageCircle> = {
   whatsapp: MessageCircle,
@@ -112,31 +119,50 @@ export function Activities() {
   const [goalsPeriod, setGoalsPeriod] = useState<'today' | 'week'>('today');
   const [wrFilter, setWrFilter] = useState<'all' | 'high' | 'resolved'>('all');
 
-  // Activity Appreciation state
+  // Activity Appreciation state — month-scoped (M1)
   const [appreciationEntries, setAppreciationEntries] = useState<ActivityAppreciationEntry[] | null>(null);
   const [appreciationIndex, setAppreciationIndex] = useState(0);
-  const [appreciatedIds, setAppreciatedIds] = useState<Set<string>>(new Set());
+  // Optimistic month-scoped marks: keys = appreciationStatusKey(monthKey, contactId|aplgoId)
+  const [appreciatedKeys, setAppreciatedKeys] = useState<Set<string>>(new Set());
   const [activityPaidFilter, setActivityPaidFilter] = useState<'all' | 'not_appreciated' | 'appreciated'>('all');
   const [selectedActivityRows, setSelectedActivityRows] = useState<Set<string>>(new Set());
   const [activityPaidSearch, setActivityPaidSearch] = useState('');
+  // Selected month for the Activity Paid section. "" = use latest available.
+  const [selectedMonthKey, setSelectedMonthKey] = useState<string>('');
 
 
-  // Detect appreciated contacts from activity log
-  const appreciatedFromLog = useMemo(() => {
-    const ids = new Set<string>();
+  // Detect appreciated (contact, month) pairs from activity log.
+  // Status is now MONTH-SCOPED — last month's "Done" never bleeds into this month.
+  const appreciatedKeysFromLog = useMemo(() => {
+    const keys = new Set<string>();
     for (const a of activities) {
-      if (a.activity_type === 'whatsapp' && a.summary?.includes('activity appreciation')) {
-        if (a.contact_id) ids.add(a.contact_id);
+      if (a.activity_type !== 'whatsapp') continue;
+      if (!a.summary || !/activity appreciation/i.test(a.summary)) continue;
+      const monthKey = extractAppreciationMonth(a);
+      if (!monthKey) continue;
+      if (a.contact_id) keys.add(appreciationStatusKey(monthKey, a.contact_id));
+      // Also index by APLGoID parsed from summary so fallback contacts (no contact_id) still flip to Done.
+      const aplgoMatch = a.summary.match(/User ID:\s*([A-Za-z0-9_-]+)/i);
+      if (aplgoMatch && aplgoMatch[1] && aplgoMatch[1] !== 'N/A') {
+        keys.add(appreciationStatusKey(monthKey, aplgoMatch[1]));
       }
     }
-    return ids;
+    return keys;
   }, [activities]);
 
-  const allAppreciatedIds = useMemo(() => {
-    const combined = new Set(appreciatedFromLog);
-    appreciatedIds.forEach(id => combined.add(id));
-    return combined;
-  }, [appreciatedFromLog, appreciatedIds]);
+  const isAppreciatedFor = useCallback((monthKey: string, contactId: string | null | undefined, aplgoId?: string | null) => {
+    if (!monthKey) return false;
+    if (contactId) {
+      const k = appreciationStatusKey(monthKey, contactId);
+      if (appreciatedKeysFromLog.has(k) || appreciatedKeys.has(k)) return true;
+    }
+    if (aplgoId) {
+      const k = appreciationStatusKey(monthKey, aplgoId);
+      if (appreciatedKeysFromLog.has(k) || appreciatedKeys.has(k)) return true;
+    }
+    return false;
+  }, [appreciatedKeysFromLog, appreciatedKeys]);
+
 
   const LEAD_TYPE_ORDER = ['Prospect', 'Registered_Nopurchase', 'Purchase_Nostatus', 'Purchase_Status', 'Expired', 'Customer', 'Distributor'] as const;
   const LEAD_TYPE_LABELS: Record<string, string> = {
@@ -264,37 +290,51 @@ export function Activities() {
   // --- Activity Paid Section (reusable for mobile + desktop) ---
   const renderActivityPaidSection = () => {
     const activityOrders = orders.filter(o => o.source === 'monthly-activity-paste');
-    const monthGroups = new Map<string, typeof activityOrders>();
+    // Group by canonical YYYY-MM key, but keep a display label per group.
+    const monthGroups = new Map<string, { label: string; orders: typeof activityOrders }>();
     for (const o of activityOrders) {
-      const month = o.product.replace('Monthly Activity - ', '') || 'Unknown';
-      const arr = monthGroups.get(month) || [];
-      arr.push(o);
-      monthGroups.set(month, arr);
+      const rawLabel = (o.product || '').replace(/^Monthly Activity\s*-\s*/i, '').trim() || 'Unknown';
+      const key = normalizeActivityMonth(rawLabel) || rawLabel; // fallback so unparseable labels still group
+      const display = monthLabel(rawLabel) || rawLabel;
+      const bucket = monthGroups.get(key) || { label: display, orders: [] };
+      bucket.orders.push(o);
+      monthGroups.set(key, bucket);
     }
-    const latestMonth = Array.from(monthGroups.keys()).pop() || '';
-    const latestOrders = monthGroups.get(latestMonth) || [];
+    // Sort month keys chronologically (newest first for the dropdown).
+    const monthOptions = Array.from(monthGroups.entries())
+      .sort((a, b) => compareMonthKeys(b[0], a[0]))
+      .map(([key, v]) => ({ key, label: v.label, count: v.orders.length }));
+
+    const effectiveMonthKey = selectedMonthKey && monthGroups.has(selectedMonthKey)
+      ? selectedMonthKey
+      : (monthOptions[0]?.key || '');
+    const monthBucket = effectiveMonthKey ? monthGroups.get(effectiveMonthKey) : undefined;
+    const latestMonth = monthBucket?.label || '';
+    const latestMonthKey = effectiveMonthKey;
+    const latestOrders = monthBucket?.orders || [];
 
     const filteredOrders = latestOrders.filter(order => {
       const cId = order.contactId;
+      const contact = cId ? contacts.find(c => String(c.id) === cId) : undefined;
+      const aplgo = contact?.APLGoID || '';
+      const isAppreciated = isAppreciatedFor(latestMonthKey, cId, aplgo);
       // Status filter
-      if (activityPaidFilter !== 'all') {
-        if (!cId) return false;
-        const isAppreciated = allAppreciatedIds.has(cId);
-        if (activityPaidFilter === 'appreciated' && !isAppreciated) return false;
-        if (activityPaidFilter === 'not_appreciated' && isAppreciated) return false;
-      }
+      if (activityPaidFilter === 'appreciated' && !isAppreciated) return false;
+      if (activityPaidFilter === 'not_appreciated' && isAppreciated) return false;
       // Name search filter
       if (activityPaidSearch.trim()) {
         const q = activityPaidSearch.trim().toLowerCase();
         const nameMatch = order.contactName.toLowerCase().includes(q);
-        const contact = contacts.find(c => String(c.id) === order.contactId);
-        const idMatch = contact?.APLGoID?.toLowerCase().includes(q);
+        const idMatch = aplgo.toLowerCase().includes(q);
         if (!nameMatch && !idMatch) return false;
       }
       return true;
     });
 
-    const appreciatedCount = latestOrders.filter(o => o.contactId && allAppreciatedIds.has(o.contactId)).length;
+    const appreciatedCount = latestOrders.filter(o => {
+      const contact = o.contactId ? contacts.find(c => String(c.id) === o.contactId) : undefined;
+      return isAppreciatedFor(latestMonthKey, o.contactId, contact?.APLGoID);
+    }).length;
     const notAppreciatedCount = latestOrders.length - appreciatedCount;
 
     const handleOpenSingleAppreciation = (order: typeof latestOrders[0], contactOrFallback: Prospect) => {
@@ -338,12 +378,24 @@ export function Activities() {
       <div className="bg-slate-800/50 border border-emerald-500/20 rounded-xl overflow-hidden">
         <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-slate-700">
           <div className="flex items-center justify-between flex-wrap gap-2">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Crown className="w-4 h-4 text-emerald-400" />
               <h3 className="font-semibold text-white text-sm sm:text-base">
                 {latestMonth ? `Activity Paid — ${latestMonth}` : 'Activity Paid'}
               </h3>
               <span className="text-xs text-emerald-400 font-medium">{latestOrders.length}</span>
+              {monthOptions.length > 0 && (
+                <select
+                  value={effectiveMonthKey}
+                  onChange={e => { setSelectedMonthKey(e.target.value); setSelectedActivityRows(new Set()); }}
+                  className="ml-1 px-2 py-1 text-[11px] bg-slate-900 border border-slate-700 rounded-md text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
+                  title="Select activity month"
+                >
+                  {monthOptions.map(opt => (
+                    <option key={opt.key} value={opt.key}>{opt.label} ({opt.count})</option>
+                  ))}
+                </select>
+              )}
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               <div className="flex bg-slate-900 rounded-lg p-0.5 text-[10px]">
@@ -411,7 +463,7 @@ export function Activities() {
             <div className="divide-y divide-slate-700/50">
               {filteredOrders.map((order) => {
                 const contact = contacts.find(c => String(c.id) === order.contactId);
-                const isAppreciated = order.contactId ? allAppreciatedIds.has(order.contactId) : false;
+                const isAppreciated = isAppreciatedFor(latestMonthKey, order.contactId, contact?.APLGoID);
                 // Build fallback contact for appreciation when no linked contact
                 const fallbackContact = (contact || {
                   id: order.id,
@@ -895,7 +947,16 @@ export function Activities() {
           entries={appreciationEntries}
           initialIndex={appreciationIndex}
           onClose={() => { setAppreciationEntries(null); setSelectedActivityRows(new Set()); }}
-          onAppreciated={(contactId) => setAppreciatedIds(prev => new Set(prev).add(contactId))}
+          onAppreciated={(info) => {
+            setAppreciatedKeys(prev => {
+              const next = new Set(prev);
+              const mk = normalizeActivityMonth(info.month);
+              if (!mk) return next;
+              if (info.contactId) next.add(appreciationStatusKey(mk, info.contactId));
+              if (info.aplgoId) next.add(appreciationStatusKey(mk, info.aplgoId));
+              return next;
+            });
+          }}
         />
       )}
     </div>
