@@ -20,6 +20,7 @@ import { Duplicates } from './pages/Duplicates';
 import { Inventory } from './pages/Inventory';
 import { MomentumRun } from './pages/MomentumRun';
 import { SponsorIdReview } from './pages/SponsorIdReview';
+import { MonthlyActivityPush } from './pages/MonthlyActivityPush';
 
 function App() {
   return (
@@ -53,6 +54,7 @@ function App() {
               <Route path="team" element={<TeamDashboard />} />
               <Route path="momentum" element={<MomentumRun />} />
               <Route path="sponsor-review" element={<SponsorIdReview />} />
+              <Route path="monthly-activity-push" element={<MonthlyActivityPush />} />
               <Route path="help" element={<PlaceholderPage title="Help" />} />
             </Route>
           </Routes>
