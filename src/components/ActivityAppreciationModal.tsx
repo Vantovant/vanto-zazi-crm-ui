@@ -264,6 +264,89 @@ export function ActivityAppreciationModal({
     }
   }, [entry, mp1Args, sendViaMaytapi, onAppreciated, isBulk, currentIndex, entries.length]);
 
+  // ── MP1.1 — Allowlist convenience helpers ───────────────────────────────
+  // Strict scope: ONLY the current entry's phone, ONLY this admin's
+  // integration_settings.maytapi_phone_allowlist column, hard cap 5,
+  // every change writes a user_activity audit row.
+  // Hard rules: no bulk add, no downline import, no order import, no Send,
+  // no Maytapi call, no zazi_actions write, no daily_send_cap change.
+  const mp11WriteAudit = useCallback(async (
+    action: 'mp11_allowlist_add_current' | 'mp11_allowlist_replace_with_current',
+    oldList: string[],
+    newList: string[],
+    phoneLast4: string,
+  ) => {
+    if (!user) return;
+    await (supabase.from('user_activity') as any).insert({
+      user_id: user.id,
+      action,
+      page: '/activity-appreciation-modal',
+      metadata: {
+        // Only last 4 digits in audit metadata to avoid leaking full phones.
+        phone_last4: phoneLast4,
+        old_count: oldList.length,
+        new_count: newList.length,
+        contact_id: mp1Args?.contactId || null,
+        entry_key: mp1Args?.entryKey || null,
+        actor_user_id: user.id,
+        changed_at: new Date().toISOString(),
+      },
+    });
+  }, [user, mp1Args]);
+
+  const mp11AddCurrentToAllowlist = useCallback(async () => {
+    setMp11Error(null); setMp11Flash(null);
+    if (!user || !mp1Args) return;
+    if (!gate.isAdmin) { setMp11Error('Admin only.'); return; }
+    const phone = mp1Args.phoneNormalized;
+    if (!phone || phone.length < 9) { setMp11Error('No valid phone for this contact.'); return; }
+    if (gate.allowlist.includes(phone)) { setMp11Flash('Already on allowlist.'); return; }
+    if (gate.allowlist.length >= MP11_MAX_ALLOWLIST) {
+      setMp11Error(`Allowlist full (${MP11_MAX_ALLOWLIST}). Remove one number first.`);
+      return;
+    }
+    setMp11Working(true);
+    const next = [...gate.allowlist, phone];
+    const { error: upErr } = await (supabase.from('integration_settings') as any)
+      .update({ maytapi_phone_allowlist: next })
+      .eq('user_id', user.id);
+    if (upErr) {
+      setMp11Working(false);
+      setMp11Error(upErr.message);
+      return;
+    }
+    await mp11WriteAudit('mp11_allowlist_add_current', gate.allowlist, next, phone.slice(-4));
+    await refreshGate();
+    setMp11Working(false);
+    setMp11Flash(`Added ****${phone.slice(-4)}`);
+  }, [user, mp1Args, gate, refreshGate, mp11WriteAudit]);
+
+  const mp11ReplaceAllowlistWithCurrent = useCallback(async () => {
+    setMp11Error(null); setMp11Flash(null);
+    if (!user || !mp1Args) return;
+    if (!gate.isAdmin) { setMp11Error('Admin only.'); return; }
+    const phone = mp1Args.phoneNormalized;
+    if (!phone || phone.length < 9) { setMp11Error('No valid phone for this contact.'); return; }
+    if (gate.allowlist.length === 1 && gate.allowlist[0] === phone) {
+      setMp11Flash('Already the only number.');
+      return;
+    }
+    setMp11Working(true);
+    const next = [phone]; // hard cap respected: length 1 ≤ 5
+    const { error: upErr } = await (supabase.from('integration_settings') as any)
+      .update({ maytapi_phone_allowlist: next })
+      .eq('user_id', user.id);
+    if (upErr) {
+      setMp11Working(false);
+      setMp11Error(upErr.message);
+      return;
+    }
+    await mp11WriteAudit('mp11_allowlist_replace_with_current', gate.allowlist, next, phone.slice(-4));
+    await refreshGate();
+    setMp11Working(false);
+    setMp11Flash(`Allowlist replaced — only ****${phone.slice(-4)} now.`);
+  }, [user, mp1Args, gate, refreshGate, mp11WriteAudit]);
+
   if (!entry) return null;
 
   return (
