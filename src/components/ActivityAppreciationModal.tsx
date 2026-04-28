@@ -174,6 +174,7 @@ export function ActivityAppreciationModal({
   useEffect(() => {
     if (!mp1Args || gate.loading) {
       setMp1Allowed(false);
+      setMp1AllowedBy(undefined);
       setMp1GateReason(undefined);
       return;
     }
@@ -182,6 +183,7 @@ export function ActivityAppreciationModal({
       const r = await evaluateGate(mp1Args);
       if (cancelled) return;
       setMp1Allowed(r.allowed);
+      setMp1AllowedBy(r.allowedBy);
       setMp1GateReason(r.reason);
       setMp1GateDetail(r.detail);
     })();
