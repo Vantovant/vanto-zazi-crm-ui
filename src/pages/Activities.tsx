@@ -947,7 +947,16 @@ export function Activities() {
           entries={appreciationEntries}
           initialIndex={appreciationIndex}
           onClose={() => { setAppreciationEntries(null); setSelectedActivityRows(new Set()); }}
-          onAppreciated={(contactId) => setAppreciatedIds(prev => new Set(prev).add(contactId))}
+          onAppreciated={(info) => {
+            setAppreciatedKeys(prev => {
+              const next = new Set(prev);
+              const mk = normalizeActivityMonth(info.month);
+              if (!mk) return next;
+              if (info.contactId) next.add(appreciationStatusKey(mk, info.contactId));
+              if (info.aplgoId) next.add(appreciationStatusKey(mk, info.aplgoId));
+              return next;
+            });
+          }}
         />
       )}
     </div>
