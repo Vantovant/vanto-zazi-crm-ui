@@ -274,6 +274,15 @@ export function Mp1PilotSettingsCard() {
               <div className="text-xs text-slate-400">
                 Digits-only, no '+', no spaces. Example: <code className="text-slate-300">27821234567</code>
               </div>
+              {/* MP1.2 — Verified downline notice. Read-only, informational. */}
+              <div className="mt-2 px-2.5 py-2 bg-emerald-500/10 border border-emerald-500/25 rounded-md text-[11px] text-emerald-200 flex items-start gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                <span>
+                  <strong>Verified CRM downlines</strong> are cleared for reviewed one-by-one Maytapi sending without manual allowlist entry.
+                  A verified downline must have an APLGo&nbsp;ID, RegistrationStatus of <em>Registered</em> or <em>Activated</em>, and a non-prospect LeadType.
+                  This allowlist remains for testing &amp; exceptions only — it never sends, and it never bulk-adds anyone.
+                </span>
+              </div>
             </div>
 
             <div className="flex gap-2">
