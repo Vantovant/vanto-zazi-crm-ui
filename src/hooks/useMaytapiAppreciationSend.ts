@@ -79,6 +79,48 @@ export interface SendResult {
 
 const MP1_MODE = 'monthly_activity_appreciation_mp1';
 
+/**
+ * MP1.2 — Verified CRM downline rule.
+ *
+ * A contact is treated as a "verified downline" (and therefore cleared for
+ * reviewed one-by-one Maytapi sending without manual allowlist entry) when
+ * ALL of the following are true:
+ *
+ *   1. The contact is matched (UUID contactId — already enforced upstream).
+ *   2. They have a non-empty APLGoID — proves they are a real APLGO associate.
+ *   3. RegistrationStatus is 'Registered' or 'Activated'
+ *      (NOT 'Not Registered' — i.e. they have actually joined).
+ *   4. LeadType is one of the team/customer roles, NOT 'Prospect' / 'Expired':
+ *        Purchase_Status, Purchase_Nostatus, Registered_Nopurchase,
+ *        Customer, Distributor.
+ *
+ * Rule chosen because these are existing CRM fields that prove team membership
+ * — APLGO ID + active registration + a non-prospect lead type. Pure cold
+ * prospects, expired contacts, and unmatched contacts are NOT cleared.
+ *
+ * This rule clears ONE thing only: the phone-allowlist gate. ALL other safety
+ * gates (no_phone, opted_out, already_done, already_in_progress,
+ * daily_cap_reached, message_format_invalid) still apply unchanged.
+ */
+const VERIFIED_DOWNLINE_LEAD_TYPES = new Set<string>([
+  'Purchase_Status',
+  'Purchase_Nostatus',
+  'Registered_Nopurchase',
+  'Customer',
+  'Distributor',
+]);
+const VERIFIED_DOWNLINE_REG_STATUSES = new Set<string>(['Registered', 'Activated']);
+
+export function isVerifiedDownline(args: Pick<SendArgs, 'aplgoId' | 'registrationStatus' | 'leadType'>): boolean {
+  const aplgo = (args.aplgoId || '').trim();
+  if (!aplgo) return false;
+  const reg = (args.registrationStatus || '').trim();
+  if (!VERIFIED_DOWNLINE_REG_STATUSES.has(reg)) return false;
+  const lt = (args.leadType || '').trim();
+  if (!VERIFIED_DOWNLINE_LEAD_TYPES.has(lt)) return false;
+  return true;
+}
+
 export function useMaytapiAppreciationSend() {
   const { user } = useAuth();
 
