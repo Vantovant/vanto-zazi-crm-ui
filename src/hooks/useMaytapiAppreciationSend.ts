@@ -149,9 +149,15 @@ export function useMaytapiAppreciationSend() {
     const phone = (args.phoneNormalized || '').replace(/[^0-9]/g, '');
     if (!phone || phone.length < 9) return { allowed: false, reason: 'no_phone' };
 
-    if (gate.allowlist.length === 0 || !gate.allowlist.includes(phone)) {
+    // MP1.2 — Eligibility paths (either one clears the phone gate):
+    //   A. phone is in manual maytapi_phone_allowlist
+    //   B. contact is a verified CRM downline (real CRM signals)
+    const onAllowlist = gate.allowlist.includes(phone);
+    const downline = isVerifiedDownline(args);
+    if (!onAllowlist && !downline) {
       return { allowed: false, reason: 'phone_not_allowlisted' };
     }
+    const allowedBy: GateAllowedBy = onAllowlist ? 'allowlist' : 'verified_downline';
 
     if (!verifyFirstTouch(args.finalMessage)) {
       return { allowed: false, reason: 'message_format_invalid' };
