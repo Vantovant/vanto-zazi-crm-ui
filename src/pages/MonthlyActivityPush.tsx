@@ -314,12 +314,11 @@ export function MonthlyActivityPush() {
       )}
 
       {/* Drawer + Crown modal — reuse existing components, no new send paths */}
-      {drawerContactId && (
-        <ContactDrawer
-          contactId={drawerContactId}
-          onClose={() => setDrawerContactId(null)}
-        />
-      )}
+      {drawerContactId && (() => {
+        const p = contacts.find((c: any) => String(c.id) === String(drawerContactId)) as Prospect | undefined;
+        if (!p) return null;
+        return <ContactDrawer prospect={p} onClose={() => setDrawerContactId(null)} />;
+      })()}
       {appreciationEntry && (
         <ActivityAppreciationModal
           entries={[appreciationEntry]}
