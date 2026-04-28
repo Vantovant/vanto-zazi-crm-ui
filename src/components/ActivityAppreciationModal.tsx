@@ -34,7 +34,7 @@ interface ActivityAppreciationModalProps {
   entries: SingleEntry[];
   initialIndex?: number;
   onClose: () => void;
-  onAppreciated?: (contactId: string) => void;
+  onAppreciated?: (info: { contactId: string | null; aplgoId: string | null; month: string; monthKey: string }) => void;
 }
 
 const APLGO_BRAND_URL = 'https://crm.onlinecourseformlm.com/aplgo.html';
