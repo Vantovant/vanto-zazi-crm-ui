@@ -119,31 +119,50 @@ export function Activities() {
   const [goalsPeriod, setGoalsPeriod] = useState<'today' | 'week'>('today');
   const [wrFilter, setWrFilter] = useState<'all' | 'high' | 'resolved'>('all');
 
-  // Activity Appreciation state
+  // Activity Appreciation state — month-scoped (M1)
   const [appreciationEntries, setAppreciationEntries] = useState<ActivityAppreciationEntry[] | null>(null);
   const [appreciationIndex, setAppreciationIndex] = useState(0);
-  const [appreciatedIds, setAppreciatedIds] = useState<Set<string>>(new Set());
+  // Optimistic month-scoped marks: keys = appreciationStatusKey(monthKey, contactId|aplgoId)
+  const [appreciatedKeys, setAppreciatedKeys] = useState<Set<string>>(new Set());
   const [activityPaidFilter, setActivityPaidFilter] = useState<'all' | 'not_appreciated' | 'appreciated'>('all');
   const [selectedActivityRows, setSelectedActivityRows] = useState<Set<string>>(new Set());
   const [activityPaidSearch, setActivityPaidSearch] = useState('');
+  // Selected month for the Activity Paid section. "" = use latest available.
+  const [selectedMonthKey, setSelectedMonthKey] = useState<string>('');
 
 
-  // Detect appreciated contacts from activity log
-  const appreciatedFromLog = useMemo(() => {
-    const ids = new Set<string>();
+  // Detect appreciated (contact, month) pairs from activity log.
+  // Status is now MONTH-SCOPED — last month's "Done" never bleeds into this month.
+  const appreciatedKeysFromLog = useMemo(() => {
+    const keys = new Set<string>();
     for (const a of activities) {
-      if (a.activity_type === 'whatsapp' && a.summary?.includes('activity appreciation')) {
-        if (a.contact_id) ids.add(a.contact_id);
+      if (a.activity_type !== 'whatsapp') continue;
+      if (!a.summary || !/activity appreciation/i.test(a.summary)) continue;
+      const monthKey = extractAppreciationMonth(a);
+      if (!monthKey) continue;
+      if (a.contact_id) keys.add(appreciationStatusKey(monthKey, a.contact_id));
+      // Also index by APLGoID parsed from summary so fallback contacts (no contact_id) still flip to Done.
+      const aplgoMatch = a.summary.match(/User ID:\s*([A-Za-z0-9_-]+)/i);
+      if (aplgoMatch && aplgoMatch[1] && aplgoMatch[1] !== 'N/A') {
+        keys.add(appreciationStatusKey(monthKey, aplgoMatch[1]));
       }
     }
-    return ids;
+    return keys;
   }, [activities]);
 
-  const allAppreciatedIds = useMemo(() => {
-    const combined = new Set(appreciatedFromLog);
-    appreciatedIds.forEach(id => combined.add(id));
-    return combined;
-  }, [appreciatedFromLog, appreciatedIds]);
+  const isAppreciatedFor = useCallback((monthKey: string, contactId: string | null | undefined, aplgoId?: string | null) => {
+    if (!monthKey) return false;
+    if (contactId) {
+      const k = appreciationStatusKey(monthKey, contactId);
+      if (appreciatedKeysFromLog.has(k) || appreciatedKeys.has(k)) return true;
+    }
+    if (aplgoId) {
+      const k = appreciationStatusKey(monthKey, aplgoId);
+      if (appreciatedKeysFromLog.has(k) || appreciatedKeys.has(k)) return true;
+    }
+    return false;
+  }, [appreciatedKeysFromLog, appreciatedKeys]);
+
 
   const LEAD_TYPE_ORDER = ['Prospect', 'Registered_Nopurchase', 'Purchase_Nostatus', 'Purchase_Status', 'Expired', 'Customer', 'Distributor'] as const;
   const LEAD_TYPE_LABELS: Record<string, string> = {
