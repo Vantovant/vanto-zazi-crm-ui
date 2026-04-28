@@ -40,8 +40,16 @@ export type GateBlockReason =
   | 'daily_cap_reached'
   | 'message_format_invalid';
 
+/**
+ * MP1.2 — How the gate cleared the send. Surfaces in modal as a clear pill:
+ *   - 'allowlist'         → phone is in maytapi_phone_allowlist
+ *   - 'verified_downline' → contact is a verified CRM downline (see isVerifiedDownline)
+ */
+export type GateAllowedBy = 'allowlist' | 'verified_downline';
+
 export interface GateResult {
   allowed: boolean;
+  allowedBy?: GateAllowedBy;
   reason?: GateBlockReason;
   detail?: string;
 }
@@ -54,6 +62,11 @@ export interface SendArgs {
   monthKey: string;           // "YYYY-MM"
   entryKey: string;           // e.g. "oid:<uuid>"
   finalMessage: string;       // already includes branded URL first line + Vanto signature
+  // MP1.2 — verified downline signals (read-only, used only to clear eligibility).
+  // All optional so existing callers without these fields fall back to allowlist-only.
+  aplgoId?: string;
+  registrationStatus?: string;
+  leadType?: string;
 }
 
 export interface SendResult {
