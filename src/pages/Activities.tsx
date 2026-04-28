@@ -42,6 +42,8 @@ import {
   appreciationStatusKey,
   extractAppreciationMonth,
   compareMonthKeys,
+  getActivityEntryKey,
+  extractAppreciationEntryKey,
 } from '@/utils/monthlyActivityKey';
 
 const activityTypeIcons: Record<string, typeof MessageCircle> = {
