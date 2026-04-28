@@ -125,7 +125,7 @@ export function MonthlyActivityPush() {
   }, [orders, selectedMonthKey]);
 
   // Decorate each order with its contact, status, and entry key.
-  const decoratedRows = useMemo(() => {
+  const decoratedRows: RowShape[] = useMemo(() => {
     return allMonthOrders.map((o: any) => {
       const contact = o.contactId
         ? contacts.find((c: any) => String(c.id) === String(o.contactId))
