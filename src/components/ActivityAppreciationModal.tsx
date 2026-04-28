@@ -134,19 +134,35 @@ export function ActivityAppreciationModal({
     const whatsappUrl = buildWhatsAppUrl(entry.contact.PhoneNumber, entry.contact.Country, editedMessage);
     if (!whatsappUrl) return;
     setLogging(true);
+    const monthKey = normalizeActivityMonth(entry.month);
+    const aplgoId = (entry.contact.APLGoID || '').toString().trim() || null;
+    const contactIdRaw = entry.contact.id ? String(entry.contact.id) : '';
+    // Only pass a real contact_id (UUID-shaped); fallback rows use the order id and must NOT be logged as a contact link.
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(contactIdRaw);
+    const contactIdForLog = isUuid ? contactIdRaw : undefined;
+
+    // Machine-readable marker so month-scoped status detection is exact.
+    const marker = monthKey ? ` [monthly_activity_appreciation:${monthKey}]` : '';
     await logActivity({
-      contact_id: String(entry.contact.id),
+      contact_id: contactIdForLog,
       activity_type: 'whatsapp',
-      summary: `Sent monthly activity appreciation message — Month: ${entry.month} | Amount: R${entry.order.amount.toLocaleString()} | User ID: ${entry.contact.APLGoID || 'N/A'}`,
-      notes: editedMessage,
+      summary: `Sent monthly activity appreciation message — Month: ${entry.month} | Amount: R${entry.order.amount.toLocaleString()} | User ID: ${aplgoId || 'N/A'}${marker}`,
+      notes: `${editedMessage}\n\n${marker.trim()}`,
     });
-    await updateContact(String(entry.contact.id), {
-      ActionTaken: `Activity Appreciation sent for ${entry.month} (${new Date().toLocaleDateString()})`,
-    } as any);
+    if (contactIdForLog) {
+      await updateContact(contactIdForLog, {
+        ActionTaken: `Activity Appreciation sent for ${entry.month} (${new Date().toLocaleDateString()})`,
+      } as any);
+    }
     window.open(whatsappUrl, '_blank');
     setLogging(false);
     setLogSuccess(true);
-    onAppreciated?.(String(entry.contact.id));
+    onAppreciated?.({
+      contactId: contactIdForLog || null,
+      aplgoId,
+      month: entry.month,
+      monthKey,
+    });
 
     // Auto-advance in bulk mode
     if (isBulk && currentIndex < entries.length - 1) {
