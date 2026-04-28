@@ -34,6 +34,7 @@ export function AddContactModal({ onClose }: AddContactModalProps) {
     SponsorName: '',
     Leg: '',
     Level: '',
+    APLGoID: '',
   });
 
   const update = (key: string, value: string) => setForm(prev => ({ ...prev, [key]: value }));
@@ -52,7 +53,8 @@ export function AddContactModal({ onClose }: AddContactModalProps) {
       return;
     }
 
-    const result = await addContact(form as any) as any;
+    const payload = { ...form, APLGoID: (form.APLGoID || '').trim() };
+    const result = await addContact(payload as any) as any;
     setLoading(false);
     if (result && result.error === 'duplicate') {
       setError('A contact with this phone or email already exists. Visit the Duplicates page to review.');
@@ -72,6 +74,7 @@ export function AddContactModal({ onClose }: AddContactModalProps) {
       LeadTemperature: 'lead_temperature', LeadType: 'lead_type',
       FocusArea: 'focus_area', AdditionalNotes: 'additional_notes', GOStatus: 'go_status',
       SalutationTitle: 'salutation_title', SponsorName: 'sponsor_name', Leg: 'leg', Level: 'level',
+      APLGoID: 'aplgo_id',
     };
 
     const incoming: Record<string, unknown> = {};
@@ -122,6 +125,12 @@ export function AddContactModal({ onClose }: AddContactModalProps) {
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-1.5">Full Name *</label>
               <input type="text" value={form.FullName} onChange={e => update('FullName', e.target.value)} placeholder="Enter full name" className="w-full px-4 py-2.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500 placeholder:text-slate-500" required />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-1.5">APLGO ID</label>
+              <input type="text" inputMode="numeric" value={form.APLGoID} onChange={e => update('APLGoID', e.target.value)} placeholder="e.g. 1234567 (leave empty if not yet assigned)" className="w-full px-4 py-2.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500 placeholder:text-slate-500 font-mono" />
+              <p className="text-xs text-slate-500 mt-1">Used to match Monthly Activity Paste rows to this contact.</p>
             </div>
 
             <div className="grid grid-cols-2 gap-4">

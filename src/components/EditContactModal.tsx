@@ -38,6 +38,7 @@ export function EditContactModal({ prospect, onClose, onSaved }: EditContactModa
     SalutationTitle: prospect.SalutationTitle || 'Leader',
     Leg: prospect.Leg || '',
     Level: prospect.Level || '',
+    APLGoID: (prospect as any).APLGoID || '',
   });
 
   const update = (key: string, value: string) => setForm(prev => ({ ...prev, [key]: value }));
@@ -56,7 +57,8 @@ export function EditContactModal({ prospect, onClose, onSaved }: EditContactModa
       return;
     }
 
-    const result = await updateContact(String(prospect.id), form as Partial<Prospect>);
+    const trimmedForm = { ...form, APLGoID: (form.APLGoID || '').trim() };
+    const result = await updateContact(String(prospect.id), trimmedForm as Partial<Prospect>);
     setLoading(false);
     if (result === 'duplicate' as any) {
       setError('A contact with this phone or email already exists. Visit the Duplicates page to review.');
@@ -79,7 +81,7 @@ export function EditContactModal({ prospect, onClose, onSaved }: EditContactModa
       RegistrationStatus: 'registration_status', FocusArea: 'focus_area',
       NextAction: 'next_action', AdditionalNotes: 'additional_notes',
       GOStatus: 'go_status', SponsorName: 'sponsor_name', SalutationTitle: 'salutation_title',
-      Leg: 'leg', Level: 'level',
+      Leg: 'leg', Level: 'level', APLGoID: 'aplgo_id',
     };
 
     const incoming: Record<string, unknown> = {};
@@ -143,6 +145,12 @@ export function EditContactModal({ prospect, onClose, onSaved }: EditContactModa
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-1.5">Full Name *</label>
               <input type="text" value={form.FullName} onChange={e => update('FullName', e.target.value)} className="w-full px-4 py-2.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500" required />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-1.5">APLGO ID</label>
+              <input type="text" inputMode="numeric" value={form.APLGoID} onChange={e => update('APLGoID', e.target.value)} placeholder="e.g. 1234567 (leave empty if not yet assigned)" className="w-full px-4 py-2.5 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500 placeholder:text-slate-500 font-mono" />
+              <p className="text-xs text-slate-500 mt-1">Used to match Monthly Activity Paste rows to this contact.</p>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
