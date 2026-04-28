@@ -162,6 +162,10 @@ export function ActivityAppreciationModal({
       monthKey,
       entryKey,
       finalMessage: editedMessage,
+      // MP1.2 — verified downline signals (read-only).
+      aplgoId: String((entry.contact as any).APLGoID || '').trim(),
+      registrationStatus: String((entry.contact as any).RegistrationStatus || '').trim(),
+      leadType: String((entry.contact as any).LeadType || '').trim(),
     };
   }, [entry, editedMessage]);
 
