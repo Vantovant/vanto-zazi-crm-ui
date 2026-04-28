@@ -18,6 +18,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { Mp1PilotSettingsCard } from '@/components/Mp1PilotSettingsCard';
 
 interface UserStat {
   userId: string;
@@ -214,6 +215,9 @@ export function TeamDashboard() {
           </button>
         </div>
       </div>
+
+      {/* MP1 Pilot Settings — admin-only, defence-in-depth gated inside the component */}
+      <Mp1PilotSettingsCard />
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
