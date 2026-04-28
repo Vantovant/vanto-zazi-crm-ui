@@ -59,7 +59,7 @@ export function MonthlyActivityPush() {
   const { user, loading: authLoading } = useAuth();
   const { contacts, orders } = useCrm();
   const { activities } = useContactActivities();
-  const { addToWaitingRoom, getEntryForContact } = useWaitingRoom();
+  const { addToWaitingRoom, getEntryForContact, openEntries } = useWaitingRoom();
 
   const [selectedMonthKey, setSelectedMonthKey] = useState<string>('');
   const [search, setSearch] = useState('');
