@@ -533,6 +533,19 @@ export function ActivityAppreciationModal({
                       );
                     })()
                   )}
+                  {/* MP1.2 — eligibility reason pill (allowlist vs verified downline) */}
+                  {mp1Allowed && !mp1Success && mp1AllowedBy && (
+                    <div className={`flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] rounded-md border ${
+                      mp1AllowedBy === 'verified_downline'
+                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-200'
+                        : 'bg-purple-500/10 border-purple-500/30 text-purple-200'
+                    }`}>
+                      <Check className="w-3 h-3" />
+                      {mp1AllowedBy === 'verified_downline'
+                        ? 'Allowed: verified CRM downline.'
+                        : 'Allowed by phone allowlist.'}
+                    </div>
+                  )}
                   {mp1Success ? (
                     <div className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm bg-purple-500/15 border border-purple-500/30 rounded-lg text-purple-200">
                       <Check className="w-4 h-4 text-purple-300" />
