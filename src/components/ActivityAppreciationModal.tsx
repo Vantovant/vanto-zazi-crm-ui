@@ -17,6 +17,7 @@ import {
   useMaytapiAppreciationSend,
   gateReasonLabel,
   type GateBlockReason,
+  type GateAllowedBy,
 } from '@/hooks/useMaytapiAppreciationSend';
 
 export type AppreciationTone = 'warm' | 'royal' | 'leadership' | 'professional';
@@ -107,6 +108,7 @@ export function ActivityAppreciationModal({
   const [mp1GateReason, setMp1GateReason] = useState<GateBlockReason | undefined>(undefined);
   const [mp1GateDetail, setMp1GateDetail] = useState<string | undefined>(undefined);
   const [mp1Allowed, setMp1Allowed] = useState(false);
+  const [mp1AllowedBy, setMp1AllowedBy] = useState<GateAllowedBy | undefined>(undefined);
   const [mp1Confirming, setMp1Confirming] = useState(false);
   const [mp1Sending, setMp1Sending] = useState(false);
   const [mp1Error, setMp1Error] = useState<string | null>(null);
@@ -162,12 +164,17 @@ export function ActivityAppreciationModal({
       monthKey,
       entryKey,
       finalMessage: editedMessage,
+      // MP1.2 — verified downline signals (read-only).
+      aplgoId: String((entry.contact as any).APLGoID || '').trim(),
+      registrationStatus: String((entry.contact as any).RegistrationStatus || '').trim(),
+      leadType: String((entry.contact as any).LeadType || '').trim(),
     };
   }, [entry, editedMessage]);
 
   useEffect(() => {
     if (!mp1Args || gate.loading) {
       setMp1Allowed(false);
+      setMp1AllowedBy(undefined);
       setMp1GateReason(undefined);
       return;
     }
@@ -176,6 +183,7 @@ export function ActivityAppreciationModal({
       const r = await evaluateGate(mp1Args);
       if (cancelled) return;
       setMp1Allowed(r.allowed);
+      setMp1AllowedBy(r.allowedBy);
       setMp1GateReason(r.reason);
       setMp1GateDetail(r.detail);
     })();
@@ -524,6 +532,19 @@ export function ActivityAppreciationModal({
                         </div>
                       );
                     })()
+                  )}
+                  {/* MP1.2 — eligibility reason pill (allowlist vs verified downline) */}
+                  {mp1Allowed && !mp1Success && mp1AllowedBy && (
+                    <div className={`flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] rounded-md border ${
+                      mp1AllowedBy === 'verified_downline'
+                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-200'
+                        : 'bg-purple-500/10 border-purple-500/30 text-purple-200'
+                    }`}>
+                      <Check className="w-3 h-3" />
+                      {mp1AllowedBy === 'verified_downline'
+                        ? 'Allowed: verified CRM downline.'
+                        : 'Allowed by phone allowlist.'}
+                    </div>
                   )}
                   {mp1Success ? (
                     <div className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm bg-purple-500/15 border border-purple-500/30 rounded-lg text-purple-200">
