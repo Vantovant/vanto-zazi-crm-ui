@@ -500,6 +500,14 @@ function RowItem({
             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusBadge}`}>
               {statusLabel}
             </span>
+            {possibleDuplicate && (
+              <span
+                className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                title="Flagged by MP0.1: same signature exists from a previous import without same-report twin"
+              >
+                ⚠ possible duplicate
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-3 mt-1 text-[10px] text-slate-500 flex-wrap">
             <span>{monthShown}</span>
