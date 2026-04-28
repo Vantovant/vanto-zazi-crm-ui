@@ -72,7 +72,7 @@ export function useOrders() {
   const addOrder = async (order: Omit<Order, 'id'> & { contact_id?: string }) => {
     if (!user) return null;
 
-    // Compute dedupe_key for backoffice-paste orders
+    // Compute dedupe_key for paste-imported orders
     let dedupe_key: string | null = null;
     if (order.source === 'backoffice-paste') {
       const parts = [
@@ -85,8 +85,12 @@ export function useOrders() {
         (order.orderDate || ''),
         (order.source || 'manual').trim().toLowerCase(),
       ].join('|');
-      // Use the same raw string; the DB unique index on (user_id, dedupe_key) prevents dups
       dedupe_key = parts;
+    } else if (order.source === 'monthly-activity-paste') {
+      // M2: orderId already encodes month + userId + amount + level + row index,
+      // so a re-paste of the exact same report is blocked, while a truly distinct
+      // second entry (different amount / level / row) is allowed.
+      dedupe_key = `ma|${(order.orderId || '').trim().toLowerCase()}`;
     }
 
     const insertPayload: Record<string, unknown> = {
