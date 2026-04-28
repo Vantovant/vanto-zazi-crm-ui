@@ -18,6 +18,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { Mp1PilotSettingsCard } from '@/components/Mp1PilotSettingsCard';
 
 interface UserStat {
   userId: string;
