@@ -179,6 +179,94 @@
             </div>
           </div>
 
+          <!-- Field Notes (Relationship Intelligence) -->
+          <div class="field-notes-card">
+            <div class="fn-header">
+              <span class="fn-title">📓 Field Notes</span>
+              <span class="fn-sub">Capture the story — not just a reply</span>
+            </div>
+
+            <div class="fn-grid">
+              <div class="fn-row">
+                <label class="form-label">Met Where / Source</label>
+                <select id="fnSource" class="form-select">
+                  <option value="">— Select —</option>
+                  <option>WhatsApp</option>
+                  <option>Facebook</option>
+                  <option>Church</option>
+                  <option>Zoom</option>
+                  <option>Event</option>
+                  <option>Referral</option>
+                  <option>Family</option>
+                  <option>Customer</option>
+                  <option>Downline</option>
+                  <option>Unknown</option>
+                </select>
+              </div>
+              <div class="fn-row">
+                <label class="form-label">Reason for Contact</label>
+                <select id="fnReason" class="form-select">
+                  <option value="">— Select —</option>
+                  <option>Product interest</option>
+                  <option>Business interest</option>
+                  <option>Follow-up</option>
+                  <option>Support</option>
+                  <option>Complaint</option>
+                  <option>Reactivation</option>
+                  <option>Appreciation</option>
+                  <option>Training</option>
+                  <option>Health concern</option>
+                </select>
+              </div>
+              <div class="fn-row">
+                <label class="form-label">Lead Type</label>
+                <select id="fnLeadType" class="form-select">
+                  <option value="Prospect">Prospect</option>
+                  <option value="Registered_Nopurchase">Registered (No Purchase)</option>
+                  <option value="Purchase_Nostatus">Purchase (No Status)</option>
+                  <option value="Purchase_Status">Purchase (Status)</option>
+                  <option value="Customer">Customer</option>
+                  <option value="Distributor">Distributor</option>
+                  <option value="Expired">Expired</option>
+                </select>
+              </div>
+              <div class="fn-row">
+                <label class="form-label">Temperature</label>
+                <select id="fnTemp" class="form-select">
+                  <option value="Cold">Cold</option>
+                  <option value="Warm" selected>Warm</option>
+                  <option value="Hot">Hot</option>
+                </select>
+              </div>
+              <div class="fn-row fn-row-full">
+                <label class="form-label">Next Action</label>
+                <select id="fnNextAction" class="form-select">
+                  <option value="">— Select —</option>
+                  <option>Reach Out</option>
+                  <option>Follow Up</option>
+                  <option>Send Product Info</option>
+                  <option>Send Business Info</option>
+                  <option>Invite to Zoom</option>
+                  <option>Check Payment</option>
+                  <option>Train / Support</option>
+                  <option>Appreciation</option>
+                  <option>No Action</option>
+                </select>
+              </div>
+            </div>
+
+            <textarea id="fnNotes" class="fn-textarea"
+              placeholder="Write what this person said, what they need, where you met them, and what follow-up is needed…"></textarea>
+
+            <div class="fn-actions">
+              <button id="fnSaveNotesBtn" class="btn-action" title="Save to contact notes only — no message sent">💾 Save Notes</button>
+              <button id="fnSaveLogBtn" class="btn-action btn-action-primary" title="Save + create activity log — no message sent">📝 Save + Log Activity</button>
+              <button id="fnSaveUpdateBtn" class="btn-action" title="Save + update Lead Type, Temperature, Next Action — no message sent">🔄 Save + Update Contact</button>
+            </div>
+            <p class="fn-safety">🔒 Notes only. No WhatsApp / Maytapi send is triggered.</p>
+            <p id="fnStatus" class="fn-status hidden"></p>
+          </div>
+
           <!-- Recent Messages -->
           <div class="messages-card">
             <h4>Recent Messages</h4>
