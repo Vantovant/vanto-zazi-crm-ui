@@ -216,6 +216,9 @@ export function TeamDashboard() {
         </div>
       </div>
 
+      {/* MP1 Pilot Settings — admin-only, defence-in-depth gated inside the component */}
+      <Mp1PilotSettingsCard />
+
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
