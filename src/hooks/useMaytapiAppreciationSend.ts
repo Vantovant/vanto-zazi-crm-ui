@@ -199,7 +199,7 @@ export function useMaytapiAppreciationSend() {
       return { allowed: false, reason: 'daily_cap_reached', detail: `${todayCount}/${gate.dailyCap}` };
     }
 
-    return { allowed: true };
+    return { allowed: true, allowedBy };
   }, [user, gate, verifyFirstTouch]);
 
   /**
