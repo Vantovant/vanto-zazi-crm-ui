@@ -525,13 +525,6 @@ export function ActivityAppreciationModal({
                       );
                     })()
                   )}
-                  {mp1Success ? (
-                    <div className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm bg-purple-500/15 border border-purple-500/30 rounded-lg text-purple-200">
-                      <Check className="w-4 h-4 text-purple-300" />
-                      Sent via Maytapi · msg <span className="font-mono text-[11px]">{mp1Success.slice(-10)}</span>
-                    </div>
-                  ) : (
-                    <button
                     <div className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm bg-purple-500/15 border border-purple-500/30 rounded-lg text-purple-200">
                       <Check className="w-4 h-4 text-purple-300" />
                       Sent via Maytapi · msg <span className="font-mono text-[11px]">{mp1Success.slice(-10)}</span>
