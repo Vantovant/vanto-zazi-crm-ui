@@ -460,8 +460,78 @@ export function ActivityAppreciationModal({
               {/* MP1 — Send via Maytapi (pilot, one-by-one). Always shown once gate has loaded;
                    disabled with reason when blocked (admin-only, Maytapi disabled, allowlist, etc.). */}
               {!gate.loading && (
-                <div className="pt-2 border-t border-slate-700/60 mt-1">
+                <div className="pt-2 border-t border-slate-700/60 mt-1 space-y-2">
+                  {/* MP1.1 — Allowlist convenience helper.
+                      Visible to admins only, only acts on the CURRENT contact's phone,
+                      cannot bulk-add, cannot import downlines or orders, never sends. */}
+                  {gate.isAdmin && mp1Args && !mp1Success && (
+                    (() => {
+                      const phone = mp1Args.phoneNormalized;
+                      const last4 = phone ? phone.slice(-4) : '';
+                      const onList = !!phone && gate.allowlist.includes(phone);
+                      const listFull = gate.allowlist.length >= MP11_MAX_ALLOWLIST;
+                      return (
+                        <div className="rounded-lg border border-purple-500/20 bg-purple-500/5 p-2.5 text-[11px] space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="text-slate-300">
+                              <span className="text-slate-500">This contact's phone: </span>
+                              <span className="font-mono text-white">{phone ? `****${last4}` : '— no valid phone —'}</span>
+                            </div>
+                            <div className="text-slate-500">
+                              Allowlist {gate.allowlist.length}/{MP11_MAX_ALLOWLIST}
+                            </div>
+                          </div>
+                          {phone && (
+                            onList ? (
+                              <p className="text-emerald-300 flex items-center gap-1">
+                                <Check className="w-3 h-3" /> This phone is already on the allowlist.
+                              </p>
+                            ) : (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                                <button
+                                  type="button"
+                                  disabled={mp11Working || listFull}
+                                  onClick={mp11AddCurrentToAllowlist}
+                                  title={listFull ? `Allowlist full — remove one number first` : 'Add only this contact to the allowlist'}
+                                  className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-[11px] font-medium bg-purple-600/80 hover:bg-purple-500 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed text-white rounded-md transition-colors"
+                                >
+                                  {mp11Working ? <Loader2 className="w-3 h-3 animate-spin" /> : <ShieldAlert className="w-3 h-3" />}
+                                  {listFull ? 'Allowlist full — remove one' : 'Add this phone to allowlist'}
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={mp11Working}
+                                  onClick={mp11ReplaceAllowlistWithCurrent}
+                                  title="Clear allowlist and add only this contact"
+                                  className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-[11px] font-medium bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-100 rounded-md transition-colors"
+                                >
+                                  {mp11Working ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                                  Replace allowlist with this contact only
+                                </button>
+                              </div>
+                            )
+                          )}
+                          {mp11Flash && (
+                            <p className="text-emerald-300">{mp11Flash}</p>
+                          )}
+                          {mp11Error && (
+                            <p className="text-rose-300">{mp11Error}</p>
+                          )}
+                          <p className="text-[10px] text-slate-500">
+                            Helper only edits your allowlist. It never sends a message, never calls Maytapi,
+                            and never adds any other contact. Send via Maytapi still requires manual review and confirmation below.
+                          </p>
+                        </div>
+                      );
+                    })()
+                  )}
                   {mp1Success ? (
+                    <div className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm bg-purple-500/15 border border-purple-500/30 rounded-lg text-purple-200">
+                      <Check className="w-4 h-4 text-purple-300" />
+                      Sent via Maytapi · msg <span className="font-mono text-[11px]">{mp1Success.slice(-10)}</span>
+                    </div>
+                  ) : (
+                    <button
                     <div className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm bg-purple-500/15 border border-purple-500/30 rounded-lg text-purple-200">
                       <Check className="w-4 h-4 text-purple-300" />
                       Sent via Maytapi · msg <span className="font-mono text-[11px]">{mp1Success.slice(-10)}</span>
