@@ -381,6 +381,7 @@ interface RowShape {
   contact: any | undefined;
   entryKey: string;
   status: 'done' | 'pending' | 'needs_review';
+  possibleDuplicate?: boolean;
 }
 
 function Section({
