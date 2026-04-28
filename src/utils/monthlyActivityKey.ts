@@ -136,3 +136,86 @@ export function extractAppreciationMonth(activity: {
 export function compareMonthKeys(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// M2 — Entry-scoped appreciation (per activity order/entry)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Lightweight stable hash (djb2) → base36, no deps. */
+function stableHash(input: string): string {
+  let h = 5381;
+  for (let i = 0; i < input.length; i++) {
+    h = ((h << 5) + h) ^ input.charCodeAt(i);
+    h = h | 0; // force int32
+  }
+  return Math.abs(h).toString(36);
+}
+
+interface ActivityEntryOrderLike {
+  id?: string | number | null;
+  dedupe_key?: string | null;
+  dedupeKey?: string | null;
+  product?: string | null;
+  amount?: number | null;
+  contactId?: string | null;
+  contact_id?: string | null;
+  source?: string | null;
+}
+
+interface ActivityEntryContactLike {
+  id?: string | number | null;
+  APLGoID?: string | null;
+  Level?: string | null;
+  Leg?: string | null;
+}
+
+/**
+ * Build a stable, entry-scoped key for one activity order/entry.
+ *
+ * Priority:
+ *   1. order.id          (UUID — most stable)
+ *   2. order.dedupe_key  (already entry-distinct)
+ *   3. fallback hash of monthKey + aplgo/userId + amount + level
+ */
+export function getActivityEntryKey(
+  order: ActivityEntryOrderLike | null | undefined,
+  contact?: ActivityEntryContactLike | null,
+): string {
+  if (!order) return '';
+  const id = order.id != null ? String(order.id).trim() : '';
+  if (id) return `oid:${id}`;
+
+  const dk = (order.dedupe_key || order.dedupeKey || '').toString().trim();
+  if (dk) return `dk:${dk}`;
+
+  // Fallback: derive from semantic fields
+  const monthKey = normalizeActivityMonth(order.product || '');
+  const aplgo = (contact?.APLGoID || '').toString().trim();
+  const cid = (contact?.id != null ? String(contact.id) : (order.contactId || order.contact_id || '')).toString().trim();
+  const amount = String(order.amount ?? 0);
+  const level = `${contact?.Level || ''}|${contact?.Leg || ''}`;
+  const raw = [monthKey, aplgo || cid, amount, level].join('::');
+  return `fk:${stableHash(raw)}`;
+}
+
+/** Composite status key for entry-scoped Done/Pending lookups. */
+export function appreciationEntryStatusKey(
+  order: ActivityEntryOrderLike | null | undefined,
+  contact?: ActivityEntryContactLike | null,
+): string {
+  return getActivityEntryKey(order, contact);
+}
+
+/**
+ * Extract entry key from a contact_activities log row, if marker present.
+ * Returns "" if no entry-level marker found (legacy logs).
+ */
+export function extractAppreciationEntryKey(activity: {
+  summary?: string | null;
+  notes?: string | null;
+}): string {
+  const haystack = `${activity.notes || ''}\n${activity.summary || ''}`;
+  const m = haystack.match(/\[monthly_activity_appreciation_entry:([^\]]+)\]/i);
+  if (m && m[1]) return m[1].trim();
+  return '';
+}

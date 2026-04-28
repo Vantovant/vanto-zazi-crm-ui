@@ -12,7 +12,7 @@ import { useContactActivities } from '@/hooks/useContactActivities';
 import { useCrm } from '@/contexts/CrmContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { normalizeActivityMonth } from '@/utils/monthlyActivityKey';
+import { normalizeActivityMonth, getActivityEntryKey } from '@/utils/monthlyActivityKey';
 
 export type AppreciationTone = 'warm' | 'royal' | 'leadership' | 'professional';
 
@@ -22,6 +22,7 @@ interface ActivityOrder {
   contactName: string;
   amount: number;
   product: string;
+  dedupe_key?: string | null;
 }
 
 interface SingleEntry {
@@ -34,7 +35,13 @@ interface ActivityAppreciationModalProps {
   entries: SingleEntry[];
   initialIndex?: number;
   onClose: () => void;
-  onAppreciated?: (info: { contactId: string | null; aplgoId: string | null; month: string; monthKey: string }) => void;
+  onAppreciated?: (info: {
+    contactId: string | null;
+    aplgoId: string | null;
+    month: string;
+    monthKey: string;
+    entryKey: string;
+  }) => void;
 }
 
 const APLGO_BRAND_URL = 'https://crm.onlinecourseformlm.com/aplgo.html';
@@ -141,13 +148,15 @@ export function ActivityAppreciationModal({
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(contactIdRaw);
     const contactIdForLog = isUuid ? contactIdRaw : undefined;
 
-    // Machine-readable marker so month-scoped status detection is exact.
-    const marker = monthKey ? ` [monthly_activity_appreciation:${monthKey}]` : '';
+    // M2: entry-scoped marker so each activity order/entry has its own Done state.
+    const entryKey = getActivityEntryKey(entry.order, entry.contact);
+    const monthMarker = monthKey ? ` [monthly_activity_appreciation:${monthKey}]` : '';
+    const entryMarker = entryKey ? ` [monthly_activity_appreciation_entry:${entryKey}]` : '';
     await logActivity({
       contact_id: contactIdForLog,
       activity_type: 'whatsapp',
-      summary: `Sent monthly activity appreciation message — Month: ${entry.month} | Amount: R${entry.order.amount.toLocaleString()} | User ID: ${aplgoId || 'N/A'}${marker}`,
-      notes: `${editedMessage}\n\n${marker.trim()}`,
+      summary: `Sent monthly activity appreciation message — Month: ${entry.month} | Amount: R${entry.order.amount.toLocaleString()} | User ID: ${aplgoId || 'N/A'}${monthMarker}${entryMarker}`,
+      notes: `${editedMessage}\n\n${monthMarker.trim()} ${entryMarker.trim()}`.trim(),
     });
     if (contactIdForLog) {
       await updateContact(contactIdForLog, {
@@ -162,6 +171,7 @@ export function ActivityAppreciationModal({
       aplgoId,
       month: entry.month,
       monthKey,
+      entryKey,
     });
 
     // Auto-advance in bulk mode
