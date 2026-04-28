@@ -77,34 +77,33 @@ export function useMaytapiAppreciationSend() {
     loading: true,
   });
 
-  // Load admin role + integration settings once per user.
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      if (!user) {
-        if (!cancelled) setGate((g) => ({ ...g, loading: false }));
-        return;
-      }
-      const [{ data: roleRow }, { data: settings }] = await Promise.all([
-        (supabase.from('user_roles') as any)
-          .select('role').eq('user_id', user.id).eq('role', 'admin').maybeSingle(),
-        (supabase.from('integration_settings') as any)
-          .select('maytapi_enabled, maytapi_phone_allowlist, daily_send_cap')
-          .eq('user_id', user.id).maybeSingle(),
-      ]);
-      if (cancelled) return;
-      setGate({
-        isAdmin: !!roleRow,
-        maytapiEnabled: !!settings?.maytapi_enabled,
-        allowlist: Array.isArray(settings?.maytapi_phone_allowlist)
-          ? (settings.maytapi_phone_allowlist as string[])
-          : [],
-        dailyCap: typeof settings?.daily_send_cap === 'number' ? settings.daily_send_cap : 100,
-        loading: false,
-      });
-    })();
-    return () => { cancelled = true; };
+  // Load admin role + integration settings. Exposed as `refreshGate` so callers
+  // (e.g. MP1.1 allowlist helper) can re-pull settings after a manual change
+  // WITHOUT triggering any send path.
+  const refreshGate = useCallback(async () => {
+    if (!user) {
+      setGate((g) => ({ ...g, loading: false }));
+      return;
+    }
+    const [{ data: roleRow }, { data: settings }] = await Promise.all([
+      (supabase.from('user_roles') as any)
+        .select('role').eq('user_id', user.id).eq('role', 'admin').maybeSingle(),
+      (supabase.from('integration_settings') as any)
+        .select('maytapi_enabled, maytapi_phone_allowlist, daily_send_cap')
+        .eq('user_id', user.id).maybeSingle(),
+    ]);
+    setGate({
+      isAdmin: !!roleRow,
+      maytapiEnabled: !!settings?.maytapi_enabled,
+      allowlist: Array.isArray(settings?.maytapi_phone_allowlist)
+        ? (settings.maytapi_phone_allowlist as string[])
+        : [],
+      dailyCap: typeof settings?.daily_send_cap === 'number' ? settings.daily_send_cap : 100,
+      loading: false,
+    });
   }, [user]);
+
+  useEffect(() => { refreshGate(); }, [refreshGate]);
 
   /** Verify branded-URL first line + Vanto signature presence (mirrors locked function check). */
   const verifyFirstTouch = useCallback((message: string): boolean => {
@@ -331,7 +330,7 @@ export function useMaytapiAppreciationSend() {
     return { ok: true, maytapi_message_id: messageId };
   }, [user, evaluateGate]);
 
-  return { gate, evaluateGate, send, verifyFirstTouch };
+  return { gate, evaluateGate, send, verifyFirstTouch, refreshGate };
 }
 
 /** UI helper: human-readable label for a gate block reason. */

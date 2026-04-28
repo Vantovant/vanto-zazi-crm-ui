@@ -103,7 +103,7 @@ export function ActivityAppreciationModal({
   const [logSuccess, setLogSuccess] = useState(false);
 
   // ── MP1 (Maytapi pilot) state ────────────────────────────────────────────
-  const { gate, evaluateGate, send: sendViaMaytapi } = useMaytapiAppreciationSend();
+  const { gate, evaluateGate, send: sendViaMaytapi, refreshGate } = useMaytapiAppreciationSend();
   const [mp1GateReason, setMp1GateReason] = useState<GateBlockReason | undefined>(undefined);
   const [mp1GateDetail, setMp1GateDetail] = useState<string | undefined>(undefined);
   const [mp1Allowed, setMp1Allowed] = useState(false);
@@ -111,6 +111,13 @@ export function ActivityAppreciationModal({
   const [mp1Sending, setMp1Sending] = useState(false);
   const [mp1Error, setMp1Error] = useState<string | null>(null);
   const [mp1Success, setMp1Success] = useState<string | null>(null);
+
+  // MP1.1 — small allowlist convenience helper state. NEVER triggers a send,
+  // NEVER calls maytapi-send-1to1, NEVER creates zazi_actions, NEVER auto-imports.
+  const [mp11Working, setMp11Working] = useState(false);
+  const [mp11Error, setMp11Error] = useState<string | null>(null);
+  const [mp11Flash, setMp11Flash] = useState<string | null>(null);
+  const MP11_MAX_ALLOWLIST = 5;
 
   const entry = entries[currentIndex];
   const isBulk = entries.length > 1;
@@ -257,6 +264,89 @@ export function ActivityAppreciationModal({
     }
   }, [entry, mp1Args, sendViaMaytapi, onAppreciated, isBulk, currentIndex, entries.length]);
 
+  // ── MP1.1 — Allowlist convenience helpers ───────────────────────────────
+  // Strict scope: ONLY the current entry's phone, ONLY this admin's
+  // integration_settings.maytapi_phone_allowlist column, hard cap 5,
+  // every change writes a user_activity audit row.
+  // Hard rules: no bulk add, no downline import, no order import, no Send,
+  // no Maytapi call, no zazi_actions write, no daily_send_cap change.
+  const mp11WriteAudit = useCallback(async (
+    action: 'mp11_allowlist_add_current' | 'mp11_allowlist_replace_with_current',
+    oldList: string[],
+    newList: string[],
+    phoneLast4: string,
+  ) => {
+    if (!user) return;
+    await (supabase.from('user_activity') as any).insert({
+      user_id: user.id,
+      action,
+      page: '/activity-appreciation-modal',
+      metadata: {
+        // Only last 4 digits in audit metadata to avoid leaking full phones.
+        phone_last4: phoneLast4,
+        old_count: oldList.length,
+        new_count: newList.length,
+        contact_id: mp1Args?.contactId || null,
+        entry_key: mp1Args?.entryKey || null,
+        actor_user_id: user.id,
+        changed_at: new Date().toISOString(),
+      },
+    });
+  }, [user, mp1Args]);
+
+  const mp11AddCurrentToAllowlist = useCallback(async () => {
+    setMp11Error(null); setMp11Flash(null);
+    if (!user || !mp1Args) return;
+    if (!gate.isAdmin) { setMp11Error('Admin only.'); return; }
+    const phone = mp1Args.phoneNormalized;
+    if (!phone || phone.length < 9) { setMp11Error('No valid phone for this contact.'); return; }
+    if (gate.allowlist.includes(phone)) { setMp11Flash('Already on allowlist.'); return; }
+    if (gate.allowlist.length >= MP11_MAX_ALLOWLIST) {
+      setMp11Error(`Allowlist full (${MP11_MAX_ALLOWLIST}). Remove one number first.`);
+      return;
+    }
+    setMp11Working(true);
+    const next = [...gate.allowlist, phone];
+    const { error: upErr } = await (supabase.from('integration_settings') as any)
+      .update({ maytapi_phone_allowlist: next })
+      .eq('user_id', user.id);
+    if (upErr) {
+      setMp11Working(false);
+      setMp11Error(upErr.message);
+      return;
+    }
+    await mp11WriteAudit('mp11_allowlist_add_current', gate.allowlist, next, phone.slice(-4));
+    await refreshGate();
+    setMp11Working(false);
+    setMp11Flash(`Added ****${phone.slice(-4)}`);
+  }, [user, mp1Args, gate, refreshGate, mp11WriteAudit]);
+
+  const mp11ReplaceAllowlistWithCurrent = useCallback(async () => {
+    setMp11Error(null); setMp11Flash(null);
+    if (!user || !mp1Args) return;
+    if (!gate.isAdmin) { setMp11Error('Admin only.'); return; }
+    const phone = mp1Args.phoneNormalized;
+    if (!phone || phone.length < 9) { setMp11Error('No valid phone for this contact.'); return; }
+    if (gate.allowlist.length === 1 && gate.allowlist[0] === phone) {
+      setMp11Flash('Already the only number.');
+      return;
+    }
+    setMp11Working(true);
+    const next = [phone]; // hard cap respected: length 1 ≤ 5
+    const { error: upErr } = await (supabase.from('integration_settings') as any)
+      .update({ maytapi_phone_allowlist: next })
+      .eq('user_id', user.id);
+    if (upErr) {
+      setMp11Working(false);
+      setMp11Error(upErr.message);
+      return;
+    }
+    await mp11WriteAudit('mp11_allowlist_replace_with_current', gate.allowlist, next, phone.slice(-4));
+    await refreshGate();
+    setMp11Working(false);
+    setMp11Flash(`Allowlist replaced — only ****${phone.slice(-4)} now.`);
+  }, [user, mp1Args, gate, refreshGate, mp11WriteAudit]);
+
   if (!entry) return null;
 
   return (
@@ -370,7 +460,71 @@ export function ActivityAppreciationModal({
               {/* MP1 — Send via Maytapi (pilot, one-by-one). Always shown once gate has loaded;
                    disabled with reason when blocked (admin-only, Maytapi disabled, allowlist, etc.). */}
               {!gate.loading && (
-                <div className="pt-2 border-t border-slate-700/60 mt-1">
+                <div className="pt-2 border-t border-slate-700/60 mt-1 space-y-2">
+                  {/* MP1.1 — Allowlist convenience helper.
+                      Visible to admins only, only acts on the CURRENT contact's phone,
+                      cannot bulk-add, cannot import downlines or orders, never sends. */}
+                  {gate.isAdmin && mp1Args && !mp1Success && (
+                    (() => {
+                      const phone = mp1Args.phoneNormalized;
+                      const last4 = phone ? phone.slice(-4) : '';
+                      const onList = !!phone && gate.allowlist.includes(phone);
+                      const listFull = gate.allowlist.length >= MP11_MAX_ALLOWLIST;
+                      return (
+                        <div className="rounded-lg border border-purple-500/20 bg-purple-500/5 p-2.5 text-[11px] space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="text-slate-300">
+                              <span className="text-slate-500">This contact's phone: </span>
+                              <span className="font-mono text-white">{phone ? `****${last4}` : '— no valid phone —'}</span>
+                            </div>
+                            <div className="text-slate-500">
+                              Allowlist {gate.allowlist.length}/{MP11_MAX_ALLOWLIST}
+                            </div>
+                          </div>
+                          {phone && (
+                            onList ? (
+                              <p className="text-emerald-300 flex items-center gap-1">
+                                <Check className="w-3 h-3" /> This phone is already on the allowlist.
+                              </p>
+                            ) : (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                                <button
+                                  type="button"
+                                  disabled={mp11Working || listFull}
+                                  onClick={mp11AddCurrentToAllowlist}
+                                  title={listFull ? `Allowlist full — remove one number first` : 'Add only this contact to the allowlist'}
+                                  className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-[11px] font-medium bg-purple-600/80 hover:bg-purple-500 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed text-white rounded-md transition-colors"
+                                >
+                                  {mp11Working ? <Loader2 className="w-3 h-3 animate-spin" /> : <ShieldAlert className="w-3 h-3" />}
+                                  {listFull ? 'Allowlist full — remove one' : 'Add this phone to allowlist'}
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={mp11Working}
+                                  onClick={mp11ReplaceAllowlistWithCurrent}
+                                  title="Clear allowlist and add only this contact"
+                                  className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-[11px] font-medium bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-100 rounded-md transition-colors"
+                                >
+                                  {mp11Working ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                                  Replace allowlist with this contact only
+                                </button>
+                              </div>
+                            )
+                          )}
+                          {mp11Flash && (
+                            <p className="text-emerald-300">{mp11Flash}</p>
+                          )}
+                          {mp11Error && (
+                            <p className="text-rose-300">{mp11Error}</p>
+                          )}
+                          <p className="text-[10px] text-slate-500">
+                            Helper only edits your allowlist. It never sends a message, never calls Maytapi,
+                            and never adds any other contact. Send via Maytapi still requires manual review and confirmation below.
+                          </p>
+                        </div>
+                      );
+                    })()
+                  )}
                   {mp1Success ? (
                     <div className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm bg-purple-500/15 border border-purple-500/30 rounded-lg text-purple-200">
                       <Check className="w-4 h-4 text-purple-300" />
