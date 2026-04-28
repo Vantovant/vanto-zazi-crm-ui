@@ -365,7 +365,7 @@ function renderMessages(messages) {
     list.appendChild(div);
   }
   if (messages.length === 0) {
-    list.innerHTML = '<p style="color:#64748b;text-align:center;padding:12px;">No messages captured</p>';
+    list.innerHTML = '<p style="color:#64748b;text-align:center;padding:12px;font-size:11px;line-height:1.5;">No captured WhatsApp messages yet.<br>Use <strong style="color:#a5b4fc;">Field Notes</strong> above to record what happened manually.</p>';
   }
 }
 
