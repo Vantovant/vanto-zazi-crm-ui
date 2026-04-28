@@ -12,6 +12,7 @@ import { useContactActivities } from '@/hooks/useContactActivities';
 import { useCrm } from '@/contexts/CrmContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { normalizeActivityMonth } from '@/utils/monthlyActivityKey';
 
 export type AppreciationTone = 'warm' | 'royal' | 'leadership' | 'professional';
 
