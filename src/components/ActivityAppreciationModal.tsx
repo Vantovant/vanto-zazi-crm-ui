@@ -17,6 +17,7 @@ import {
   useMaytapiAppreciationSend,
   gateReasonLabel,
   type GateBlockReason,
+  type GateAllowedBy,
 } from '@/hooks/useMaytapiAppreciationSend';
 
 export type AppreciationTone = 'warm' | 'royal' | 'leadership' | 'professional';
