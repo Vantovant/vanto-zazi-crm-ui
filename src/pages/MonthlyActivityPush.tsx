@@ -475,7 +475,7 @@ function RowItem({
   onSkip: () => void;
   hideSkip?: boolean;
 }) {
-  const { order, contact, entryKey, status } = row;
+  const { order, contact, entryKey, status, possibleDuplicate } = row;
   const statusBadge =
     status === 'done'
       ? 'bg-emerald-500/20 text-emerald-300'
