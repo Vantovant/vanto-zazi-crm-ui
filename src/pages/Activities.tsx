@@ -290,37 +290,51 @@ export function Activities() {
   // --- Activity Paid Section (reusable for mobile + desktop) ---
   const renderActivityPaidSection = () => {
     const activityOrders = orders.filter(o => o.source === 'monthly-activity-paste');
-    const monthGroups = new Map<string, typeof activityOrders>();
+    // Group by canonical YYYY-MM key, but keep a display label per group.
+    const monthGroups = new Map<string, { label: string; orders: typeof activityOrders }>();
     for (const o of activityOrders) {
-      const month = o.product.replace('Monthly Activity - ', '') || 'Unknown';
-      const arr = monthGroups.get(month) || [];
-      arr.push(o);
-      monthGroups.set(month, arr);
+      const rawLabel = (o.product || '').replace(/^Monthly Activity\s*-\s*/i, '').trim() || 'Unknown';
+      const key = normalizeActivityMonth(rawLabel) || rawLabel; // fallback so unparseable labels still group
+      const display = monthLabel(rawLabel) || rawLabel;
+      const bucket = monthGroups.get(key) || { label: display, orders: [] };
+      bucket.orders.push(o);
+      monthGroups.set(key, bucket);
     }
-    const latestMonth = Array.from(monthGroups.keys()).pop() || '';
-    const latestOrders = monthGroups.get(latestMonth) || [];
+    // Sort month keys chronologically (newest first for the dropdown).
+    const monthOptions = Array.from(monthGroups.entries())
+      .sort((a, b) => compareMonthKeys(b[0], a[0]))
+      .map(([key, v]) => ({ key, label: v.label, count: v.orders.length }));
+
+    const effectiveMonthKey = selectedMonthKey && monthGroups.has(selectedMonthKey)
+      ? selectedMonthKey
+      : (monthOptions[0]?.key || '');
+    const monthBucket = effectiveMonthKey ? monthGroups.get(effectiveMonthKey) : undefined;
+    const latestMonth = monthBucket?.label || '';
+    const latestMonthKey = effectiveMonthKey;
+    const latestOrders = monthBucket?.orders || [];
 
     const filteredOrders = latestOrders.filter(order => {
       const cId = order.contactId;
+      const contact = cId ? contacts.find(c => String(c.id) === cId) : undefined;
+      const aplgo = contact?.APLGoID || '';
+      const isAppreciated = isAppreciatedFor(latestMonthKey, cId, aplgo);
       // Status filter
-      if (activityPaidFilter !== 'all') {
-        if (!cId) return false;
-        const isAppreciated = allAppreciatedIds.has(cId);
-        if (activityPaidFilter === 'appreciated' && !isAppreciated) return false;
-        if (activityPaidFilter === 'not_appreciated' && isAppreciated) return false;
-      }
+      if (activityPaidFilter === 'appreciated' && !isAppreciated) return false;
+      if (activityPaidFilter === 'not_appreciated' && isAppreciated) return false;
       // Name search filter
       if (activityPaidSearch.trim()) {
         const q = activityPaidSearch.trim().toLowerCase();
         const nameMatch = order.contactName.toLowerCase().includes(q);
-        const contact = contacts.find(c => String(c.id) === order.contactId);
-        const idMatch = contact?.APLGoID?.toLowerCase().includes(q);
+        const idMatch = aplgo.toLowerCase().includes(q);
         if (!nameMatch && !idMatch) return false;
       }
       return true;
     });
 
-    const appreciatedCount = latestOrders.filter(o => o.contactId && allAppreciatedIds.has(o.contactId)).length;
+    const appreciatedCount = latestOrders.filter(o => {
+      const contact = o.contactId ? contacts.find(c => String(c.id) === o.contactId) : undefined;
+      return isAppreciatedFor(latestMonthKey, o.contactId, contact?.APLGoID);
+    }).length;
     const notAppreciatedCount = latestOrders.length - appreciatedCount;
 
     const handleOpenSingleAppreciation = (order: typeof latestOrders[0], contactOrFallback: Prospect) => {
