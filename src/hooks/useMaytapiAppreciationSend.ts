@@ -330,7 +330,7 @@ export function useMaytapiAppreciationSend() {
     return { ok: true, maytapi_message_id: messageId };
   }, [user, evaluateGate]);
 
-  return { gate, evaluateGate, send, verifyFirstTouch };
+  return { gate, evaluateGate, send, verifyFirstTouch, refreshGate };
 }
 
 /** UI helper: human-readable label for a gate block reason. */
