@@ -122,10 +122,11 @@ export function useOrders() {
       .select()
       .single();
     if (error) {
-      // If duplicate key violation, treat as success (idempotent)
+      // MP0.1: surface duplicate-skip as a typed result so callers can count
+      // and route ambiguous repeats to Needs Review.
       if (error.code === '23505' && dedupe_key) {
-        console.log('[useOrders] Duplicate order skipped by DB constraint');
-        return { id: 'duplicate-skipped' };
+        console.log('[useOrders] Duplicate order skipped by DB constraint', { dedupe_key });
+        return { id: 'duplicate-skipped', duplicate: true } as { id: string; duplicate: true };
       }
       console.error('Error adding order:', error);
       return null;
