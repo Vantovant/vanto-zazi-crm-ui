@@ -35,13 +35,14 @@ function getCurrentMonthYear() {
 export function MonthlyActivityPasteModal({ onClose, onComplete }: MonthlyActivityPasteModalProps) {
   const { contacts, addOrder, refetchOrders } = useCrm();
   const { user } = useAuth();
+  const { addToWaitingRoom } = useWaitingRoom();
   const [pastedText, setPastedText] = useState('');
   const [activityMonth, setActivityMonth] = useState(getCurrentMonthYear());
   const [step, setStep] = useState<'input' | 'preview' | 'done'>('input');
   const [matchedRows, setMatchedRows] = useState<MatchedRow[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [result, setResult] = useState({ created: 0, skipped: 0 });
+  const [result, setResult] = useState({ created: 0, skipped: 0, flagged: 0 });
 
   const handleParse = () => {
     if (!pastedText.trim()) { setError('Please paste monthly activity data.'); return; }
