@@ -404,10 +404,10 @@ export function ImportExport() {
         if (colIdx !== -1 && row[colIdx] != null) record[field.key] = String(row[colIdx]).trim();
       }
       const fullName = (record.FullName || '').trim();
-      // Sanitize APLGO ID: strip any non-digit characters (e.g. "1823834 new!" -> "1823834")
+      // Sanitize APLGO ID: digits only (e.g. "1823834 new!" -> "1823834", "APLGO 787178" -> "787178")
       const rawAplgo = (record.APLGoID || '').trim();
-      const incomingAplgo = rawAplgo.replace(/[^0-9]/g, '');
-      if (incomingAplgo) record.APLGoID = incomingAplgo;
+      const incomingAplgo = sanitizeAplgoId(rawAplgo);
+      record.APLGoID = incomingAplgo;
       const incomingPhone = (record.PhoneNumber || '').trim();
       const incomingEmail = (record.EmailAddress || '').trim();
 
@@ -512,7 +512,9 @@ export function ImportExport() {
       // 1. aplgo_id exact match first (only when present and non-empty)
       // 2. phone_normalized
       // 3. email_normalized
-      const aplgoForMatch = (dbRow.aplgo_id as string | undefined)?.toString().trim() || '';
+      const aplgoForMatch = sanitizeAplgoId(dbRow.aplgo_id);
+      // Always store sanitized value back so insert/update writes digits only
+      if (aplgoForMatch) dbRow.aplgo_id = aplgoForMatch; else dbRow.aplgo_id = '';
       const normPhone = normalizePhone(dbRow.phone_number as string);
       const normEmail = normalizeEmail(dbRow.email_address as string);
 
