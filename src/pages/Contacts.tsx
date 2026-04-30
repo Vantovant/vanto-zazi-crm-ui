@@ -371,6 +371,29 @@ export function Contacts() {
         </div>
       )}
 
+      {/* Active filter / search banner — shown whenever results are restricted */}
+      {(searchQuery.trim() || activeFilterCount > 0) && (
+        <div className="flex flex-wrap items-center gap-2 px-3 py-2 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs text-amber-300">
+          <span className="font-semibold">Filtered view:</span>
+          {searchQuery.trim() && (
+            <span className="px-2 py-0.5 rounded bg-amber-500/20">search: "{searchQuery.trim()}"</span>
+          )}
+          {Object.entries(activeFilters).filter(([, v]) => v).map(([k, v]) => (
+            <span key={k} className="px-2 py-0.5 rounded bg-amber-500/20">{k}: {v}</span>
+          ))}
+          <span className="ml-auto text-amber-200/80">
+            Showing {filteredProspects.length} of {prospects.length}
+          </span>
+          <button
+            type="button"
+            onClick={() => { setSearchQuery(''); setActiveFilters({ LeadTemperature: '', RegistrationStatus: '', LeadType: '', FocusArea: '', LeadPath: '' }); }}
+            className="text-amber-300 underline hover:text-amber-200"
+          >
+            Clear all
+          </button>
+        </div>
+      )}
+
       {/* Table */}
       <div className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
