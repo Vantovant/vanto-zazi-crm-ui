@@ -1271,6 +1271,56 @@ export function ImportExport() {
                       Powered by ZAZI AI column mapping
                     </p>
                   )}
+                  {lastBatchId && (
+                    <div className="mb-4 text-left">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const { data, error } = await supabase
+                            .from('import_audit')
+                            .select('sheet_row, incoming_full_name, incoming_aplgo_id, incoming_phone, incoming_email, match_method, action, matched_contact_id, reason')
+                            .eq('batch_id', lastBatchId)
+                            .order('sheet_row', { ascending: true });
+                          if (error) {
+                            alert('Could not load audit: ' + error.message);
+                            return;
+                          }
+                          setAuditPreview(data as Array<Record<string, unknown>>);
+                        }}
+                        className="px-3 py-1.5 text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-md"
+                      >
+                        📜 View Import Audit ({lastBatchId.slice(0, 8)}…)
+                      </button>
+                      {auditPreview && (
+                        <div className="mt-3 max-h-72 overflow-auto bg-slate-900/70 border border-slate-700 rounded-lg">
+                          <table className="w-full text-[11px]">
+                            <thead className="bg-slate-800 text-slate-400 sticky top-0">
+                              <tr>
+                                <th className="px-2 py-1.5 text-left">Row</th>
+                                <th className="px-2 py-1.5 text-left">Name</th>
+                                <th className="px-2 py-1.5 text-left">APLGO</th>
+                                <th className="px-2 py-1.5 text-left">Match</th>
+                                <th className="px-2 py-1.5 text-left">Action</th>
+                                <th className="px-2 py-1.5 text-left">Reason</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {auditPreview.map((r, i) => (
+                                <tr key={i} className="border-t border-slate-700/50">
+                                  <td className="px-2 py-1 text-slate-400">{String(r.sheet_row)}</td>
+                                  <td className="px-2 py-1 text-slate-200">{String(r.incoming_full_name || '—')}</td>
+                                  <td className="px-2 py-1 text-slate-300 font-mono">{String(r.incoming_aplgo_id || '—')}</td>
+                                  <td className="px-2 py-1 text-cyan-300">{String(r.match_method)}</td>
+                                  <td className={`px-2 py-1 font-medium ${r.action === 'create' ? 'text-emerald-400' : r.action === 'update' ? 'text-amber-400' : r.action === 'fail' ? 'text-rose-400' : 'text-slate-400'}`}>{String(r.action)}</td>
+                                  <td className="px-2 py-1 text-slate-500">{String(r.reason || '')}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div className="flex justify-center gap-3 mt-4">
                     <button type="button" onClick={resetImport} className="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white text-sm font-medium rounded-lg transition-colors">
                       Import More
