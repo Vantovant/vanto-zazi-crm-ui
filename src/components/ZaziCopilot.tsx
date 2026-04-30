@@ -284,9 +284,37 @@ export function ZaziCopilot({ selectedContactId }: { selectedContactId?: string 
     };
 
     try {
+      // ===== EXACT APLGO ID LOOKUP (FIX 3) =====
+      // Detect "APLGO ID 964067", "ID 964067", "find 964067", "who is 964067"
+      // Look for any 4-10 digit number in the question.
+      const aplgoIdMatches = input.match(/\b(\d{4,10})\b/g) || [];
+      const looksLikeAplgoQuery = /\b(aplgo|apl-?go|apl|associate(?:'?s)?\s*id|find|lookup|who\s+is|search)\b/i.test(input)
+        || aplgoIdMatches.length > 0;
+
+      let exactLookupBlock = '';
+      if (user && looksLikeAplgoQuery && aplgoIdMatches.length > 0) {
+        for (const candidate of aplgoIdMatches.slice(0, 3)) {
+          const { data, error } = await supabase
+            .from('contacts')
+            .select('id, full_name, aplgo_id, phone_number, phone_normalized, email_address, email_normalized, level, leg, go_status, lead_type, registration_status, sponsor_name, city, country, additional_notes')
+            .eq('user_id', user.id)
+            .eq('aplgo_id', candidate)
+            .limit(1);
+          if (!error && data && data.length > 0) {
+            exactLookupBlock += `\n\nEXACT_APLGO_LOOKUP for ID ${candidate}: FOUND\n${JSON.stringify(data[0], null, 2)}\n`;
+          } else {
+            exactLookupBlock += `\n\nEXACT_APLGO_LOOKUP for ID ${candidate}: NOT FOUND in contacts.aplgo_id (no fuzzy guessing allowed).\n`;
+          }
+        }
+      }
+
       const knowledgeContext = await getKnowledgeContext();
+      const messageWithLookup = exactLookupBlock
+        ? `${input}\n\n[SYSTEM-INJECTED EXACT DATABASE LOOKUP — use these results verbatim. If FOUND, return that contact's actual details. If NOT FOUND, say "No exact match for APLGO ID X" and DO NOT suggest similar IDs unless explicitly labelled as a fallback.]${exactLookupBlock}`
+        : input;
+
       await streamChat(
-        { action: 'ask', message: input, route: currentRoute, crmSummary, knowledgeContext },
+        { action: 'ask', message: messageWithLookup, route: currentRoute, crmSummary, knowledgeContext },
         upsert,
         () => setLoading(false),
       );
@@ -294,7 +322,7 @@ export function ZaziCopilot({ selectedContactId }: { selectedContactId?: string 
       upsert(`\n\n⚠️ ${e instanceof Error ? e.message : 'Error connecting to AI'}`);
       setLoading(false);
     }
-  }, [input, loading, currentRoute, crmSummary, getKnowledgeContext]);
+  }, [input, loading, currentRoute, crmSummary, getKnowledgeContext, user]);
 
   const sendContactChat = useCallback(async () => {
     if (!contactInput.trim() || loading || !selectedContact) return;
