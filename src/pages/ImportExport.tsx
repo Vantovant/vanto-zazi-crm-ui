@@ -27,6 +27,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { prospectColumns } from '@/data/mockData';
 import { normalizePhone, normalizeEmail, safeMerge } from '@/utils/contactNormalization';
+import { sanitizeAplgoId } from '@/utils/aplgoId';
 
 type ImportStep = 'upload' | 'ai-analyzing' | 'mapping' | 'preview' | 'complete';
 

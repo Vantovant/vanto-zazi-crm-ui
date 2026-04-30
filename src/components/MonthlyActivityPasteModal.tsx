@@ -9,6 +9,7 @@ import { useWaitingRoom } from '@/hooks/useWaitingRoom';
 import { parseMonthlyActivityReport, type MonthlyActivityRow } from '@/utils/monthlyActivityParser';
 import { normalizeActivityMonth } from '@/utils/monthlyActivityKey';
 import { supabase } from '@/integrations/supabase/client';
+import { sanitizeAplgoId } from '@/utils/aplgoId';
 import type { Prospect } from '@/data/mockData';
 
 interface MatchedRow extends MonthlyActivityRow {
@@ -93,12 +94,13 @@ export function MonthlyActivityPasteModal({ onClose, onComplete }: MonthlyActivi
 
     const localByAplgo = new Map(
       contacts
-        .map(c => [String(c.APLGoID || '').trim(), c] as const)
+        .map(c => [sanitizeAplgoId(c.APLGoID), c] as const)
         .filter(([aplgo]) => aplgo)
     );
 
     let rows: MatchedRow[] = parsed.map(row => {
-      const contact = localByAplgo.get(String(row.userId).trim()) || null;
+      const key = sanitizeAplgoId(row.userId);
+      const contact = localByAplgo.get(key) || null;
       return {
         ...row,
         contact,
@@ -110,7 +112,7 @@ export function MonthlyActivityPasteModal({ onClose, onComplete }: MonthlyActivi
 
     const unmatchedIds = Array.from(new Set(rows
       .filter(r => !r.contact)
-      .map(r => String(r.userId || '').trim())
+      .map(r => sanitizeAplgoId(r.userId))
       .filter(Boolean)));
 
     if (user && unmatchedIds.length > 0) {
@@ -124,10 +126,10 @@ export function MonthlyActivityPasteModal({ onClose, onComplete }: MonthlyActivi
         console.error('Monthly Activity exact DB fallback failed:', lookupError);
         setError(`Exact DB fallback lookup failed: ${lookupError.message}`);
       } else if (Array.isArray(data) && data.length > 0) {
-        const dbByAplgo = new Map(data.map((row: any) => [String(row.aplgo_id || '').trim(), dbContactToProspect(row)]));
+        const dbByAplgo = new Map(data.map((row: any) => [sanitizeAplgoId(row.aplgo_id), dbContactToProspect(row)]));
         rows = rows.map(row => {
           if (row.contact) return row;
-          const contact = dbByAplgo.get(String(row.userId).trim()) || null;
+          const contact = dbByAplgo.get(sanitizeAplgoId(row.userId)) || null;
           return contact
             ? { ...row, contact, matchStatus: 'matched', matchMethod: 'exact-db', selected: true }
             : row;
