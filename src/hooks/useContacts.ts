@@ -111,20 +111,39 @@ export function useContacts() {
   const [dbActive, setDbActive] = useState(false);
 
   const fetchContacts = useCallback(async () => {
-    if (!user) return;
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('contacts')
-      .select('*')
-      .order('date_captured', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching contacts:', error);
-      setDbActive(false);
-    } else {
-      setContacts((data as ContactRow[]).map(rowToProspect));
-      setDbActive(true);
+    if (!user) {
+      setContacts([]);
+      setLoading(false);
+      return;
     }
+    setLoading(true);
+
+    const pageSize = 1000;
+    const allRows: ContactRow[] = [];
+    let from = 0;
+
+    while (true) {
+      const { data, error } = await supabase
+        .from('contacts')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('date_captured', { ascending: false })
+        .range(from, from + pageSize - 1);
+
+      if (error) {
+        console.error('Error fetching contacts:', error);
+        setDbActive(false);
+        setLoading(false);
+        return;
+      }
+
+      allRows.push(...((data || []) as ContactRow[]));
+      if (!data || data.length < pageSize) break;
+      from += pageSize;
+    }
+
+    setContacts(allRows.map(rowToProspect));
+    setDbActive(true);
     setLoading(false);
   }, [user]);
 
