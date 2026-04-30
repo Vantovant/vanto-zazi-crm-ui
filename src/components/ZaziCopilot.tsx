@@ -5,6 +5,7 @@ import { useCrm } from '@/contexts/CrmContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import ReactMarkdown from 'react-markdown';
+import { sanitizeAplgoId } from '@/utils/aplgoId';
 
 type Tab = 'ask' | 'page' | 'contact' | 'insight' | 'knowledge';
 interface Message { role: 'user' | 'assistant'; content: string }
@@ -293,7 +294,9 @@ export function ZaziCopilot({ selectedContactId }: { selectedContactId?: string 
 
       let exactLookupBlock = '';
       if (user && looksLikeAplgoQuery && aplgoIdMatches.length > 0) {
-        for (const candidate of aplgoIdMatches.slice(0, 3)) {
+        for (const rawCandidate of aplgoIdMatches.slice(0, 3)) {
+          const candidate = sanitizeAplgoId(rawCandidate);
+          if (!candidate) continue;
           const { data, error } = await supabase
             .from('contacts')
             .select('id, full_name, aplgo_id, phone_number, phone_normalized, email_address, email_normalized, level, leg, go_status, lead_type, registration_status, sponsor_name, city, country, additional_notes')

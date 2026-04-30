@@ -314,7 +314,7 @@ Deno.serve(async (req) => {
         country: contact.country || "South Africa",
         city: contact.city || "",
         additional_notes: contact.additional_notes || "",
-        aplgo_id: contact.aplgo_id || "",
+        aplgo_id: String(contact.aplgo_id || "").replace(/[^0-9]/g, ""),
         sponsor_name: contact.sponsor_name || "",
       };
 
