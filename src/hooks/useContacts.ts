@@ -94,7 +94,7 @@ function prospectToInsert(p: Omit<Prospect, 'id'>, userId: string) {
     action_taken: p.ActionTaken || '',
     next_action: p.NextAction || '',
     meeting_time: p.MeetingTime || '',
-    aplgo_id: p.APLGoID || '',
+    aplgo_id: sanitizeAplgoId(p.APLGoID),
     associate_status: p.AssociateStatus || '',
     additional_notes: p.AdditionalNotes || '',
     go_status: p.GOStatus || '',
@@ -191,7 +191,7 @@ export function useContacts() {
     if (updates.ActionTaken !== undefined) dbUpdates.action_taken = updates.ActionTaken;
     if (updates.NextAction !== undefined) dbUpdates.next_action = updates.NextAction;
     if (updates.MeetingTime !== undefined) dbUpdates.meeting_time = updates.MeetingTime;
-    if (updates.APLGoID !== undefined) dbUpdates.aplgo_id = updates.APLGoID;
+    if (updates.APLGoID !== undefined) dbUpdates.aplgo_id = sanitizeAplgoId(updates.APLGoID);
     if (updates.AssociateStatus !== undefined) dbUpdates.associate_status = updates.AssociateStatus;
     if (updates.AdditionalNotes !== undefined) dbUpdates.additional_notes = updates.AdditionalNotes;
     if (updates.DateCaptured !== undefined) dbUpdates.date_captured = updates.DateCaptured;
