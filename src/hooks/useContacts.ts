@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import type { Prospect } from '@/data/mockData';
 import { pushOutboundEvent } from '@/hooks/useOutboundWebhook';
 import { normalizePhone, normalizeEmail } from '@/utils/contactNormalization';
+import { sanitizeAplgoId } from '@/utils/aplgoId';
 
 // DB row type
 interface ContactRow {
