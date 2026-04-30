@@ -5,6 +5,7 @@ import { useCrm } from '@/contexts/CrmContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import ReactMarkdown from 'react-markdown';
+import { sanitizeAplgoId } from '@/utils/aplgoId';
 
 type Tab = 'ask' | 'page' | 'contact' | 'insight' | 'knowledge';
 interface Message { role: 'user' | 'assistant'; content: string }
