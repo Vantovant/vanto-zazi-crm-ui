@@ -175,6 +175,18 @@ const SupabaseClient = {
     return Array.isArray(data) ? data : [];
   },
 
+  /**
+   * Exact-match lookup by APLGO ID. MUST be tried first when the user's
+   * question contains an APLGO/Associate ID. No fuzzy fallback.
+   */
+  async findContactByAplgoId(aplgoId) {
+    const id = String(aplgoId || '').trim();
+    if (!id) return null;
+    const data = await this._query('contacts', `aplgo_id=eq.${encodeURIComponent(id)}&limit=1`);
+    if (Array.isArray(data) && data.length > 0) return data[0];
+    return null;
+  },
+
   async getContactActivities(contactId, limit = 20) {
     return this._query('contact_activities', `contact_id=eq.${contactId}&order=created_at.desc&limit=${limit}`);
   },
