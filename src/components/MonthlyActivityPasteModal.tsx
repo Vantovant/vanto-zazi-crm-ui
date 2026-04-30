@@ -400,6 +400,7 @@ export function MonthlyActivityPasteModal({ onClose, onComplete }: MonthlyActivi
                         <th className="px-3 py-2 text-left text-xs font-semibold text-slate-400">Displayed Lvl</th>
                         <th className="px-3 py-2 text-left text-xs font-semibold text-slate-400">Actual Lvl</th>
                         <th className="px-3 py-2 text-left text-xs font-semibold text-slate-400">Amount</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-slate-400">Method</th>
                         <th className="px-3 py-2 text-left text-xs font-semibold text-slate-400">Status</th>
                       </tr>
                     </thead>
@@ -435,6 +436,17 @@ export function MonthlyActivityPasteModal({ onClose, onComplete }: MonthlyActivi
                             )}
                           </td>
                           <td className="px-3 py-2.5 text-slate-200 font-medium">R{row.amount.toLocaleString()}</td>
+                          <td className="px-3 py-2.5">
+                            <span className={`text-xs px-2 py-0.5 rounded font-medium ${
+                              row.matchMethod === 'exact-db'
+                                ? 'bg-cyan-500/20 text-cyan-300'
+                                : row.matchMethod === 'local-cache'
+                                  ? 'bg-slate-700 text-slate-300'
+                                  : 'bg-rose-500/20 text-rose-400'
+                            }`}>
+                              {row.matchMethod === 'exact-db' ? 'Exact DB' : row.matchMethod === 'local-cache' ? 'Local cache' : 'None'}
+                            </span>
+                          </td>
                           <td className="px-3 py-2.5">
                             {row.contact ? (
                               <span className="text-xs px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-medium">Matched</span>
@@ -503,10 +515,11 @@ export function MonthlyActivityPasteModal({ onClose, onComplete }: MonthlyActivi
                 <button
                   type="button"
                   onClick={handleParse}
+                  disabled={matching}
                   className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition-colors"
                 >
-                  <Sparkles className="w-4 h-4" />
-                  Parse & Match
+                  {matching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                  {matching ? 'Matching...' : 'Parse & Match'}
                 </button>
               )}
               {step === 'preview' && (
