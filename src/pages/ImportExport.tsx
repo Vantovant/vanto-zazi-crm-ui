@@ -404,7 +404,10 @@ export function ImportExport() {
         if (colIdx !== -1 && row[colIdx] != null) record[field.key] = String(row[colIdx]).trim();
       }
       const fullName = (record.FullName || '').trim();
-      const incomingAplgo = (record.APLGoID || '').trim();
+      // Sanitize APLGO ID: strip any non-digit characters (e.g. "1823834 new!" -> "1823834")
+      const rawAplgo = (record.APLGoID || '').trim();
+      const incomingAplgo = rawAplgo.replace(/[^0-9]/g, '');
+      if (incomingAplgo) record.APLGoID = incomingAplgo;
       const incomingPhone = (record.PhoneNumber || '').trim();
       const incomingEmail = (record.EmailAddress || '').trim();
 
