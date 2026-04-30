@@ -453,6 +453,57 @@ export type Database = {
           },
         ]
       }
+      import_audit: {
+        Row: {
+          action: string
+          batch_id: string
+          created_at: string
+          file_name: string
+          id: string
+          incoming_aplgo_id: string
+          incoming_email: string
+          incoming_full_name: string
+          incoming_phone: string
+          match_method: string
+          matched_contact_id: string | null
+          reason: string
+          sheet_row: number
+          user_id: string
+        }
+        Insert: {
+          action?: string
+          batch_id: string
+          created_at?: string
+          file_name?: string
+          id?: string
+          incoming_aplgo_id?: string
+          incoming_email?: string
+          incoming_full_name?: string
+          incoming_phone?: string
+          match_method?: string
+          matched_contact_id?: string | null
+          reason?: string
+          sheet_row: number
+          user_id: string
+        }
+        Update: {
+          action?: string
+          batch_id?: string
+          created_at?: string
+          file_name?: string
+          id?: string
+          incoming_aplgo_id?: string
+          incoming_email?: string
+          incoming_full_name?: string
+          incoming_phone?: string
+          match_method?: string
+          matched_contact_id?: string | null
+          reason?: string
+          sheet_row?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       integration_settings: {
         Row: {
           created_at: string
