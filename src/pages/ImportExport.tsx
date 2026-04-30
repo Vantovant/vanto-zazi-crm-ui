@@ -312,6 +312,8 @@ export function ImportExport() {
     setAiError(null);
     setSmartTags({ sponsor_name: '', leg: '', level: '', country: '', province: '', lead_type: '', lead_temperature: '' });
     setPreviewDupeStatus({});
+    setLastBatchId(null);
+    setAuditPreview(null);
   };
 
   const runImport = async () => {
