@@ -323,6 +323,37 @@ export function ImportExport() {
     const errorMessages: string[] = [];
     const mappedFields = CRM_FIELDS.filter(f => columnMapping[f.key]);
 
+    // Audit batch — every row in this run will be tagged with this id
+    const batchId = (crypto as any).randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+    const fileName = uploadedFile?.name || 'unknown';
+    const auditRows: Array<Record<string, unknown>> = [];
+    const recordAudit = (entry: {
+      sheet_row: number;
+      full_name: string;
+      aplgo_id: string;
+      phone: string;
+      email: string;
+      match_method: 'aplgo_id' | 'phone' | 'email' | 'none';
+      action: 'create' | 'update' | 'skip' | 'fail';
+      matched_contact_id: string | null;
+      reason: string;
+    }) => {
+      auditRows.push({
+        user_id: user.id,
+        batch_id: batchId,
+        file_name: fileName,
+        sheet_row: entry.sheet_row,
+        incoming_full_name: entry.full_name,
+        incoming_aplgo_id: entry.aplgo_id,
+        incoming_phone: entry.phone,
+        incoming_email: entry.email,
+        match_method: entry.match_method,
+        action: entry.action,
+        matched_contact_id: entry.matched_contact_id,
+        reason: entry.reason,
+      });
+    };
+
     const fieldToCol: Record<string, string> = {
       FullName: 'full_name', PhoneNumber: 'phone_number', EmailAddress: 'email_address',
       DateCaptured: 'date_captured', City: 'city', Province: 'province', State: 'state',
@@ -358,10 +389,10 @@ export function ImportExport() {
 
     for (let rowIdx = 0; rowIdx < fileRows.length; rowIdx++) {
       const row = fileRows[rowIdx];
+      const sheetRow = rowIdx + 2; // header is row 1, data starts at row 2
       const record: Record<string, string> = {};
       for (const field of mappedFields) {
         const csvHeader = columnMapping[field.key];
-        // Try exact case-insensitive match first, then fuzzy normalized match
         let colIdx = fileHeaders.findIndex(h => h.trim().toLowerCase() === csvHeader.trim().toLowerCase());
         if (colIdx === -1) {
           colIdx = headerIndexMap[normalize(csvHeader)] ?? -1;
@@ -369,11 +400,19 @@ export function ImportExport() {
         if (colIdx !== -1 && row[colIdx] != null) record[field.key] = String(row[colIdx]).trim();
       }
       const fullName = (record.FullName || '').trim();
-      if (!fullName) { 
-        failed++; 
-        errorMessages.push(`Row ${rowIdx + 1}: FullName is empty — check column mapping`);
-        setImportProgress(rowIdx + 1); 
-        continue; 
+      const incomingAplgo = (record.APLGoID || '').trim();
+      const incomingPhone = (record.PhoneNumber || '').trim();
+      const incomingEmail = (record.EmailAddress || '').trim();
+
+      if (!fullName) {
+        failed++;
+        errorMessages.push(`Row ${sheetRow}: FullName is empty — check column mapping`);
+        recordAudit({
+          sheet_row: sheetRow, full_name: '', aplgo_id: incomingAplgo, phone: incomingPhone, email: incomingEmail,
+          match_method: 'none', action: 'fail', matched_contact_id: null, reason: 'FullName empty',
+        });
+        setImportProgress(rowIdx + 1);
+        continue;
       }
       record.FullName = fullName;
 
@@ -408,7 +447,7 @@ export function ImportExport() {
         if (fieldToCol[k]) dbRow[fieldToCol[k]] = v;
       }
 
-      // Apply Smart Tags (compensate for missing columns)
+      // Apply Smart Tags
       for (const [dbCol, tagVal] of Object.entries(smartTags)) {
         if (tagVal.trim()) {
           const current = dbRow[dbCol] as string | undefined;
@@ -437,7 +476,7 @@ export function ImportExport() {
         }
       }
 
-      // Sanitize enum fields to prevent validation trigger rejection
+      // Sanitize enum fields
       const enumRules: Record<string, { allowed: string[]; fallback: string }> = {
         lead_temperature: { allowed: ['Hot', 'Warm', 'Cold', ''], fallback: 'Warm' },
         communication_status: { allowed: ['New', 'In Progress', 'Pending', 'Completed', 'Unsubscribed', 'Active', 'Contacted', ''], fallback: 'New' },
@@ -454,34 +493,59 @@ export function ImportExport() {
           dbRow[col] = rule.fallback;
         }
       }
-      // I1: Normalize leg to L/R/'' so the validation trigger accepts CSV imports with free-text values
       if (dbRow.leg !== undefined) {
         const legRaw = String(dbRow.leg ?? '').trim().toLowerCase();
         if (['1', '1 leg', 'left', 'l'].includes(legRaw)) dbRow.leg = 'L';
         else if (['2', '2 leg', 'right', 'r'].includes(legRaw)) dbRow.leg = 'R';
         else if (legRaw === '') dbRow.leg = '';
-        else dbRow.leg = ''; // unknown → Unplaced (avoids trigger rejection; original value is already in CSV source)
+        else dbRow.leg = '';
       }
-      // UPSERT: Check for existing contact by normalized phone/email
+
+      // ===== UPSERT MATCH PRIORITY (FIX 2) =====
+      // 1. aplgo_id exact match first (only when present and non-empty)
+      // 2. phone_normalized
+      // 3. email_normalized
+      const aplgoForMatch = (dbRow.aplgo_id as string | undefined)?.toString().trim() || '';
       const normPhone = normalizePhone(dbRow.phone_number as string);
       const normEmail = normalizeEmail(dbRow.email_address as string);
 
       let existingId: string | null = null;
+      let matchMethod: 'aplgo_id' | 'phone' | 'email' | 'none' = 'none';
 
-      if (normPhone) {
+      if (aplgoForMatch) {
         const { data } = await supabase.from('contacts')
           .select('id')
+          .eq('user_id', user.id)
+          .eq('aplgo_id', aplgoForMatch)
+          .limit(1);
+        if (data && data.length > 0) {
+          existingId = (data[0] as { id: string }).id;
+          matchMethod = 'aplgo_id';
+        }
+      }
+
+      if (!existingId && normPhone) {
+        const { data } = await supabase.from('contacts')
+          .select('id')
+          .eq('user_id', user.id)
           .eq('phone_normalized', normPhone)
           .limit(1);
-        if (data && data.length > 0) existingId = (data[0] as any).id;
+        if (data && data.length > 0) {
+          existingId = (data[0] as { id: string }).id;
+          matchMethod = 'phone';
+        }
       }
 
       if (!existingId && normEmail) {
         const { data } = await supabase.from('contacts')
           .select('id')
+          .eq('user_id', user.id)
           .eq('email_normalized', normEmail)
           .limit(1);
-        if (data && data.length > 0) existingId = (data[0] as any).id;
+        if (data && data.length > 0) {
+          existingId = (data[0] as { id: string }).id;
+          matchMethod = 'email';
+        }
       }
 
       if (existingId) {
@@ -489,36 +553,65 @@ export function ImportExport() {
         const { data: existingData } = await supabase.from('contacts').select('*').eq('id', existingId).single();
         if (existingData) {
           const merged = safeMerge(existingData as Record<string, unknown>, dbRow);
-          delete merged.user_id; // Don't update user_id
+          delete merged.user_id;
           delete merged.id;
           if (Object.keys(merged).length > 0) {
             const { error } = await supabase.from('contacts').update(merged).eq('id', existingId);
-            if (error) { 
+            if (error) {
               console.error(`Import update error row ${rowIdx}:`, error.message, error.code, 'id:', existingId);
-              errorMessages.push(`Row ${rowIdx + 1} (${fullName}): ${error.message}`);
-              failed++; 
+              errorMessages.push(`Row ${sheetRow} (${fullName}): ${error.message}`);
+              failed++;
+              recordAudit({
+                sheet_row: sheetRow, full_name: fullName, aplgo_id: incomingAplgo, phone: incomingPhone, email: incomingEmail,
+                match_method: matchMethod, action: 'fail', matched_contact_id: existingId, reason: error.message,
+              });
+            } else {
+              updated++;
+              recordAudit({
+                sheet_row: sheetRow, full_name: fullName, aplgo_id: incomingAplgo, phone: incomingPhone, email: incomingEmail,
+                match_method: matchMethod, action: 'update', matched_contact_id: existingId, reason: `merged ${Object.keys(merged).length} field(s)`,
+              });
             }
-            else { updated++; }
           } else {
-            updated++; // No changes needed
+            updated++;
+            recordAudit({
+              sheet_row: sheetRow, full_name: fullName, aplgo_id: incomingAplgo, phone: incomingPhone, email: incomingEmail,
+              match_method: matchMethod, action: 'update', matched_contact_id: existingId, reason: 'no field changes (already up to date)',
+            });
           }
         } else {
           failed++;
-          errorMessages.push(`Row ${rowIdx + 1} (${fullName}): Could not fetch existing contact`);
+          errorMessages.push(`Row ${sheetRow} (${fullName}): Could not fetch existing contact`);
+          recordAudit({
+            sheet_row: sheetRow, full_name: fullName, aplgo_id: incomingAplgo, phone: incomingPhone, email: incomingEmail,
+            match_method: matchMethod, action: 'fail', matched_contact_id: existingId, reason: 'existing contact fetch failed',
+          });
         }
       } else {
         // INSERT new
-        const { error } = await supabase.from('contacts').insert(dbRow as any);
+        const { data: insData, error } = await supabase.from('contacts').insert(dbRow as any).select('id').single();
         if (error) {
-          console.error(`Import insert error row ${rowIdx}:`, error.message, error.code, 'fullName:', fullName, 'date:', dbRow.date_captured, 'dbRow:', JSON.stringify(dbRow));
+          console.error(`Import insert error row ${rowIdx}:`, error.message, error.code, 'fullName:', fullName);
           if (error.code === '23505') {
             updated++;
+            recordAudit({
+              sheet_row: sheetRow, full_name: fullName, aplgo_id: incomingAplgo, phone: incomingPhone, email: incomingEmail,
+              match_method: 'none', action: 'update', matched_contact_id: null, reason: 'unique constraint hit (existing record)',
+            });
           } else {
-            errorMessages.push(`Row ${rowIdx + 1} (${fullName}): ${error.message}`);
+            errorMessages.push(`Row ${sheetRow} (${fullName}): ${error.message}`);
             failed++;
+            recordAudit({
+              sheet_row: sheetRow, full_name: fullName, aplgo_id: incomingAplgo, phone: incomingPhone, email: incomingEmail,
+              match_method: 'none', action: 'fail', matched_contact_id: null, reason: error.message,
+            });
           }
         } else {
           inserted++;
+          recordAudit({
+            sheet_row: sheetRow, full_name: fullName, aplgo_id: incomingAplgo, phone: incomingPhone, email: incomingEmail,
+            match_method: 'none', action: 'create', matched_contact_id: insData?.id ?? null, reason: 'new contact',
+          });
         }
       }
 
@@ -526,8 +619,16 @@ export function ImportExport() {
       if (rowIdx % 10 === 0) await new Promise(r => setTimeout(r, 10));
     }
 
+    // Flush audit rows in chunks of 200
+    for (let i = 0; i < auditRows.length; i += 200) {
+      const chunk = auditRows.slice(i, i + 200);
+      const { error: auditErr } = await supabase.from('import_audit').insert(chunk as any);
+      if (auditErr) console.error('Import audit write failed:', auditErr.message);
+    }
+
     setImportResult({ success: inserted, failed, updated, skipped: 0 });
-    setImportErrors(errorMessages.slice(0, 10)); // Keep first 10 errors for display
+    setImportErrors(errorMessages.slice(0, 10));
+    setLastBatchId(batchId);
     await refetchContacts();
     setImporting(false);
     setImportStep('complete');
