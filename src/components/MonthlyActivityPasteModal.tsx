@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import {
   X, ClipboardPaste, Loader2, Check, Sparkles, MessageCircle, AlertTriangle,
   Calendar, Users, ShieldAlert,
@@ -14,7 +14,41 @@ import type { Prospect } from '@/data/mockData';
 interface MatchedRow extends MonthlyActivityRow {
   contact: Prospect | null;
   matchStatus: 'matched' | 'unmatched';
+  matchMethod: 'local-cache' | 'exact-db' | 'none';
   selected: boolean;
+}
+
+function dbContactToProspect(row: any): Prospect {
+  return {
+    id: row.id as unknown as number,
+    DateCaptured: row.date_captured,
+    FullName: row.full_name,
+    PhoneNumber: row.phone_number,
+    EmailAddress: row.email_address,
+    City: row.city,
+    Province: row.province,
+    State: row.state,
+    Country: row.country,
+    LeadTemperature: row.lead_temperature,
+    CommunicationStatus: row.communication_status,
+    RegistrationStatus: row.registration_status,
+    LeadType: row.lead_type,
+    InterestLevel: row.interest_level,
+    FocusArea: row.focus_area,
+    LeadPath: row.lead_path,
+    SponsorName: row.sponsor_name,
+    AssignedTo: row.assigned_to,
+    ActionTaken: row.action_taken,
+    NextAction: row.next_action,
+    MeetingTime: row.meeting_time,
+    APLGoID: row.aplgo_id,
+    AssociateStatus: row.associate_status,
+    AdditionalNotes: row.additional_notes,
+    GOStatus: row.go_status,
+    SalutationTitle: row.salutation_title,
+    Leg: row.leg,
+    Level: row.level,
+  } as Prospect;
 }
 
 interface MonthlyActivityPasteModalProps {
@@ -41,32 +75,69 @@ export function MonthlyActivityPasteModal({ onClose, onComplete }: MonthlyActivi
   const [step, setStep] = useState<'input' | 'preview' | 'done'>('input');
   const [matchedRows, setMatchedRows] = useState<MatchedRow[]>([]);
   const [saving, setSaving] = useState(false);
+  const [matching, setMatching] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState({ created: 0, skipped: 0, flagged: 0 });
 
-  const handleParse = () => {
+  const handleParse = async () => {
     if (!pastedText.trim()) { setError('Please paste monthly activity data.'); return; }
     setError('');
+    setMatching(true);
 
     const parsed = parseMonthlyActivityReport(pastedText);
     if (parsed.length === 0) {
       setError('No entries found. Make sure the format is:\nLevel 1\n1129930(6): 2,520.00 R, 934517: 2,385.00 R');
+      setMatching(false);
       return;
     }
 
-    // Match by APLGoID
-    const rows: MatchedRow[] = parsed.map(row => {
-      const contact = contacts.find(c => c.APLGoID === row.userId) || null;
+    const localByAplgo = new Map(
+      contacts
+        .map(c => [String(c.APLGoID || '').trim(), c] as const)
+        .filter(([aplgo]) => aplgo)
+    );
+
+    let rows: MatchedRow[] = parsed.map(row => {
+      const contact = localByAplgo.get(String(row.userId).trim()) || null;
       return {
         ...row,
         contact,
         matchStatus: contact ? 'matched' : 'unmatched',
+        matchMethod: contact ? 'local-cache' : 'none',
         selected: !!contact,
       };
     });
 
+    const unmatchedIds = Array.from(new Set(rows
+      .filter(r => !r.contact)
+      .map(r => String(r.userId || '').trim())
+      .filter(Boolean)));
+
+    if (user && unmatchedIds.length > 0) {
+      const { data, error: lookupError } = await supabase
+        .from('contacts')
+        .select('*')
+        .eq('user_id', user.id)
+        .in('aplgo_id', unmatchedIds);
+
+      if (lookupError) {
+        console.error('Monthly Activity exact DB fallback failed:', lookupError);
+        setError(`Exact DB fallback lookup failed: ${lookupError.message}`);
+      } else if (Array.isArray(data) && data.length > 0) {
+        const dbByAplgo = new Map(data.map((row: any) => [String(row.aplgo_id || '').trim(), dbContactToProspect(row)]));
+        rows = rows.map(row => {
+          if (row.contact) return row;
+          const contact = dbByAplgo.get(String(row.userId).trim()) || null;
+          return contact
+            ? { ...row, contact, matchStatus: 'matched', matchMethod: 'exact-db', selected: true }
+            : row;
+        });
+      }
+    }
+
     setMatchedRows(rows);
     setStep('preview');
+    setMatching(false);
   };
 
   const toggleRow = (idx: number) => {
@@ -329,6 +400,7 @@ export function MonthlyActivityPasteModal({ onClose, onComplete }: MonthlyActivi
                         <th className="px-3 py-2 text-left text-xs font-semibold text-slate-400">Displayed Lvl</th>
                         <th className="px-3 py-2 text-left text-xs font-semibold text-slate-400">Actual Lvl</th>
                         <th className="px-3 py-2 text-left text-xs font-semibold text-slate-400">Amount</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-slate-400">Method</th>
                         <th className="px-3 py-2 text-left text-xs font-semibold text-slate-400">Status</th>
                       </tr>
                     </thead>
@@ -364,6 +436,17 @@ export function MonthlyActivityPasteModal({ onClose, onComplete }: MonthlyActivi
                             )}
                           </td>
                           <td className="px-3 py-2.5 text-slate-200 font-medium">R{row.amount.toLocaleString()}</td>
+                          <td className="px-3 py-2.5">
+                            <span className={`text-xs px-2 py-0.5 rounded font-medium ${
+                              row.matchMethod === 'exact-db'
+                                ? 'bg-cyan-500/20 text-cyan-300'
+                                : row.matchMethod === 'local-cache'
+                                  ? 'bg-slate-700 text-slate-300'
+                                  : 'bg-rose-500/20 text-rose-400'
+                            }`}>
+                              {row.matchMethod === 'exact-db' ? 'Exact DB' : row.matchMethod === 'local-cache' ? 'Local cache' : 'None'}
+                            </span>
+                          </td>
                           <td className="px-3 py-2.5">
                             {row.contact ? (
                               <span className="text-xs px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-medium">Matched</span>
@@ -432,10 +515,11 @@ export function MonthlyActivityPasteModal({ onClose, onComplete }: MonthlyActivi
                 <button
                   type="button"
                   onClick={handleParse}
+                  disabled={matching}
                   className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition-colors"
                 >
-                  <Sparkles className="w-4 h-4" />
-                  Parse & Match
+                  {matching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                  {matching ? 'Matching...' : 'Parse & Match'}
                 </button>
               )}
               {step === 'preview' && (
