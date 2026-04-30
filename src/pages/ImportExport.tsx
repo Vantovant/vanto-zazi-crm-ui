@@ -161,6 +161,8 @@ export function ImportExport() {
   const [importProgress, setImportProgress] = useState(0);
   const [importResult, setImportResult] = useState<{ success: number; failed: number; updated: number; skipped: number }>({ success: 0, failed: 0, updated: 0, skipped: 0 });
   const [importErrors, setImportErrors] = useState<string[]>([]);
+  const [lastBatchId, setLastBatchId] = useState<string | null>(null);
+  const [auditPreview, setAuditPreview] = useState<Array<Record<string, unknown>> | null>(null);
 
   // Smart Tagging (compensation for missing columns)
   const [smartTags, setSmartTags] = useState<Record<string, string>>({
