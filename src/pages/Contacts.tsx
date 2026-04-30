@@ -97,11 +97,41 @@ export function Contacts() {
     setDeleting(false);
   };
   const filteredProspects = useMemo(() => {
+    const rawQuery = searchQuery.trim();
+    const query = rawQuery.toLowerCase();
+    // Strip non-digits for phone-style numeric matching (e.g. "27 72 960 8908" → "27729608908")
+    const queryDigits = rawQuery.replace(/[^0-9]/g, '');
+
     return prospects.filter((prospect) => {
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        const searchableValues = Object.values(prospect).join(' ').toLowerCase();
-        if (!searchableValues.includes(query)) return false;
+      if (rawQuery) {
+        // Explicit identity fields searched first (covers aplgo_id, phone variants, email variants, name, level, leg, GO status)
+        const explicitFields: string[] = [
+          (prospect.FullName ?? '').toString(),
+          (prospect.APLGoID ?? '').toString(),
+          (prospect.PhoneNumber ?? '').toString(),
+          (prospect.PhoneNumber ?? '').toString().replace(/[^0-9]/g, ''), // phone_normalized equivalent
+          (prospect.EmailAddress ?? '').toString(),
+          (prospect.EmailAddress ?? '').toString().toLowerCase().trim(), // email_normalized equivalent
+          (prospect.GOStatus ?? '').toString(),
+          (prospect.Level ?? '').toString(),
+          (prospect.Leg ?? '').toString(),
+          (prospect.SponsorName ?? '').toString(),
+          (prospect.City ?? '').toString(),
+          (prospect.Country ?? '').toString(),
+        ].map(v => v.toLowerCase());
+
+        const explicitHit = explicitFields.some(v => v && v.includes(query));
+        const digitHit = queryDigits.length >= 4 && (
+          (prospect.PhoneNumber ?? '').toString().replace(/[^0-9]/g, '').includes(queryDigits) ||
+          (prospect.APLGoID ?? '').toString().replace(/[^0-9]/g, '').includes(queryDigits)
+        );
+
+        // Fallback: full-row text search (preserves prior behaviour for any other column)
+        const fallbackHit = !explicitHit && !digitHit
+          ? Object.values(prospect).join(' ').toLowerCase().includes(query)
+          : false;
+
+        if (!explicitHit && !digitHit && !fallbackHit) return false;
       }
       for (const [key, value] of Object.entries(activeFilters)) {
         if (value && prospect[key as keyof Prospect] !== value) {
