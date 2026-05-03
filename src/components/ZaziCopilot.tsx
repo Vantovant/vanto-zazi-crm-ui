@@ -119,6 +119,57 @@ export function ZaziCopilot({ selectedContactId }: { selectedContactId?: string 
 
   const currentRoute = location.pathname.replace('/', '') || 'dashboard';
 
+  // ---- Dictation (Web Speech API) ----
+  const [dictating, setDictating] = useState<null | 'ask' | 'contact'>(null);
+  const recognitionRef = useRef<any>(null);
+  const dictateBaseRef = useRef<string>('');
+
+  const speechSupported = typeof window !== 'undefined' &&
+    !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+
+  const stopDictation = useCallback(() => {
+    try { recognitionRef.current?.stop(); } catch {}
+    recognitionRef.current = null;
+    setDictating(null);
+  }, []);
+
+  const startDictation = useCallback((target: 'ask' | 'contact') => {
+    if (!speechSupported) {
+      alert('Voice dictation is not supported in this browser. Try Chrome or Edge.');
+      return;
+    }
+    if (dictating) { stopDictation(); return; }
+    const SR: any = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const rec = new SR();
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.lang = navigator.language || 'en-US';
+    dictateBaseRef.current = target === 'ask' ? input : contactInput;
+    rec.onresult = (e: any) => {
+      let finalText = '';
+      let interim = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const r = e.results[i];
+        if (r.isFinal) finalText += r[0].transcript;
+        else interim += r[0].transcript;
+      }
+      if (finalText) {
+        dictateBaseRef.current = (dictateBaseRef.current ? dictateBaseRef.current + ' ' : '') + finalText.trim();
+      }
+      const combined = (dictateBaseRef.current + (interim ? ' ' + interim : '')).trim();
+      if (target === 'ask') setInput(combined);
+      else setContactInput(combined);
+    };
+    rec.onerror = () => stopDictation();
+    rec.onend = () => { recognitionRef.current = null; setDictating(null); };
+    recognitionRef.current = rec;
+    setDictating(target);
+    try { rec.start(); } catch { stopDictation(); }
+  }, [speechSupported, dictating, input, contactInput, stopDictation]);
+
+  useEffect(() => () => { try { recognitionRef.current?.stop(); } catch {} }, []);
+
+
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, contactMessages, pageContent, insightContent]);
