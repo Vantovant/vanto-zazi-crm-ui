@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
-import { MessageSquare, X, Sparkles, BookOpen, User, TrendingUp, Send, Loader2, ThumbsUp, ThumbsDown, Minus, FileText, Upload, Trash2 } from 'lucide-react';
+import { MessageSquare, X, Sparkles, BookOpen, User, TrendingUp, Send, Loader2, ThumbsUp, ThumbsDown, Minus, FileText, Upload, Trash2, Mic, MicOff } from 'lucide-react';
 import { useCrm } from '@/contexts/CrmContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -118,6 +118,57 @@ export function ZaziCopilot({ selectedContactId }: { selectedContactId?: string 
   const { user } = useAuth();
 
   const currentRoute = location.pathname.replace('/', '') || 'dashboard';
+
+  // ---- Dictation (Web Speech API) ----
+  const [dictating, setDictating] = useState<null | 'ask' | 'contact'>(null);
+  const recognitionRef = useRef<any>(null);
+  const dictateBaseRef = useRef<string>('');
+
+  const speechSupported = typeof window !== 'undefined' &&
+    !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+
+  const stopDictation = useCallback(() => {
+    try { recognitionRef.current?.stop(); } catch {}
+    recognitionRef.current = null;
+    setDictating(null);
+  }, []);
+
+  const startDictation = useCallback((target: 'ask' | 'contact') => {
+    if (!speechSupported) {
+      alert('Voice dictation is not supported in this browser. Try Chrome or Edge.');
+      return;
+    }
+    if (dictating) { stopDictation(); return; }
+    const SR: any = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const rec = new SR();
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.lang = navigator.language || 'en-US';
+    dictateBaseRef.current = target === 'ask' ? input : contactInput;
+    rec.onresult = (e: any) => {
+      let finalText = '';
+      let interim = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const r = e.results[i];
+        if (r.isFinal) finalText += r[0].transcript;
+        else interim += r[0].transcript;
+      }
+      if (finalText) {
+        dictateBaseRef.current = (dictateBaseRef.current ? dictateBaseRef.current + ' ' : '') + finalText.trim();
+      }
+      const combined = (dictateBaseRef.current + (interim ? ' ' + interim : '')).trim();
+      if (target === 'ask') setInput(combined);
+      else setContactInput(combined);
+    };
+    rec.onerror = () => stopDictation();
+    rec.onend = () => { recognitionRef.current = null; setDictating(null); };
+    recognitionRef.current = rec;
+    setDictating(target);
+    try { rec.start(); } catch { stopDictation(); }
+  }, [speechSupported, dictating, input, contactInput, stopDictation]);
+
+  useEffect(() => () => { try { recognitionRef.current?.stop(); } catch {} }, []);
+
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -697,9 +748,19 @@ export function ZaziCopilot({ selectedContactId }: { selectedContactId?: string 
                   value={input}
                   onChange={e => setInput(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && sendAsk()}
-                  placeholder="Ask about your contacts, APLGO, or MLM..."
+                  placeholder={dictating === 'ask' ? 'Listening… speak now' : 'Ask about your contacts, APLGO, or MLM...'}
                   className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-teal-500"
                 />
+                {speechSupported && (
+                  <button
+                    type="button"
+                    onClick={() => startDictation('ask')}
+                    title={dictating === 'ask' ? 'Stop dictation' : 'Dictate message'}
+                    className={`px-3 py-2 rounded-lg transition-colors text-white ${dictating === 'ask' ? 'bg-red-600 hover:bg-red-500 animate-pulse' : 'bg-slate-700 hover:bg-slate-600'}`}
+                  >
+                    {dictating === 'ask' ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={sendAsk}
@@ -721,9 +782,19 @@ export function ZaziCopilot({ selectedContactId }: { selectedContactId?: string 
                   value={contactInput}
                   onChange={e => setContactInput(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && sendContactChat()}
-                  placeholder={`Ask about ${selectedContact.FullName}...`}
+                  placeholder={dictating === 'contact' ? 'Listening… speak now' : `Ask about ${selectedContact.FullName}...`}
                   className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-teal-500"
                 />
+                {speechSupported && (
+                  <button
+                    type="button"
+                    onClick={() => startDictation('contact')}
+                    title={dictating === 'contact' ? 'Stop dictation' : 'Dictate message'}
+                    className={`px-3 py-2 rounded-lg transition-colors text-white ${dictating === 'contact' ? 'bg-red-600 hover:bg-red-500 animate-pulse' : 'bg-slate-700 hover:bg-slate-600'}`}
+                  >
+                    {dictating === 'contact' ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={sendContactChat}
