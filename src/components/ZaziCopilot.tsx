@@ -782,9 +782,19 @@ export function ZaziCopilot({ selectedContactId }: { selectedContactId?: string 
                   value={contactInput}
                   onChange={e => setContactInput(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && sendContactChat()}
-                  placeholder={`Ask about ${selectedContact.FullName}...`}
+                  placeholder={dictating === 'contact' ? 'Listening… speak now' : `Ask about ${selectedContact.FullName}...`}
                   className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-teal-500"
                 />
+                {speechSupported && (
+                  <button
+                    type="button"
+                    onClick={() => startDictation('contact')}
+                    title={dictating === 'contact' ? 'Stop dictation' : 'Dictate message'}
+                    className={`px-3 py-2 rounded-lg transition-colors text-white ${dictating === 'contact' ? 'bg-red-600 hover:bg-red-500 animate-pulse' : 'bg-slate-700 hover:bg-slate-600'}`}
+                  >
+                    {dictating === 'contact' ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={sendContactChat}
