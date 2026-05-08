@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Mp1PilotSettingsCard } from '@/components/Mp1PilotSettingsCard';
+import { AutoSendShadowCard } from '@/components/AutoSendShadowCard';
 
 interface UserStat {
   userId: string;
@@ -218,6 +219,9 @@ export function TeamDashboard() {
 
       {/* MP1 Pilot Settings — admin-only, defence-in-depth gated inside the component */}
       <Mp1PilotSettingsCard />
+
+      {/* Phase Auto-Send — Phase 1 SHADOW MODE — admin/owner gated inside the component */}
+      <AutoSendShadowCard />
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

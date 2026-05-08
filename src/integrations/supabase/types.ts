@@ -130,6 +130,57 @@ export type Database = {
         }
         Relationships: []
       }
+      auto_send_shadow_log: {
+        Row: {
+          block_reason: string
+          contact_id: string | null
+          contact_name: string
+          created_at: string
+          cycle_key: string
+          dedupe_key: string
+          eligibility: string
+          entry_key: string
+          gates: Json
+          id: string
+          lane: string
+          message_style: string
+          user_id: string
+          would_send_at: string
+        }
+        Insert: {
+          block_reason?: string
+          contact_id?: string | null
+          contact_name?: string
+          created_at?: string
+          cycle_key?: string
+          dedupe_key: string
+          eligibility: string
+          entry_key?: string
+          gates?: Json
+          id?: string
+          lane: string
+          message_style?: string
+          user_id: string
+          would_send_at?: string
+        }
+        Update: {
+          block_reason?: string
+          contact_id?: string | null
+          contact_name?: string
+          created_at?: string
+          cycle_key?: string
+          dedupe_key?: string
+          eligibility?: string
+          entry_key?: string
+          gates?: Json
+          id?: string
+          lane?: string
+          message_style?: string
+          user_id?: string
+          would_send_at?: string
+        }
+        Relationships: []
+      }
       contact_activities: {
         Row: {
           activity_type: string
@@ -293,6 +344,7 @@ export type Database = {
           aplgo_id: string
           assigned_to: string
           associate_status: string
+          auto_send_opt_out: boolean
           city: string
           communication_status: string
           country: string
@@ -330,6 +382,7 @@ export type Database = {
           aplgo_id?: string
           assigned_to?: string
           associate_status?: string
+          auto_send_opt_out?: boolean
           city?: string
           communication_status?: string
           country?: string
@@ -367,6 +420,7 @@ export type Database = {
           aplgo_id?: string
           assigned_to?: string
           associate_status?: string
+          auto_send_opt_out?: boolean
           city?: string
           communication_status?: string
           country?: string
@@ -506,6 +560,12 @@ export type Database = {
       }
       integration_settings: {
         Row: {
+          auto_send_appreciation_enabled: boolean
+          auto_send_birthdays_enabled: boolean
+          auto_send_daily_cap: number
+          auto_send_enabled: boolean
+          auto_send_quiet_end_hour: number
+          auto_send_quiet_start_hour: number
           created_at: string
           daily_send_cap: number
           daily_token_cap: number
@@ -524,6 +584,12 @@ export type Database = {
           zazi_prospector_enabled: boolean
         }
         Insert: {
+          auto_send_appreciation_enabled?: boolean
+          auto_send_birthdays_enabled?: boolean
+          auto_send_daily_cap?: number
+          auto_send_enabled?: boolean
+          auto_send_quiet_end_hour?: number
+          auto_send_quiet_start_hour?: number
           created_at?: string
           daily_send_cap?: number
           daily_token_cap?: number
@@ -542,6 +608,12 @@ export type Database = {
           zazi_prospector_enabled?: boolean
         }
         Update: {
+          auto_send_appreciation_enabled?: boolean
+          auto_send_birthdays_enabled?: boolean
+          auto_send_daily_cap?: number
+          auto_send_enabled?: boolean
+          auto_send_quiet_end_hour?: number
+          auto_send_quiet_start_hour?: number
           created_at?: string
           daily_send_cap?: number
           daily_token_cap?: number
