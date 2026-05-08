@@ -215,6 +215,87 @@ export function AutoSendShadowCard() {
         {lastResult && <span className="text-xs text-slate-400">{lastResult}</span>}
       </div>
 
+      {/* ─────────── Phase 1.5 — MICRO-LIVE PILOT ─────────── */}
+      <div className="border-2 border-red-500/60 bg-red-950/20 rounded-xl p-4 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Zap className="w-5 h-5 text-red-400" />
+            <h3 className="text-sm font-bold text-red-200">Phase 1.5 — MICRO-LIVE PILOT</h3>
+          </div>
+          <span className="text-[10px] font-bold px-2 py-1 rounded bg-red-500/20 text-red-200 border border-red-500/40 flex items-center gap-1">
+            <AlertTriangle className="w-3 h-3" />
+            MAX {settings.auto_send_micro_live_daily_cap} — ALLOWLIST ONLY
+          </span>
+        </div>
+        <p className="text-[11px] text-red-200/80">
+          Sends REAL WhatsApp messages. Requires Master + Lane + MICRO-LIVE all ON, and contact must be on phone allowlist OR contact-ID allowlist.
+          Birthdays: today only. Appreciation: each Activity entry, current month, not yet Done.
+        </p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Toggle label="MICRO-LIVE enabled" checked={settings.auto_send_micro_live_enabled}
+            onChange={(v) => updateSetting({ auto_send_micro_live_enabled: v })} />
+          <div className="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg">
+            <div className="text-sm text-white">Micro-live cap</div>
+            <div className="flex gap-2 items-center">
+              <input type="number" min={1} max={10} value={microCapDraft}
+                onChange={(e) => setMicroCapDraft(e.target.value)}
+                className="w-16 px-2 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-white" />
+              <button
+                onClick={() => updateSetting({ auto_send_micro_live_daily_cap: Math.max(1, Math.min(10, parseInt(microCapDraft, 10) || 3)) })}
+                className="text-xs px-2 py-1 bg-red-600 hover:bg-red-500 text-white rounded">Save</button>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-3 bg-slate-900/50 rounded-lg space-y-1">
+          <div className="text-xs text-slate-300">Contact-ID allowlist (comma-separated UUIDs)</div>
+          <div className="flex gap-2">
+            <input type="text" value={allowDraft} onChange={(e) => setAllowDraft(e.target.value)}
+              placeholder="uuid, uuid, uuid"
+              className="flex-1 px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs text-white font-mono" />
+            <button
+              onClick={() => {
+                const ids = allowDraft.split(',').map(s => s.trim()).filter(s => /^[0-9a-f-]{36}$/i.test(s));
+                updateSetting({ auto_send_micro_live_contact_allowlist: ids });
+                setAllowDraft(ids.join(', '));
+              }}
+              className="text-xs px-2 py-1 bg-red-600 hover:bg-red-500 text-white rounded">Save</button>
+          </div>
+          <div className="text-[10px] text-slate-500">{settings.auto_send_micro_live_contact_allowlist.length} contact(s) allowlisted. Phone allowlist also accepted.</div>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <button onClick={runMicroLive} disabled={microRunning || !settings.auto_send_micro_live_enabled}
+            className="flex items-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-500 text-white text-sm font-semibold rounded-lg disabled:opacity-40">
+            {microRunning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+            Run Micro-Live Now
+          </button>
+          <span className="text-xs text-slate-300">
+            Sent today: <strong className="text-white">{microSentToday}</strong> / {settings.auto_send_micro_live_daily_cap}
+            {' · '}Remaining: <strong className="text-white">{Math.max(0, settings.auto_send_micro_live_daily_cap - microSentToday)}</strong>
+          </span>
+          {microResult && <span className="text-xs text-amber-300">{microResult}</span>}
+        </div>
+
+        <div>
+          <div className="text-xs font-medium text-slate-300 mb-1">Last 10 micro-live sends</div>
+          {microSends.length === 0 ? (
+            <div className="text-[11px] text-slate-500 italic">No micro-live sends yet.</div>
+          ) : (
+            <div className="space-y-1">
+              {microSends.map(s => (
+                <div key={s.id} className="text-[11px] text-slate-400 flex justify-between gap-2 px-2 py-1 bg-slate-900/50 rounded">
+                  <span className="font-mono truncate">{s.intended_send_type} · {s.contact_id?.slice(0,8) || '—'}</span>
+                  <span className={s.request_status === 'ok' ? 'text-emerald-400' : 'text-red-400'}>{s.request_status}</span>
+                  <span className="text-slate-500">{new Date(s.attempted_at).toLocaleTimeString()}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
       <div className="border-t border-slate-700/50 pt-3">
         <div className="text-sm font-medium text-white mb-2">Recent shadow rows ({rows.length})</div>
         {loading ? (
