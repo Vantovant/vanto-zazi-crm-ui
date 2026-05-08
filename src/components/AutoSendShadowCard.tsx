@@ -13,7 +13,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { Loader2, ShieldAlert, Play, RefreshCw } from 'lucide-react';
+import { Loader2, ShieldAlert, Play, RefreshCw, Zap, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -24,6 +24,18 @@ interface AutoSettings {
   auto_send_birthdays_enabled: boolean;
   auto_send_appreciation_enabled: boolean;
   auto_send_daily_cap: number;
+  auto_send_micro_live_enabled: boolean;
+  auto_send_micro_live_daily_cap: number;
+  auto_send_micro_live_contact_allowlist: string[];
+}
+
+interface MicroLiveSend {
+  id: string;
+  contact_id: string | null;
+  intended_send_type: string;
+  maytapi_message_id: string | null;
+  attempted_at: string;
+  request_status: string;
 }
 
 interface ShadowRow {
@@ -48,6 +60,12 @@ export function AutoSendShadowCard() {
   const [scanning, setScanning] = useState(false);
   const [lastResult, setLastResult] = useState<string>('');
   const [capDraft, setCapDraft] = useState('10');
+  const [microCapDraft, setMicroCapDraft] = useState('3');
+  const [allowDraft, setAllowDraft] = useState('');
+  const [microSends, setMicroSends] = useState<MicroLiveSend[]>([]);
+  const [microRunning, setMicroRunning] = useState(false);
+  const [microResult, setMicroResult] = useState<string>('');
+  const [microSentToday, setMicroSentToday] = useState(0);
 
   useEffect(() => {
     if (authLoading || !user) return;
@@ -61,24 +79,40 @@ export function AutoSendShadowCard() {
   const load = useCallback(async () => {
     if (!user) return;
     setLoading(true);
-    const [{ data: s }, { data: r }] = await Promise.all([
+    const startOfDay = new Date(); startOfDay.setHours(0,0,0,0);
+    const [{ data: s }, { data: r }, { data: mSends }] = await Promise.all([
       (supabase.from('integration_settings') as any)
-        .select('auto_send_enabled, auto_send_birthdays_enabled, auto_send_appreciation_enabled, auto_send_daily_cap')
+        .select('auto_send_enabled, auto_send_birthdays_enabled, auto_send_appreciation_enabled, auto_send_daily_cap, auto_send_micro_live_enabled, auto_send_micro_live_daily_cap, auto_send_micro_live_contact_allowlist')
         .eq('user_id', user.id).maybeSingle(),
       (supabase.from('auto_send_shadow_log') as any)
         .select('id, lane, contact_name, entry_key, cycle_key, dedupe_key, eligibility, block_reason, would_send_at, message_style')
         .eq('user_id', user.id)
         .order('would_send_at', { ascending: false })
         .limit(50),
+      (supabase.from('prospector_send_log') as any)
+        .select('id, contact_id, intended_send_type, maytapi_message_id, attempted_at, request_status')
+        .eq('user_id', user.id)
+        .eq('mode', 'auto_micro_live')
+        .order('attempted_at', { ascending: false })
+        .limit(10),
     ]);
+    const allow: string[] = Array.isArray(s?.auto_send_micro_live_contact_allowlist) ? s.auto_send_micro_live_contact_allowlist : [];
     setSettings({
       auto_send_enabled: !!s?.auto_send_enabled,
       auto_send_birthdays_enabled: !!s?.auto_send_birthdays_enabled,
       auto_send_appreciation_enabled: !!s?.auto_send_appreciation_enabled,
       auto_send_daily_cap: typeof s?.auto_send_daily_cap === 'number' ? s.auto_send_daily_cap : 10,
+      auto_send_micro_live_enabled: !!s?.auto_send_micro_live_enabled,
+      auto_send_micro_live_daily_cap: typeof s?.auto_send_micro_live_daily_cap === 'number' ? s.auto_send_micro_live_daily_cap : 3,
+      auto_send_micro_live_contact_allowlist: allow,
     });
     setCapDraft(String(s?.auto_send_daily_cap ?? 10));
+    setMicroCapDraft(String(s?.auto_send_micro_live_daily_cap ?? 3));
+    setAllowDraft(allow.join(', '));
     setRows((r as ShadowRow[]) || []);
+    const sends = (mSends as MicroLiveSend[]) || [];
+    setMicroSends(sends);
+    setMicroSentToday(sends.filter(x => x.request_status === 'ok' && new Date(x.attempted_at) >= startOfDay).length);
     setLoading(false);
   }, [user]);
 
@@ -89,6 +123,24 @@ export function AutoSendShadowCard() {
     const next = { ...settings, ...patch };
     setSettings(next);
     await (supabase.from('integration_settings') as any).update(patch).eq('user_id', user.id);
+  };
+
+  const runMicroLive = async () => {
+    if (!confirm('MICRO-LIVE will send REAL WhatsApp messages to allowlisted contacts. Continue?')) return;
+    setMicroRunning(true);
+    setMicroResult('');
+    const { data, error } = await supabase.functions.invoke('auto-send-micro-live');
+    setMicroRunning(false);
+    if (error) {
+      setMicroResult(`Error: ${error.message}`);
+    } else if (data?.blocked) {
+      setMicroResult(`Blocked: ${data.blocked}`);
+    } else {
+      const sent = data?.sent_today ?? 0;
+      const att = Array.isArray(data?.attempts) ? data.attempts.length : 0;
+      setMicroResult(`Done. Sent today: ${sent}/${data?.cap ?? 3}. Attempts: ${att}.`);
+    }
+    load();
   };
 
   const runScan = async () => {
@@ -161,6 +213,87 @@ export function AutoSendShadowCard() {
           <RefreshCw className="w-3 h-3" /> Refresh
         </button>
         {lastResult && <span className="text-xs text-slate-400">{lastResult}</span>}
+      </div>
+
+      {/* ─────────── Phase 1.5 — MICRO-LIVE PILOT ─────────── */}
+      <div className="border-2 border-red-500/60 bg-red-950/20 rounded-xl p-4 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Zap className="w-5 h-5 text-red-400" />
+            <h3 className="text-sm font-bold text-red-200">Phase 1.5 — MICRO-LIVE PILOT</h3>
+          </div>
+          <span className="text-[10px] font-bold px-2 py-1 rounded bg-red-500/20 text-red-200 border border-red-500/40 flex items-center gap-1">
+            <AlertTriangle className="w-3 h-3" />
+            MAX {settings.auto_send_micro_live_daily_cap} — ALLOWLIST ONLY
+          </span>
+        </div>
+        <p className="text-[11px] text-red-200/80">
+          Sends REAL WhatsApp messages. Requires Master + Lane + MICRO-LIVE all ON, and contact must be on phone allowlist OR contact-ID allowlist.
+          Birthdays: today only. Appreciation: each Activity entry, current month, not yet Done.
+        </p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Toggle label="MICRO-LIVE enabled" checked={settings.auto_send_micro_live_enabled}
+            onChange={(v) => updateSetting({ auto_send_micro_live_enabled: v })} />
+          <div className="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg">
+            <div className="text-sm text-white">Micro-live cap</div>
+            <div className="flex gap-2 items-center">
+              <input type="number" min={1} max={10} value={microCapDraft}
+                onChange={(e) => setMicroCapDraft(e.target.value)}
+                className="w-16 px-2 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-white" />
+              <button
+                onClick={() => updateSetting({ auto_send_micro_live_daily_cap: Math.max(1, Math.min(10, parseInt(microCapDraft, 10) || 3)) })}
+                className="text-xs px-2 py-1 bg-red-600 hover:bg-red-500 text-white rounded">Save</button>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-3 bg-slate-900/50 rounded-lg space-y-1">
+          <div className="text-xs text-slate-300">Contact-ID allowlist (comma-separated UUIDs)</div>
+          <div className="flex gap-2">
+            <input type="text" value={allowDraft} onChange={(e) => setAllowDraft(e.target.value)}
+              placeholder="uuid, uuid, uuid"
+              className="flex-1 px-2 py-1 bg-slate-800 border border-slate-700 rounded text-xs text-white font-mono" />
+            <button
+              onClick={() => {
+                const ids = allowDraft.split(',').map(s => s.trim()).filter(s => /^[0-9a-f-]{36}$/i.test(s));
+                updateSetting({ auto_send_micro_live_contact_allowlist: ids });
+                setAllowDraft(ids.join(', '));
+              }}
+              className="text-xs px-2 py-1 bg-red-600 hover:bg-red-500 text-white rounded">Save</button>
+          </div>
+          <div className="text-[10px] text-slate-500">{settings.auto_send_micro_live_contact_allowlist.length} contact(s) allowlisted. Phone allowlist also accepted.</div>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <button onClick={runMicroLive} disabled={microRunning || !settings.auto_send_micro_live_enabled}
+            className="flex items-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-500 text-white text-sm font-semibold rounded-lg disabled:opacity-40">
+            {microRunning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+            Run Micro-Live Now
+          </button>
+          <span className="text-xs text-slate-300">
+            Sent today: <strong className="text-white">{microSentToday}</strong> / {settings.auto_send_micro_live_daily_cap}
+            {' · '}Remaining: <strong className="text-white">{Math.max(0, settings.auto_send_micro_live_daily_cap - microSentToday)}</strong>
+          </span>
+          {microResult && <span className="text-xs text-amber-300">{microResult}</span>}
+        </div>
+
+        <div>
+          <div className="text-xs font-medium text-slate-300 mb-1">Last 10 micro-live sends</div>
+          {microSends.length === 0 ? (
+            <div className="text-[11px] text-slate-500 italic">No micro-live sends yet.</div>
+          ) : (
+            <div className="space-y-1">
+              {microSends.map(s => (
+                <div key={s.id} className="text-[11px] text-slate-400 flex justify-between gap-2 px-2 py-1 bg-slate-900/50 rounded">
+                  <span className="font-mono truncate">{s.intended_send_type} · {s.contact_id?.slice(0,8) || '—'}</span>
+                  <span className={s.request_status === 'ok' ? 'text-emerald-400' : 'text-red-400'}>{s.request_status}</span>
+                  <span className="text-slate-500">{new Date(s.attempted_at).toLocaleTimeString()}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="border-t border-slate-700/50 pt-3">

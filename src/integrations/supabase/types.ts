@@ -564,6 +564,9 @@ export type Database = {
           auto_send_birthdays_enabled: boolean
           auto_send_daily_cap: number
           auto_send_enabled: boolean
+          auto_send_micro_live_contact_allowlist: string[]
+          auto_send_micro_live_daily_cap: number
+          auto_send_micro_live_enabled: boolean
           auto_send_quiet_end_hour: number
           auto_send_quiet_start_hour: number
           created_at: string
@@ -588,6 +591,9 @@ export type Database = {
           auto_send_birthdays_enabled?: boolean
           auto_send_daily_cap?: number
           auto_send_enabled?: boolean
+          auto_send_micro_live_contact_allowlist?: string[]
+          auto_send_micro_live_daily_cap?: number
+          auto_send_micro_live_enabled?: boolean
           auto_send_quiet_end_hour?: number
           auto_send_quiet_start_hour?: number
           created_at?: string
@@ -612,6 +618,9 @@ export type Database = {
           auto_send_birthdays_enabled?: boolean
           auto_send_daily_cap?: number
           auto_send_enabled?: boolean
+          auto_send_micro_live_contact_allowlist?: string[]
+          auto_send_micro_live_daily_cap?: number
+          auto_send_micro_live_enabled?: boolean
           auto_send_quiet_end_hour?: number
           auto_send_quiet_start_hour?: number
           created_at?: string
