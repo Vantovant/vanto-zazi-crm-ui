@@ -13,7 +13,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { Loader2, ShieldAlert, Play, RefreshCw } from 'lucide-react';
+import { Loader2, ShieldAlert, Play, RefreshCw, Zap, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -24,6 +24,18 @@ interface AutoSettings {
   auto_send_birthdays_enabled: boolean;
   auto_send_appreciation_enabled: boolean;
   auto_send_daily_cap: number;
+  auto_send_micro_live_enabled: boolean;
+  auto_send_micro_live_daily_cap: number;
+  auto_send_micro_live_contact_allowlist: string[];
+}
+
+interface MicroLiveSend {
+  id: string;
+  contact_id: string | null;
+  intended_send_type: string;
+  maytapi_message_id: string | null;
+  attempted_at: string;
+  request_status: string;
 }
 
 interface ShadowRow {
