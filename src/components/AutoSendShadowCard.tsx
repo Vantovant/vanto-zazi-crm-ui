@@ -60,6 +60,12 @@ export function AutoSendShadowCard() {
   const [scanning, setScanning] = useState(false);
   const [lastResult, setLastResult] = useState<string>('');
   const [capDraft, setCapDraft] = useState('10');
+  const [microCapDraft, setMicroCapDraft] = useState('3');
+  const [allowDraft, setAllowDraft] = useState('');
+  const [microSends, setMicroSends] = useState<MicroLiveSend[]>([]);
+  const [microRunning, setMicroRunning] = useState(false);
+  const [microResult, setMicroResult] = useState<string>('');
+  const [microSentToday, setMicroSentToday] = useState(0);
 
   useEffect(() => {
     if (authLoading || !user) return;
@@ -73,24 +79,40 @@ export function AutoSendShadowCard() {
   const load = useCallback(async () => {
     if (!user) return;
     setLoading(true);
-    const [{ data: s }, { data: r }] = await Promise.all([
+    const startOfDay = new Date(); startOfDay.setHours(0,0,0,0);
+    const [{ data: s }, { data: r }, { data: mSends }] = await Promise.all([
       (supabase.from('integration_settings') as any)
-        .select('auto_send_enabled, auto_send_birthdays_enabled, auto_send_appreciation_enabled, auto_send_daily_cap')
+        .select('auto_send_enabled, auto_send_birthdays_enabled, auto_send_appreciation_enabled, auto_send_daily_cap, auto_send_micro_live_enabled, auto_send_micro_live_daily_cap, auto_send_micro_live_contact_allowlist')
         .eq('user_id', user.id).maybeSingle(),
       (supabase.from('auto_send_shadow_log') as any)
         .select('id, lane, contact_name, entry_key, cycle_key, dedupe_key, eligibility, block_reason, would_send_at, message_style')
         .eq('user_id', user.id)
         .order('would_send_at', { ascending: false })
         .limit(50),
+      (supabase.from('prospector_send_log') as any)
+        .select('id, contact_id, intended_send_type, maytapi_message_id, attempted_at, request_status')
+        .eq('user_id', user.id)
+        .eq('mode', 'auto_micro_live')
+        .order('attempted_at', { ascending: false })
+        .limit(10),
     ]);
+    const allow: string[] = Array.isArray(s?.auto_send_micro_live_contact_allowlist) ? s.auto_send_micro_live_contact_allowlist : [];
     setSettings({
       auto_send_enabled: !!s?.auto_send_enabled,
       auto_send_birthdays_enabled: !!s?.auto_send_birthdays_enabled,
       auto_send_appreciation_enabled: !!s?.auto_send_appreciation_enabled,
       auto_send_daily_cap: typeof s?.auto_send_daily_cap === 'number' ? s.auto_send_daily_cap : 10,
+      auto_send_micro_live_enabled: !!s?.auto_send_micro_live_enabled,
+      auto_send_micro_live_daily_cap: typeof s?.auto_send_micro_live_daily_cap === 'number' ? s.auto_send_micro_live_daily_cap : 3,
+      auto_send_micro_live_contact_allowlist: allow,
     });
     setCapDraft(String(s?.auto_send_daily_cap ?? 10));
+    setMicroCapDraft(String(s?.auto_send_micro_live_daily_cap ?? 3));
+    setAllowDraft(allow.join(', '));
     setRows((r as ShadowRow[]) || []);
+    const sends = (mSends as MicroLiveSend[]) || [];
+    setMicroSends(sends);
+    setMicroSentToday(sends.filter(x => x.request_status === 'ok' && new Date(x.attempted_at) >= startOfDay).length);
     setLoading(false);
   }, [user]);
 
@@ -101,6 +123,24 @@ export function AutoSendShadowCard() {
     const next = { ...settings, ...patch };
     setSettings(next);
     await (supabase.from('integration_settings') as any).update(patch).eq('user_id', user.id);
+  };
+
+  const runMicroLive = async () => {
+    if (!confirm('MICRO-LIVE will send REAL WhatsApp messages to allowlisted contacts. Continue?')) return;
+    setMicroRunning(true);
+    setMicroResult('');
+    const { data, error } = await supabase.functions.invoke('auto-send-micro-live');
+    setMicroRunning(false);
+    if (error) {
+      setMicroResult(`Error: ${error.message}`);
+    } else if (data?.blocked) {
+      setMicroResult(`Blocked: ${data.blocked}`);
+    } else {
+      const sent = data?.sent_today ?? 0;
+      const att = Array.isArray(data?.attempts) ? data.attempts.length : 0;
+      setMicroResult(`Done. Sent today: ${sent}/${data?.cap ?? 3}. Attempts: ${att}.`);
+    }
+    load();
   };
 
   const runScan = async () => {
