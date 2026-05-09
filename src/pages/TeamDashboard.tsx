@@ -20,6 +20,7 @@ import {
 import ReactMarkdown from 'react-markdown';
 import { Mp1PilotSettingsCard } from '@/components/Mp1PilotSettingsCard';
 import { AutoSendShadowCard } from '@/components/AutoSendShadowCard';
+import { PhoneRescueDashboard } from '@/components/PhoneRescueDashboard';
 
 interface UserStat {
   userId: string;
