@@ -1004,6 +1004,72 @@ export type Database = {
           },
         ]
       }
+      phone_rescue_candidates: {
+        Row: {
+          audit: Json
+          confidence: string
+          contact_id: string | null
+          contact_name: string
+          created_at: string
+          entry_key: string
+          id: string
+          lane: string
+          match_method: string
+          old_phone: string
+          recovered_aplgo_id: string
+          recovered_full_name: string
+          recovered_phone: string
+          resolved_at: string | null
+          resolved_by: string | null
+          shadow_log_id: string | null
+          source_table: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          audit?: Json
+          confidence?: string
+          contact_id?: string | null
+          contact_name?: string
+          created_at?: string
+          entry_key?: string
+          id?: string
+          lane?: string
+          match_method?: string
+          old_phone?: string
+          recovered_aplgo_id?: string
+          recovered_full_name?: string
+          recovered_phone?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          shadow_log_id?: string | null
+          source_table?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          audit?: Json
+          confidence?: string
+          contact_id?: string | null
+          contact_name?: string
+          created_at?: string
+          entry_key?: string
+          id?: string
+          lane?: string
+          match_method?: string
+          old_phone?: string
+          recovered_aplgo_id?: string
+          recovered_full_name?: string
+          recovered_phone?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          shadow_log_id?: string | null
+          source_table?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -1424,6 +1490,8 @@ export type Database = {
       }
       normalize_email: { Args: { raw: string }; Returns: string }
       normalize_phone: { Args: { raw: string }; Returns: string }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
     }
     Enums: {
       app_role: "admin" | "user"

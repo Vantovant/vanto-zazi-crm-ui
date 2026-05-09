@@ -20,6 +20,7 @@ import {
 import ReactMarkdown from 'react-markdown';
 import { Mp1PilotSettingsCard } from '@/components/Mp1PilotSettingsCard';
 import { AutoSendShadowCard } from '@/components/AutoSendShadowCard';
+import { PhoneRescueDashboard } from '@/components/PhoneRescueDashboard';
 
 interface UserStat {
   userId: string;
@@ -222,6 +223,9 @@ export function TeamDashboard() {
 
       {/* Phase Auto-Send — Phase 1 SHADOW MODE — admin/owner gated inside the component */}
       <AutoSendShadowCard />
+
+      {/* Phone Rescue + Auto-Link Repair — admin-only */}
+      <PhoneRescueDashboard />
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
