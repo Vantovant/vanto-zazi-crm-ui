@@ -224,6 +224,9 @@ export function TeamDashboard() {
       {/* Phase Auto-Send — Phase 1 SHADOW MODE — admin/owner gated inside the component */}
       <AutoSendShadowCard />
 
+      {/* Phone Rescue + Auto-Link Repair — admin-only */}
+      <PhoneRescueDashboard />
+
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
