@@ -274,11 +274,26 @@ export function BirthdayComposerModal({
               {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
               {copied ? 'Copied!' : 'Copy'}
             </button>
-            <button type="button" onClick={handleSendAndLog} disabled={logging}
-              className="flex items-center gap-1.5 px-3 py-2 text-sm bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white rounded-lg transition-colors font-medium">
-              {logging ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              Send & Log
-            </button>
+            {assistedSend ? (
+              <button type="button" onClick={handleMaytapiSend}
+                disabled={maytapiSending || !entry.contact_id || !(entry.phone_normalized || entry.phone_number) || entry.opt_out}
+                title={
+                  !entry.contact_id ? 'No linked contact' :
+                  !(entry.phone_normalized || entry.phone_number) ? 'No phone number' :
+                  entry.opt_out ? 'Contact opted out' :
+                  'Send this birthday via Maytapi (one click, then auto-advance)'
+                }
+                className="flex items-center gap-1.5 px-3 py-2 text-sm bg-pink-600 hover:bg-pink-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg transition-colors font-medium">
+                {maytapiSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+                Send via Maytapi
+              </button>
+            ) : (
+              <button type="button" onClick={handleSendAndLog} disabled={logging}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white rounded-lg transition-colors font-medium">
+                {logging ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                Send & Log
+              </button>
+            )}
           </div>
         </div>
       </div>
