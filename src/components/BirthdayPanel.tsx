@@ -2,15 +2,18 @@ import { useState, useMemo, useCallback } from 'react';
 import {
   Cake, ClipboardPaste, Search, ExternalLink, Check,
   ChevronDown, ChevronUp, MessageCircle, Trash2, Filter, PartyPopper, Play,
-  FlaskConical, Undo2,
+  FlaskConical, Undo2, PhoneOff, PhoneCall, Link2, AlertTriangle,
 } from 'lucide-react';
 import { classifyBirthday, daysUntil, classifyBirthdayEntry, daysUntilEntry } from '@/utils/birthdayParser';
 import { useBirthdays, type BirthdayEntry } from '@/hooks/useBirthdays';
+import { useCrm } from '@/contexts/CrmContext';
 import { BirthdaySmartPasteModal } from './BirthdaySmartPasteModal';
 import { BirthdayComposerModal } from './BirthdayComposerModal';
 import { BirthdaySessionModal } from './BirthdaySessionModal';
+import { EditContactModal } from './EditContactModal';
+import type { Prospect } from '@/data/mockData';
 
-type FilterType = 'all' | 'today' | 'tomorrow' | 'this_week' | 'upcoming' | 'congratulated' | 'not_congratulated' | 'unmatched';
+type FilterType = 'all' | 'today' | 'tomorrow' | 'this_week' | 'upcoming' | 'congratulated' | 'not_congratulated' | 'unmatched' | 'missing_phone';
 
 const STATUS_COLORS: Record<string, string> = {
   not_congratulated: 'bg-amber-500/20 text-amber-300',
