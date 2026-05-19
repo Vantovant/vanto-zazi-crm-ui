@@ -58,9 +58,11 @@ export function BirthdayComposerModal({
   initialIndex = 0,
   onClose,
   onCongratulated,
+  assistedSend = false,
 }: BirthdayComposerModalProps) {
   const { user } = useAuth();
   const { logActivity } = useContactActivities();
+  const { send: assistedSendFn } = useAssistedBirthdaySend();
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [tone, setTone] = useState<BirthdayTone>('warm');
   const [senderName, setSenderName] = useState('');
@@ -68,6 +70,8 @@ export function BirthdayComposerModal({
   const [copied, setCopied] = useState(false);
   const [logging, setLogging] = useState(false);
   const [logSuccess, setLogSuccess] = useState(false);
+  const [maytapiSending, setMaytapiSending] = useState(false);
+  const [maytapiError, setMaytapiError] = useState<string | null>(null);
 
   const entry = entries[currentIndex];
   const isBulk = entries.length > 1;
