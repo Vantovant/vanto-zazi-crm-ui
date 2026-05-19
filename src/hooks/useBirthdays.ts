@@ -199,6 +199,7 @@ export function useBirthdays() {
     clearAll,
     testToday,
     restoreOriginalDate,
+    linkContact,
     refetch: fetchBirthdays,
   };
 }
