@@ -412,6 +412,13 @@ export function BirthdayPanel() {
           onSaved={() => setEditingContact(null)}
         />
       )}
+      {phoneSuggestEntry && (
+        <SmartPhoneSuggestModal
+          entry={phoneSuggestEntry}
+          onClose={() => setPhoneSuggestEntry(null)}
+          onSaved={() => { setPhoneSuggestEntry(null); }}
+        />
+      )}
     </>
   );
 }
