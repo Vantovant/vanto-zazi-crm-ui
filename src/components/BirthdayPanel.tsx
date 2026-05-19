@@ -33,6 +33,7 @@ export function BirthdayPanel() {
   const [showPaste, setShowPaste] = useState(false);
   const [composerEntries, setComposerEntries] = useState<BirthdayEntry[] | null>(null);
   const [composerIndex, setComposerIndex] = useState(0);
+  const [composerAssisted, setComposerAssisted] = useState(false);
   const [filter, setFilter] = useState<FilterType>('all');
   const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState(true);
