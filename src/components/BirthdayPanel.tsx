@@ -441,8 +441,9 @@ export function BirthdayPanel() {
         <BirthdayComposerModal
           entries={composerEntries}
           initialIndex={composerIndex}
-          onClose={() => setComposerEntries(null)}
+          onClose={() => { setComposerEntries(null); setComposerAssisted(false); }}
           onCongratulated={handleCongratulated}
+          assistedSend={composerAssisted}
         />
       )}
       {showSession && (
