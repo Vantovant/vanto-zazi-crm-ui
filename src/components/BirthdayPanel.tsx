@@ -39,6 +39,8 @@ export function BirthdayPanel() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showSession, setShowSession] = useState(false);
   const [editingContact, setEditingContact] = useState<Prospect | null>(null);
+  const [phoneSuggestEntry, setPhoneSuggestEntry] = useState<BirthdayEntry | null>(null);
+  const [queueRefresh, setQueueRefresh] = useState(0);
 
   // Helper: does this birthday have a sendable phone? (matched contact with non-empty PhoneNumber)
   const hasSendablePhone = useCallback((b: BirthdayEntry) => {
