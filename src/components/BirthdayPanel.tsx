@@ -14,7 +14,7 @@ import { BirthdaySessionModal } from './BirthdaySessionModal';
 import { EditContactModal } from './EditContactModal';
 import { BirthdaySendabilityQueue } from './BirthdaySendabilityQueue';
 import { SmartPhoneSuggestModal } from './SmartPhoneSuggestModal';
-import { recordHealthSnapshot, readTrend } from '@/utils/birthdaySendability';
+import { recordHealthSnapshot, readTrend, categorize } from '@/utils/birthdaySendability';
 import type { Prospect } from '@/data/mockData';
 
 
