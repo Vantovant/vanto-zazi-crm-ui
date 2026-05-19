@@ -285,6 +285,14 @@ export function BirthdayPanel() {
                 <ClipboardPaste className="w-3 h-3" />
                 Smart Paste
               </button>
+              {todaysEligible.length > 0 && (
+                <button type="button" onClick={openAssistedTodayComposer}
+                  title="MP1.5 Assisted Send — open today's first eligible birthday, send one-by-one via Maytapi"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white rounded-lg transition-colors shadow-sm shadow-pink-500/30">
+                  <PartyPopper className="w-3 h-3" />
+                  Send today's birthdays ({todaysEligible.length})
+                </button>
+              )}
               {birthdays.filter(b => b.status !== 'congratulated').length > 0 && (
                 <button type="button" onClick={() => setShowSession(true)}
                   className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors">
