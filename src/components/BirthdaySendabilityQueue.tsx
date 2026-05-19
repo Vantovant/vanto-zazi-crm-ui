@@ -107,16 +107,39 @@ export function BirthdaySendabilityQueue({
             {repairedCount} repaired today
           </span>
         </div>
-        <button
-          type="button"
-          onClick={openNextUnresolved}
-          disabled={unresolvedCount === 0}
-          className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium bg-pink-600 hover:bg-pink-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-md"
-          title="Cycle through Missing phone → Unmatched → Duplicate"
-        >
-          <PlayCircle className="w-3.5 h-3.5" /> Open next
-        </button>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {onBulkRepairPhones && (
+            <button
+              type="button"
+              onClick={() => onBulkRepairPhones()}
+              className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium bg-amber-600 hover:bg-amber-500 text-white rounded-md"
+              title="Copy pasted phone numbers from birthday rows into linked contacts that still have no phone (safeMerge — never overwrites)"
+            >
+              <PhoneCall className="w-3.5 h-3.5" /> Update contact phones from birthdays
+            </button>
+          )}
+          {onReevaluate && (
+            <button
+              type="button"
+              onClick={() => onReevaluate()}
+              className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium bg-slate-700 hover:bg-slate-600 text-white rounded-md"
+              title="Re-scan contact_birthdays against the latest contact data"
+            >
+              <RefreshCw className="w-3.5 h-3.5" /> Re-evaluate
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={openNextUnresolved}
+            disabled={unresolvedCount === 0}
+            className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium bg-pink-600 hover:bg-pink-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-md"
+            title="Cycle through Missing phone → Unmatched → Duplicate"
+          >
+            <PlayCircle className="w-3.5 h-3.5" /> Open next
+          </button>
+        </div>
       </div>
+
 
       {/* Compact chips */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
