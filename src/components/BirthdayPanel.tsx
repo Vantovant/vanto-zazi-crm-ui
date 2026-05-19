@@ -364,6 +364,13 @@ export function BirthdayPanel() {
           onCongratulated={async (id) => { await markCongratulated(id); }}
         />
       )}
+      {editingContact && (
+        <EditContactModal
+          prospect={editingContact}
+          onClose={() => setEditingContact(null)}
+          onSaved={() => setEditingContact(null)}
+        />
+      )}
     </>
   );
 }
