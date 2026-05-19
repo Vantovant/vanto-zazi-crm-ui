@@ -23,7 +23,9 @@ export interface BirthdayEntry {
   created_at: string;
   // Joined from contact
   phone_number?: string;
+  phone_normalized?: string | null;
   country?: string;
+  opt_out?: boolean;
 }
 
 export function useBirthdays() {
