@@ -112,6 +112,26 @@ export function BirthdayPanel() {
     await markCongratulated(id);
   }, [markCongratulated]);
 
+  const openAddPhone = useCallback((b: BirthdayEntry) => {
+    const contact = contacts.find(c => String(c.id) === b.contact_id);
+    if (contact) setEditingContact(contact);
+  }, [contacts]);
+
+  const handleMatchContact = useCallback(async (b: BirthdayEntry) => {
+    const input = window.prompt(
+      `Match "${b.full_name}" to an existing contact.\n\nEnter the APLGO ID${b.associate_id ? ` (pasted as ${b.associate_id})` : ''}:`,
+      b.associate_id || '',
+    );
+    if (!input) return;
+    const cleaned = input.replace(/[^\d]/g, '');
+    const contact = contacts.find(c => (c.APLGoID || '').replace(/[^\d]/g, '') === cleaned);
+    if (!contact) {
+      window.alert(`No contact found with APLGO ID "${cleaned}". Add the APLGO ID on the contact first, then try again.`);
+      return;
+    }
+    await linkContact(b.id, String(contact.id));
+  }, [contacts, linkContact]);
+
   return (
     <>
       <div className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden">
