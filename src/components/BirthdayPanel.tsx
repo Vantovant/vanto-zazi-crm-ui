@@ -43,7 +43,7 @@ export function BirthdayPanel() {
 
   // Counts
   const counts = useMemo(() => {
-    const c = { today: 0, tomorrow: 0, this_week: 0, upcoming: 0, congratulated: 0, not_congratulated: 0, unmatched: 0 };
+    const c = { today: 0, tomorrow: 0, this_week: 0, upcoming: 0, congratulated: 0, not_congratulated: 0, unmatched: 0, missing_phone: 0 };
     birthdays.forEach(b => {
       const timing = classifyBirthdayEntry(b);
       if (timing === 'today') c.today++;
@@ -53,9 +53,22 @@ export function BirthdayPanel() {
       if (b.status === 'congratulated') c.congratulated++;
       else if (b.status === 'unmatched') c.unmatched++;
       else c.not_congratulated++;
+      if (!hasSendablePhone(b)) c.missing_phone++;
     });
     return c;
-  }, [birthdays]);
+  }, [birthdays, hasSendablePhone]);
+
+  // Phase 0 nightly health metric: % of upcoming (next 14 days) birthdays with a sendable phone.
+  const phoneHealth = useMemo(() => {
+    const upcoming = birthdays.filter(b => {
+      const d = daysUntilEntry(b);
+      return d !== null && d >= 0 && d <= 14;
+    });
+    const total = upcoming.length;
+    const sendable = upcoming.filter(hasSendablePhone).length;
+    const pct = total === 0 ? 100 : Math.round((sendable / total) * 100);
+    return { total, sendable, pct, alert: total > 0 && pct < 80 };
+  }, [birthdays, hasSendablePhone]);
 
   const filtered = useMemo(() => {
     let list = birthdays;
@@ -67,13 +80,15 @@ export function BirthdayPanel() {
       list = list.filter(b => b.status === 'not_congratulated');
     } else if (filter === 'unmatched') {
       list = list.filter(b => b.status === 'unmatched');
+    } else if (filter === 'missing_phone') {
+      list = list.filter(b => !hasSendablePhone(b));
     }
     if (search) {
       const q = search.toLowerCase();
       list = list.filter(b => b.full_name.toLowerCase().includes(q) || b.associate_id.includes(q));
     }
     return list;
-  }, [birthdays, filter, search]);
+  }, [birthdays, filter, search, hasSendablePhone]);
 
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds(prev => {
