@@ -66,6 +66,7 @@ export function useBirthdays() {
 
     let matched = 0;
     let unmatched = 0;
+    const phoneBackfills: Array<{ id: string; phone: string }> = [];
 
     const inserts = rows.map(row => {
       // Match by APLGoID
@@ -75,6 +76,17 @@ export function useBirthdays() {
 
       if (contact) matched++;
       else unmatched++;
+
+      // Phase 0 phone backfill: if paste includes phone and contact has no phone, safeMerge it in.
+      if (contact && row.phone) {
+        const merged = safeMerge(
+          { phone_number: (contact.PhoneNumber || '').trim() },
+          { phone_number: row.phone.trim() },
+        );
+        if (merged.phone_number && !(contact.PhoneNumber || '').trim()) {
+          phoneBackfills.push({ id: String(contact.id), phone: String(merged.phone_number) });
+        }
+      }
 
       // Format date as local YYYY-MM-DD to avoid UTC timezone shift
       const formatLocal = (d: Date | null) => {
@@ -103,11 +115,25 @@ export function useBirthdays() {
 
     if (inserts.length > 0) {
       await supabase.from('contact_birthdays').insert(inserts as any);
-      await fetchBirthdays();
     }
 
+    // Apply phone backfills (never overwrites existing — guarded above).
+    for (const bf of phoneBackfills) {
+      await updateContact(bf.id, { PhoneNumber: bf.phone } as any);
+    }
+
+    if (inserts.length > 0) await fetchBirthdays();
+
     return { imported: inserts.length, matched, unmatched };
-  }, [user, contacts, fetchBirthdays]);
+  }, [user, contacts, fetchBirthdays, updateContact]);
+
+  const linkContact = useCallback(async (birthdayId: string, contactId: string) => {
+    await supabase
+      .from('contact_birthdays')
+      .update({ contact_id: contactId, status: 'not_congratulated' } as any)
+      .eq('id', birthdayId);
+    await fetchBirthdays();
+  }, [fetchBirthdays]);
 
   const markCongratulated = useCallback(async (id: string) => {
     await supabase
