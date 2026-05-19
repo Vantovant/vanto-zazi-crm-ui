@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCrm } from '@/contexts/CrmContext';
+import { safeMerge } from '@/utils/contactNormalization';
 import type { BirthdayRow } from '@/utils/birthdayParser';
 
 export interface BirthdayEntry {
