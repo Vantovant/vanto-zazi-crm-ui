@@ -28,7 +28,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export function BirthdayPanel() {
-  const { birthdays, loading, importBirthdays, markCongratulated, deleteBirthday, clearAll, testToday, restoreOriginalDate, linkContact } = useBirthdays();
+  const { birthdays, loading, importBirthdays, markCongratulated, deleteBirthday, clearAll, testToday, restoreOriginalDate, linkContact, repairPhonesFromBirthdays, refetch } = useBirthdays();
   const { contacts } = useCrm();
   const [showPaste, setShowPaste] = useState(false);
   const [composerEntries, setComposerEntries] = useState<BirthdayEntry[] | null>(null);
