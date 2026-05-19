@@ -186,9 +186,24 @@ export function BirthdayPanel() {
                     {phoneHealth.alert && ' · below 80% threshold'}
                   </div>
                 </div>
+                  <div className="text-[11px] text-slate-400 truncate">
+                    {phoneHealth.sendable} of {phoneHealth.total} upcoming birthdays have a sendable phone
+                    {phoneHealth.alert && ' · below 80% threshold'}
+                  </div>
+                </div>
               </div>
-              <div className={`text-lg font-bold ${phoneHealth.alert ? 'text-amber-300' : 'text-emerald-300'}`}>
-                {phoneHealth.pct}%
+              <div className="flex items-center gap-2">
+                {trendDelta !== null && trend.yesterday && (
+                  <div className="flex items-center gap-1 text-[11px] text-slate-400">
+                    <span>{trend.yesterday.pct}%</span>
+                    {trendDelta > 0 && <ArrowUp className="w-3 h-3 text-emerald-400" />}
+                    {trendDelta < 0 && <ArrowDown className="w-3 h-3 text-rose-400" />}
+                    {trendDelta === 0 && <Minus className="w-3 h-3 text-slate-500" />}
+                  </div>
+                )}
+                <div className={`text-lg font-bold ${phoneHealth.alert ? 'text-amber-300' : 'text-emerald-300'}`}>
+                  {phoneHealth.pct}%
+                </div>
               </div>
             </button>
           {expanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
@@ -196,7 +211,22 @@ export function BirthdayPanel() {
 
         {expanded && (
           <div className="px-4 pb-4 space-y-3">
+            {/* Sendable Soon queue (Phase 0.5) */}
+            <BirthdaySendabilityQueue
+              birthdays={birthdays}
+              onFixMissingPhone={openAddPhone}
+              onFixUnmatched={handleMatchContact}
+              onFixDuplicate={(b) => {
+                const contact = contacts.find(c => String(c.id) === b.contact_id);
+                if (contact) setEditingContact(contact);
+                else handleMatchContact(b);
+              }}
+              onChanged={() => setQueueRefresh(n => n + 1)}
+              key={queueRefresh}
+            />
+
             {/* Notification counters */}
+
             <div className="grid grid-cols-4 gap-2">
               {[
                 { key: 'today' as FilterType, label: 'Today', count: counts.today, color: 'bg-rose-500/20 text-rose-300 border-rose-500/30' },
