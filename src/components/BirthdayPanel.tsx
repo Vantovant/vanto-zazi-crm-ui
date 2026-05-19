@@ -435,7 +435,7 @@ export function BirthdayPanel() {
         <SmartPhoneSuggestModal
           entry={phoneSuggestEntry}
           onClose={() => setPhoneSuggestEntry(null)}
-          onSaved={() => { setPhoneSuggestEntry(null); }}
+          onSaved={() => { setPhoneSuggestEntry(null); setAutoNext(true); }}
         />
       )}
     </>
