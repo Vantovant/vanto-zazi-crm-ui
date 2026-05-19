@@ -149,6 +149,24 @@ export function BirthdayPanel() {
     await linkContact(b.id, String(contact.id));
   }, [contacts, linkContact]);
 
+  // Auto-rerun: after a successful repair, refresh-trigger or birthdays change → open next unresolved.
+  useEffect(() => {
+    if (!autoNext) return;
+    if (phoneSuggestEntry || editingContact) return; // wait until current modal is closed
+    const data = categorize(birthdays);
+    const next = data.missing_phone[0] || data.unmatched[0] || data.duplicate[0];
+    setAutoNext(false);
+    if (!next) return;
+    if (data.missing_phone.includes(next)) openAddPhone(next);
+    else if (data.unmatched.includes(next)) void handleMatchContact(next);
+    else {
+      const contact = contacts.find(c => String(c.id) === next.contact_id);
+      if (contact) setEditingContact(contact);
+      else void handleMatchContact(next);
+    }
+  }, [autoNext, birthdays, phoneSuggestEntry, editingContact, openAddPhone, handleMatchContact, contacts]);
+
+
   return (
     <>
       <div className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden">
