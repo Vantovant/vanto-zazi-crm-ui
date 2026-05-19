@@ -154,8 +154,40 @@ export function useBirthdays() {
       .from('contact_birthdays')
       .update({ contact_id: contactId, status: 'not_congratulated' } as any)
       .eq('id', birthdayId);
+
+    // Apply pasted_phone to the freshly linked contact via safeMerge (never overwrite).
+    const entry = birthdays.find(b => b.id === birthdayId);
+    const contact = contacts.find(c => String(c.id) === contactId);
+    const pasted = (entry as any)?.pasted_phone?.trim?.() || '';
+    if (entry && contact && pasted && !(contact.PhoneNumber || '').trim()) {
+      await updateContact(String(contact.id), { PhoneNumber: pasted } as any);
+      auditRepaired(birthdayId, entry.full_name, pasted, 'link+pasted_phone');
+    }
     await fetchBirthdays();
-  }, [fetchBirthdays]);
+  }, [fetchBirthdays, birthdays, contacts, updateContact]);
+
+  /**
+   * Bulk repair: copy pasted_phone → contact.PhoneNumber for every birthday
+   * whose linked contact still has no phone. safeMerge is enforced by guard.
+   * Returns the number of contacts repaired.
+   */
+  const repairPhonesFromBirthdays = useCallback(async (): Promise<number> => {
+    let repaired = 0;
+    for (const b of birthdays) {
+      const pasted = ((b as any).pasted_phone || '').trim();
+      if (!pasted || !b.contact_id) continue;
+      const contact = contacts.find(c => String(c.id) === b.contact_id);
+      if (!contact) continue;
+      if ((contact.PhoneNumber || '').trim()) continue;
+      const ok = await updateContact(String(contact.id), { PhoneNumber: pasted } as any);
+      if (ok) {
+        repaired++;
+        auditRepaired(b.id, b.full_name, pasted, 'bulk_repair_from_birthdays');
+      }
+    }
+    if (repaired > 0) await fetchBirthdays();
+    return repaired;
+  }, [birthdays, contacts, updateContact, fetchBirthdays]);
 
   const markCongratulated = useCallback(async (id: string) => {
     await supabase
