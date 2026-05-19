@@ -131,6 +131,7 @@ export function useBirthdays() {
         congratulate_by_date: formatLocal(row.congratulateByDate),
         status: contact ? 'not_congratulated' : 'unmatched',
         cycle_year: new Date().getFullYear(),
+        pasted_phone: (row.phone || '').trim(),
       };
     });
 
