@@ -32,7 +32,7 @@ export interface BirthdayEntry {
 
 export function useBirthdays() {
   const { user } = useAuth();
-  const { contacts, updateContact } = useCrm();
+  const { contacts, updateContact, addContact } = useCrm();
   const [birthdays, setBirthdays] = useState<BirthdayEntry[]>([]);
   const [loading, setLoading] = useState(false);
 
