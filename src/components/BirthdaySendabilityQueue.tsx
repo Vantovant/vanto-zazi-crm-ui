@@ -54,6 +54,7 @@ function timeAgo(iso: string): string {
 
 export function BirthdaySendabilityQueue({
   birthdays, onFixMissingPhone, onFixUnmatched, onFixDuplicate, onChanged,
+  onBulkRepairPhones, onReevaluate,
 }: Props) {
   const [openCat, setOpenCat] = useState<SendabilityCategory | null>(null);
   const [showHistory, setShowHistory] = useState(false);
