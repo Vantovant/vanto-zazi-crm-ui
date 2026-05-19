@@ -254,6 +254,7 @@ export function useBirthdays() {
     testToday,
     restoreOriginalDate,
     linkContact,
+    repairPhonesFromBirthdays,
     refetch: fetchBirthdays,
   };
 }
