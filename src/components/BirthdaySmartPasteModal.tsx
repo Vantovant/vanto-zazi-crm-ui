@@ -100,6 +100,7 @@ export function BirthdaySmartPasteModal({ onClose, onImport }: BirthdaySmartPast
                         <th className="px-3 py-2 text-left">Name</th>
                         <th className="px-3 py-2 text-left">Birthday</th>
                         <th className="px-3 py-2 text-left">When</th>
+                        <th className="px-3 py-2 text-left">Phone</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -110,6 +111,7 @@ export function BirthdaySmartPasteModal({ onClose, onImport }: BirthdaySmartPast
                           <td className="px-3 py-2 text-white">{row.fullName}</td>
                           <td className="px-3 py-2 text-slate-300">{row.birthDateText || '—'}</td>
                           <td className="px-3 py-2 text-slate-400 text-xs">{row.whenToCongratulate || '—'}</td>
+                          <td className="px-3 py-2 text-pink-300 text-xs font-mono">{row.phone || '—'}</td>
                         </tr>
                       ))}
                     </tbody>
