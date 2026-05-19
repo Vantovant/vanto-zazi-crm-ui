@@ -18,6 +18,8 @@ export interface BirthdayRow {
   birthDate: Date | null;
   whenToCongratulate: string;
   congratulateByDate: Date | null;
+  /** Optional phone (6th column) — used to backfill contacts.phone_number via safeMerge. */
+  phone?: string;
 }
 
 const MONTHS: Record<string, number> = {
@@ -144,8 +146,17 @@ export function parseBirthdayReport(text: string): BirthdayRow[] {
     let fullName = '';
     let birthDateText = '';
     let whenToCongratulate = '';
+    let phone = '';
 
-    if (cells.length >= 5) {
+    if (cells.length >= 6) {
+      // 6-column format: Level | ID | Name | DOB | When | Phone
+      level = cells[0];
+      associateId = cells[1];
+      fullName = cells[2];
+      birthDateText = cells[3];
+      whenToCongratulate = cells[4];
+      phone = cells[5];
+    } else if (cells.length === 5) {
       // Full 5-column format: Level | ID | Name | DOB | When
       level = cells[0];
       associateId = cells[1];
@@ -186,6 +197,7 @@ export function parseBirthdayReport(text: string): BirthdayRow[] {
     const firstName = fullName.split(/\s+/)[0] || fullName;
     const birthDate = parseDateText(birthDateText);
     const congratulateByDate = parseCongratulateDate(whenToCongratulate, birthDate);
+    const phoneTrimmed = phone.trim();
 
     rows.push({
       level: level.replace(/^level\s*/i, '').trim(),
@@ -196,6 +208,7 @@ export function parseBirthdayReport(text: string): BirthdayRow[] {
       birthDate,
       whenToCongratulate,
       congratulateByDate,
+      phone: phoneTrimmed && /\d/.test(phoneTrimmed) ? phoneTrimmed : undefined,
     });
   }
 

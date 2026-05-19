@@ -2,15 +2,18 @@ import { useState, useMemo, useCallback } from 'react';
 import {
   Cake, ClipboardPaste, Search, ExternalLink, Check,
   ChevronDown, ChevronUp, MessageCircle, Trash2, Filter, PartyPopper, Play,
-  FlaskConical, Undo2,
+  FlaskConical, Undo2, PhoneOff, PhoneCall, Link2, AlertTriangle,
 } from 'lucide-react';
 import { classifyBirthday, daysUntil, classifyBirthdayEntry, daysUntilEntry } from '@/utils/birthdayParser';
 import { useBirthdays, type BirthdayEntry } from '@/hooks/useBirthdays';
+import { useCrm } from '@/contexts/CrmContext';
 import { BirthdaySmartPasteModal } from './BirthdaySmartPasteModal';
 import { BirthdayComposerModal } from './BirthdayComposerModal';
 import { BirthdaySessionModal } from './BirthdaySessionModal';
+import { EditContactModal } from './EditContactModal';
+import type { Prospect } from '@/data/mockData';
 
-type FilterType = 'all' | 'today' | 'tomorrow' | 'this_week' | 'upcoming' | 'congratulated' | 'not_congratulated' | 'unmatched';
+type FilterType = 'all' | 'today' | 'tomorrow' | 'this_week' | 'upcoming' | 'congratulated' | 'not_congratulated' | 'unmatched' | 'missing_phone';
 
 const STATUS_COLORS: Record<string, string> = {
   not_congratulated: 'bg-amber-500/20 text-amber-300',
@@ -20,7 +23,8 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export function BirthdayPanel() {
-  const { birthdays, loading, importBirthdays, markCongratulated, deleteBirthday, clearAll, testToday, restoreOriginalDate } = useBirthdays();
+  const { birthdays, loading, importBirthdays, markCongratulated, deleteBirthday, clearAll, testToday, restoreOriginalDate, linkContact } = useBirthdays();
+  const { contacts } = useCrm();
   const [showPaste, setShowPaste] = useState(false);
   const [composerEntries, setComposerEntries] = useState<BirthdayEntry[] | null>(null);
   const [composerIndex, setComposerIndex] = useState(0);
@@ -29,10 +33,17 @@ export function BirthdayPanel() {
   const [expanded, setExpanded] = useState(true);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showSession, setShowSession] = useState(false);
+  const [editingContact, setEditingContact] = useState<Prospect | null>(null);
+
+  // Helper: does this birthday have a sendable phone? (matched contact with non-empty PhoneNumber)
+  const hasSendablePhone = useCallback((b: BirthdayEntry) => {
+    if (!b.contact_id) return false;
+    return Boolean((b.phone_number || '').trim());
+  }, []);
 
   // Counts
   const counts = useMemo(() => {
-    const c = { today: 0, tomorrow: 0, this_week: 0, upcoming: 0, congratulated: 0, not_congratulated: 0, unmatched: 0 };
+    const c = { today: 0, tomorrow: 0, this_week: 0, upcoming: 0, congratulated: 0, not_congratulated: 0, unmatched: 0, missing_phone: 0 };
     birthdays.forEach(b => {
       const timing = classifyBirthdayEntry(b);
       if (timing === 'today') c.today++;
@@ -42,9 +53,22 @@ export function BirthdayPanel() {
       if (b.status === 'congratulated') c.congratulated++;
       else if (b.status === 'unmatched') c.unmatched++;
       else c.not_congratulated++;
+      if (!hasSendablePhone(b)) c.missing_phone++;
     });
     return c;
-  }, [birthdays]);
+  }, [birthdays, hasSendablePhone]);
+
+  // Phase 0 nightly health metric: % of upcoming (next 14 days) birthdays with a sendable phone.
+  const phoneHealth = useMemo(() => {
+    const upcoming = birthdays.filter(b => {
+      const d = daysUntilEntry(b);
+      return d !== null && d >= 0 && d <= 14;
+    });
+    const total = upcoming.length;
+    const sendable = upcoming.filter(hasSendablePhone).length;
+    const pct = total === 0 ? 100 : Math.round((sendable / total) * 100);
+    return { total, sendable, pct, alert: total > 0 && pct < 80 };
+  }, [birthdays, hasSendablePhone]);
 
   const filtered = useMemo(() => {
     let list = birthdays;
@@ -56,13 +80,15 @@ export function BirthdayPanel() {
       list = list.filter(b => b.status === 'not_congratulated');
     } else if (filter === 'unmatched') {
       list = list.filter(b => b.status === 'unmatched');
+    } else if (filter === 'missing_phone') {
+      list = list.filter(b => !hasSendablePhone(b));
     }
     if (search) {
       const q = search.toLowerCase();
       list = list.filter(b => b.full_name.toLowerCase().includes(q) || b.associate_id.includes(q));
     }
     return list;
-  }, [birthdays, filter, search]);
+  }, [birthdays, filter, search, hasSendablePhone]);
 
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds(prev => {
@@ -86,6 +112,26 @@ export function BirthdayPanel() {
     await markCongratulated(id);
   }, [markCongratulated]);
 
+  const openAddPhone = useCallback((b: BirthdayEntry) => {
+    const contact = contacts.find(c => String(c.id) === b.contact_id);
+    if (contact) setEditingContact(contact);
+  }, [contacts]);
+
+  const handleMatchContact = useCallback(async (b: BirthdayEntry) => {
+    const input = window.prompt(
+      `Match "${b.full_name}" to an existing contact.\n\nEnter the APLGO ID${b.associate_id ? ` (pasted as ${b.associate_id})` : ''}:`,
+      b.associate_id || '',
+    );
+    if (!input) return;
+    const cleaned = input.replace(/[^\d]/g, '');
+    const contact = contacts.find(c => (c.APLGoID || '').replace(/[^\d]/g, '') === cleaned);
+    if (!contact) {
+      window.alert(`No contact found with APLGO ID "${cleaned}". Add the APLGO ID on the contact first, then try again.`);
+      return;
+    }
+    await linkContact(b.id, String(contact.id));
+  }, [contacts, linkContact]);
+
   return (
     <>
       <div className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden">
@@ -98,7 +144,37 @@ export function BirthdayPanel() {
             {birthdays.length > 0 && (
               <span className="px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-300 text-xs font-medium">{birthdays.length}</span>
             )}
-          </div>
+            </div>
+
+            {/* Phone Health Card (Phase 0 nightly metric) */}
+            <button
+              type="button"
+              onClick={() => setFilter(f => f === 'missing_phone' ? 'all' : 'missing_phone')}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border text-left transition-colors ${
+                phoneHealth.alert
+                  ? 'border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/15'
+                  : 'border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/15'
+              }`}
+              title="Click to view birthdays missing a sendable phone number"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                {phoneHealth.alert
+                  ? <AlertTriangle className="w-4 h-4 text-amber-300 shrink-0" />
+                  : <PhoneCall className="w-4 h-4 text-emerald-300 shrink-0" />}
+                <div className="min-w-0">
+                  <div className={`text-xs font-medium ${phoneHealth.alert ? 'text-amber-200' : 'text-emerald-200'}`}>
+                    Phone health · next 14 days
+                  </div>
+                  <div className="text-[11px] text-slate-400 truncate">
+                    {phoneHealth.sendable} of {phoneHealth.total} upcoming birthdays have a sendable phone
+                    {phoneHealth.alert && ' · below 80% threshold'}
+                  </div>
+                </div>
+              </div>
+              <div className={`text-lg font-bold ${phoneHealth.alert ? 'text-amber-300' : 'text-emerald-300'}`}>
+                {phoneHealth.pct}%
+              </div>
+            </button>
           {expanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
         </button>
 
@@ -150,6 +226,7 @@ export function BirthdayPanel() {
                   { key: 'not_congratulated' as FilterType, label: 'Pending' },
                   { key: 'congratulated' as FilterType, label: 'Done' },
                   { key: 'unmatched' as FilterType, label: 'Unmatched' },
+                  { key: 'missing_phone' as FilterType, label: `Missing phone${counts.missing_phone ? ` (${counts.missing_phone})` : ''}` },
                 ].map(f => (
                   <button key={f.key} type="button" onClick={() => setFilter(fi => fi === f.key ? 'all' : f.key)}
                     className={`px-2 py-1 text-xs rounded-md transition-colors ${
@@ -214,6 +291,22 @@ export function BirthdayPanel() {
                         </div>
                       </div>
                       <div className="flex items-center gap-1">
+                        {/* Missing phone: match contact or add phone */}
+                        {!hasSendablePhone(b) && (
+                          b.contact_id ? (
+                            <button type="button" onClick={() => openAddPhone(b)} title="Add phone number to matched contact"
+                              className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium bg-amber-500/15 hover:bg-amber-500/25 text-amber-200 rounded-md transition-colors">
+                              <PhoneOff className="w-3 h-3" />
+                              Add phone
+                            </button>
+                          ) : (
+                            <button type="button" onClick={() => handleMatchContact(b)} title="Match this birthday to an existing contact by APLGO ID"
+                              className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium bg-sky-500/15 hover:bg-sky-500/25 text-sky-200 rounded-md transition-colors">
+                              <Link2 className="w-3 h-3" />
+                              Match contact
+                            </button>
+                          )
+                        )}
                         {/* Test Today / Restore */}
                         {b.status !== 'congratulated' && !(b as any).original_congratulate_by_date && (
                           <button type="button" onClick={() => testToday(b.id)} title="Test Today — temporarily set to today"
@@ -269,6 +362,13 @@ export function BirthdayPanel() {
           birthdays={birthdays}
           onClose={() => setShowSession(false)}
           onCongratulated={async (id) => { await markCongratulated(id); }}
+        />
+      )}
+      {editingContact && (
+        <EditContactModal
+          prospect={editingContact}
+          onClose={() => setEditingContact(null)}
+          onSaved={() => setEditingContact(null)}
         />
       )}
     </>

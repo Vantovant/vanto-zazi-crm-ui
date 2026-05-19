@@ -100,6 +100,7 @@ export function BirthdaySmartPasteModal({ onClose, onImport }: BirthdaySmartPast
                         <th className="px-3 py-2 text-left">Name</th>
                         <th className="px-3 py-2 text-left">Birthday</th>
                         <th className="px-3 py-2 text-left">When</th>
+                        <th className="px-3 py-2 text-left">Phone</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -110,6 +111,7 @@ export function BirthdaySmartPasteModal({ onClose, onImport }: BirthdaySmartPast
                           <td className="px-3 py-2 text-white">{row.fullName}</td>
                           <td className="px-3 py-2 text-slate-300">{row.birthDateText || '—'}</td>
                           <td className="px-3 py-2 text-slate-400 text-xs">{row.whenToCongratulate || '—'}</td>
+                          <td className="px-3 py-2 text-pink-300 text-xs font-mono">{row.phone || '—'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -121,11 +123,12 @@ export function BirthdaySmartPasteModal({ onClose, onImport }: BirthdaySmartPast
             /* Input */
             <>
               <p className="text-sm text-slate-400">Paste the birthday table from the back-office. Supports tab-separated, pipe-separated, or multi-space formats.</p>
-              <p className="text-xs text-slate-500">Expected columns: Level · ID Associate · Name · Date of Birth · When to Congratulate</p>
+              <p className="text-xs text-slate-500">Expected columns: Level · ID Associate · Name · Date of Birth · When to Congratulate · <span className="text-pink-300">Phone (optional)</span></p>
+              <p className="text-xs text-slate-500">If a 6th Phone column is included, it backfills the matched contact's phone number only when empty (existing numbers are never overwritten).</p>
               <textarea
                 value={rawText}
                 onChange={(e) => setRawText(e.target.value)}
-                placeholder={`Level\tID\tName\tBirthday\tWhen\n1\t1129930\tJohn Smith\t03 May\tAfter 20 days\n2\t934517\tJane Doe\t05 May\ttomorrow`}
+                placeholder={`Level\tID\tName\tBirthday\tWhen\tPhone\n1\t1129930\tJohn Smith\t03 May\tAfter 20 days\t+27 82 111 2222\n2\t934517\tJane Doe\t05 May\ttomorrow\t`}
                 className="w-full h-48 p-3 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-pink-500/40 font-mono resize-none"
               />
               <div className="flex justify-end">
