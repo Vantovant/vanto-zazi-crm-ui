@@ -93,24 +93,6 @@ export function confidenceLabel(c: Confidence): string {
 }
 
 
-// ---------- Skip (local-only persistent dismiss) ----------
-const SKIP_KEY = 'birthday_sendability_skip_v1';
-function readSkip(): Set<string> {
-  try { return new Set(JSON.parse(localStorage.getItem(SKIP_KEY) || '[]')); }
-  catch { return new Set(); }
-}
-export function isSkipped(id: string): boolean {
-  return readSkip().has(id);
-}
-export function skip(id: string) {
-  const s = readSkip(); s.add(id);
-  localStorage.setItem(SKIP_KEY, JSON.stringify([...s]));
-}
-export function unskip(id: string) {
-  const s = readSkip(); s.delete(id);
-  localStorage.setItem(SKIP_KEY, JSON.stringify([...s]));
-}
-
 // ---------- Categorization ----------
 function nameKey(name: string): string {
   return (name || '').trim().toLowerCase().replace(/\s+/g, ' ');
