@@ -18,6 +18,8 @@ export interface BirthdayRow {
   birthDate: Date | null;
   whenToCongratulate: string;
   congratulateByDate: Date | null;
+  /** Optional phone (6th column) — used to backfill contacts.phone_number via safeMerge. */
+  phone?: string;
 }
 
 const MONTHS: Record<string, number> = {
