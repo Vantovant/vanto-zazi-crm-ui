@@ -22,14 +22,14 @@ export function isSnoozed(id: string): boolean {
   const until = m[id];
   if (!until) return false;
   if (new Date(until).getTime() > Date.now()) return true;
-  // expired -> cleanup
   delete m[id]; writeSnooze(m);
   return false;
 }
-export function snoozeFor(id: string, days: number) {
+export function snoozeFor(id: string, days: number, name = '') {
   const m = readSnooze();
   m[id] = new Date(Date.now() + days * 86400_000).toISOString();
   writeSnooze(m);
+  appendAudit({ id, name, action: 'snoozed' });
 }
 export function unsnooze(id: string) {
   const m = readSnooze();
@@ -45,14 +45,53 @@ function readSkip(): Set<string> {
 export function isSkipped(id: string): boolean {
   return readSkip().has(id);
 }
-export function skip(id: string) {
+export function skip(id: string, name = '') {
   const s = readSkip(); s.add(id);
   localStorage.setItem(SKIP_KEY, JSON.stringify([...s]));
+  appendAudit({ id, name, action: 'skipped' });
 }
 export function unskip(id: string) {
   const s = readSkip(); s.delete(id);
   localStorage.setItem(SKIP_KEY, JSON.stringify([...s]));
 }
+
+// ---------- Audit trail (local operational history) ----------
+export type AuditAction = 'repaired' | 'skipped' | 'snoozed';
+export interface AuditEntry {
+  id: string;
+  name: string;
+  action: AuditAction;
+  source?: string;
+  phone?: string;
+  repairedBy?: string;
+  ts: string;
+}
+const AUDIT_KEY = 'birthday_repair_audit_v1';
+const AUDIT_CAP = 100;
+
+export function readAudit(): AuditEntry[] {
+  try { return JSON.parse(localStorage.getItem(AUDIT_KEY) || '[]'); }
+  catch { return []; }
+}
+export function appendAudit(e: Omit<AuditEntry, 'ts'>): void {
+  const list = readAudit();
+  list.unshift({ ...e, ts: new Date().toISOString() });
+  localStorage.setItem(AUDIT_KEY, JSON.stringify(list.slice(0, AUDIT_CAP)));
+}
+export function auditRepaired(id: string, name: string, phone: string, source: string, repairedBy?: string) {
+  appendAudit({ id, name, action: 'repaired', phone, source, repairedBy });
+}
+export function repairedToday(): number {
+  const today = todayKey();
+  return readAudit().filter(a => a.action === 'repaired' && a.ts.startsWith(today)).length;
+}
+
+// ---------- Recovery confidence ----------
+export type Confidence = 'high' | 'medium' | 'low';
+export function confidenceLabel(c: Confidence): string {
+  return c === 'high' ? 'High' : c === 'medium' ? 'Medium' : 'Low';
+}
+
 
 // ---------- Categorization ----------
 function nameKey(name: string): string {

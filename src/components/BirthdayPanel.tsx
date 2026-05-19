@@ -14,7 +14,7 @@ import { BirthdaySessionModal } from './BirthdaySessionModal';
 import { EditContactModal } from './EditContactModal';
 import { BirthdaySendabilityQueue } from './BirthdaySendabilityQueue';
 import { SmartPhoneSuggestModal } from './SmartPhoneSuggestModal';
-import { recordHealthSnapshot, readTrend } from '@/utils/birthdaySendability';
+import { recordHealthSnapshot, readTrend, categorize } from '@/utils/birthdaySendability';
 import type { Prospect } from '@/data/mockData';
 
 
@@ -41,6 +41,7 @@ export function BirthdayPanel() {
   const [editingContact, setEditingContact] = useState<Prospect | null>(null);
   const [phoneSuggestEntry, setPhoneSuggestEntry] = useState<BirthdayEntry | null>(null);
   const [queueRefresh, setQueueRefresh] = useState(0);
+  const [autoNext, setAutoNext] = useState(false);
 
   // Helper: does this birthday have a sendable phone? (matched contact with non-empty PhoneNumber)
   const hasSendablePhone = useCallback((b: BirthdayEntry) => {
@@ -147,6 +148,24 @@ export function BirthdayPanel() {
     }
     await linkContact(b.id, String(contact.id));
   }, [contacts, linkContact]);
+
+  // Auto-rerun: after a successful repair, refresh-trigger or birthdays change → open next unresolved.
+  useEffect(() => {
+    if (!autoNext) return;
+    if (phoneSuggestEntry || editingContact) return; // wait until current modal is closed
+    const data = categorize(birthdays);
+    const next = data.missing_phone[0] || data.unmatched[0] || data.duplicate[0];
+    setAutoNext(false);
+    if (!next) return;
+    if (data.missing_phone.includes(next)) openAddPhone(next);
+    else if (data.unmatched.includes(next)) void handleMatchContact(next);
+    else {
+      const contact = contacts.find(c => String(c.id) === next.contact_id);
+      if (contact) setEditingContact(contact);
+      else void handleMatchContact(next);
+    }
+  }, [autoNext, birthdays, phoneSuggestEntry, editingContact, openAddPhone, handleMatchContact, contacts]);
+
 
   return (
     <>
@@ -416,7 +435,7 @@ export function BirthdayPanel() {
         <SmartPhoneSuggestModal
           entry={phoneSuggestEntry}
           onClose={() => setPhoneSuggestEntry(null)}
-          onSaved={() => { setPhoneSuggestEntry(null); }}
+          onSaved={() => { setPhoneSuggestEntry(null); setAutoNext(true); }}
         />
       )}
     </>
