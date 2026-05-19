@@ -1,8 +1,9 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   Cake, ClipboardPaste, Search, ExternalLink, Check,
   ChevronDown, ChevronUp, MessageCircle, Trash2, Filter, PartyPopper, Play,
   FlaskConical, Undo2, PhoneOff, PhoneCall, Link2, AlertTriangle,
+  ArrowUp, ArrowDown, Minus,
 } from 'lucide-react';
 import { classifyBirthday, daysUntil, classifyBirthdayEntry, daysUntilEntry } from '@/utils/birthdayParser';
 import { useBirthdays, type BirthdayEntry } from '@/hooks/useBirthdays';
@@ -11,7 +12,11 @@ import { BirthdaySmartPasteModal } from './BirthdaySmartPasteModal';
 import { BirthdayComposerModal } from './BirthdayComposerModal';
 import { BirthdaySessionModal } from './BirthdaySessionModal';
 import { EditContactModal } from './EditContactModal';
+import { BirthdaySendabilityQueue } from './BirthdaySendabilityQueue';
+import { SmartPhoneSuggestModal } from './SmartPhoneSuggestModal';
+import { recordHealthSnapshot, readTrend } from '@/utils/birthdaySendability';
 import type { Prospect } from '@/data/mockData';
+
 
 type FilterType = 'all' | 'today' | 'tomorrow' | 'this_week' | 'upcoming' | 'congratulated' | 'not_congratulated' | 'unmatched' | 'missing_phone';
 
@@ -34,6 +39,8 @@ export function BirthdayPanel() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showSession, setShowSession] = useState(false);
   const [editingContact, setEditingContact] = useState<Prospect | null>(null);
+  const [phoneSuggestEntry, setPhoneSuggestEntry] = useState<BirthdayEntry | null>(null);
+  const [queueRefresh, setQueueRefresh] = useState(0);
 
   // Helper: does this birthday have a sendable phone? (matched contact with non-empty PhoneNumber)
   const hasSendablePhone = useCallback((b: BirthdayEntry) => {
@@ -113,9 +120,18 @@ export function BirthdayPanel() {
   }, [markCongratulated]);
 
   const openAddPhone = useCallback((b: BirthdayEntry) => {
-    const contact = contacts.find(c => String(c.id) === b.contact_id);
-    if (contact) setEditingContact(contact);
-  }, [contacts]);
+    if (b.contact_id) setPhoneSuggestEntry(b);
+  }, []);
+
+  // Record daily phone-health snapshot (yesterday vs today trend).
+  const [trend, setTrend] = useState(() => readTrend());
+  useEffect(() => {
+    if (phoneHealth.total > 0) {
+      const next = recordHealthSnapshot(phoneHealth.pct);
+      setTrend(next);
+    }
+  }, [phoneHealth.pct, phoneHealth.total]);
+  const trendDelta = trend.today && trend.yesterday ? trend.today.pct - trend.yesterday.pct : null;
 
   const handleMatchContact = useCallback(async (b: BirthdayEntry) => {
     const input = window.prompt(
@@ -171,8 +187,18 @@ export function BirthdayPanel() {
                   </div>
                 </div>
               </div>
-              <div className={`text-lg font-bold ${phoneHealth.alert ? 'text-amber-300' : 'text-emerald-300'}`}>
-                {phoneHealth.pct}%
+              <div className="flex items-center gap-2">
+                {trendDelta !== null && trend.yesterday && (
+                  <div className="flex items-center gap-1 text-[11px] text-slate-400">
+                    <span>{trend.yesterday.pct}%</span>
+                    {trendDelta > 0 && <ArrowUp className="w-3 h-3 text-emerald-400" />}
+                    {trendDelta < 0 && <ArrowDown className="w-3 h-3 text-rose-400" />}
+                    {trendDelta === 0 && <Minus className="w-3 h-3 text-slate-500" />}
+                  </div>
+                )}
+                <div className={`text-lg font-bold ${phoneHealth.alert ? 'text-amber-300' : 'text-emerald-300'}`}>
+                  {phoneHealth.pct}%
+                </div>
               </div>
             </button>
           {expanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
@@ -180,7 +206,22 @@ export function BirthdayPanel() {
 
         {expanded && (
           <div className="px-4 pb-4 space-y-3">
+            {/* Sendable Soon queue (Phase 0.5) */}
+            <BirthdaySendabilityQueue
+              birthdays={birthdays}
+              onFixMissingPhone={openAddPhone}
+              onFixUnmatched={handleMatchContact}
+              onFixDuplicate={(b) => {
+                const contact = contacts.find(c => String(c.id) === b.contact_id);
+                if (contact) setEditingContact(contact);
+                else handleMatchContact(b);
+              }}
+              onChanged={() => setQueueRefresh(n => n + 1)}
+              key={queueRefresh}
+            />
+
             {/* Notification counters */}
+
             <div className="grid grid-cols-4 gap-2">
               {[
                 { key: 'today' as FilterType, label: 'Today', count: counts.today, color: 'bg-rose-500/20 text-rose-300 border-rose-500/30' },
@@ -369,6 +410,13 @@ export function BirthdayPanel() {
           prospect={editingContact}
           onClose={() => setEditingContact(null)}
           onSaved={() => setEditingContact(null)}
+        />
+      )}
+      {phoneSuggestEntry && (
+        <SmartPhoneSuggestModal
+          entry={phoneSuggestEntry}
+          onClose={() => setPhoneSuggestEntry(null)}
+          onSaved={() => { setPhoneSuggestEntry(null); }}
         />
       )}
     </>

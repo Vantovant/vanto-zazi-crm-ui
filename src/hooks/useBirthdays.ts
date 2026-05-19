@@ -23,7 +23,9 @@ export interface BirthdayEntry {
   created_at: string;
   // Joined from contact
   phone_number?: string;
+  phone_normalized?: string | null;
   country?: string;
+  opt_out?: boolean;
 }
 
 export function useBirthdays() {
@@ -43,15 +45,32 @@ export function useBirthdays() {
       .order('birth_date', { ascending: true, nullsFirst: false });
 
     if (data) {
-      // Enrich with contact phone data
+      // Fetch opt-out + normalized phone for matched contacts in one query.
+      const ids = Array.from(new Set(data.map((b: any) => b.contact_id).filter(Boolean)));
+      let metaById: Record<string, { opt_out: boolean; phone_normalized: string | null }> = {};
+      if (ids.length > 0) {
+        const { data: meta } = await supabase
+          .from('contacts')
+          .select('id, auto_send_opt_out, phone_normalized')
+          .in('id', ids as string[]);
+        (meta || []).forEach((m: any) => {
+          metaById[String(m.id)] = {
+            opt_out: Boolean(m.auto_send_opt_out),
+            phone_normalized: m.phone_normalized ?? null,
+          };
+        });
+      }
       const enriched = data.map((b: any) => {
         const contact = b.contact_id
           ? contacts.find(c => String(c.id) === b.contact_id)
           : null;
+        const meta = b.contact_id ? metaById[b.contact_id] : undefined;
         return {
           ...b,
           phone_number: contact?.PhoneNumber || '',
+          phone_normalized: meta?.phone_normalized ?? null,
           country: contact?.Country || '',
+          opt_out: meta?.opt_out ?? false,
         };
       });
       setBirthdays(enriched);
