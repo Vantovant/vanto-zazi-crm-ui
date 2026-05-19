@@ -1,12 +1,13 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   X, Copy, Check, ExternalLink, Send, ChevronLeft, ChevronRight,
-  Heart, Crown, Briefcase, Award, Loader2, Cake,
+  Heart, Crown, Briefcase, Award, Loader2, Cake, Zap, AlertTriangle,
 } from 'lucide-react';
 import { buildWhatsAppUrl } from '@/utils/whatsappPhone';
 import { useContactActivities } from '@/hooks/useContactActivities';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useAssistedBirthdaySend } from '@/hooks/useAssistedBirthdaySend';
 import type { BirthdayEntry } from '@/hooks/useBirthdays';
 
 export type BirthdayTone = 'warm' | 'royal' | 'spiritual' | 'professional';
@@ -16,6 +17,8 @@ interface BirthdayComposerModalProps {
   initialIndex?: number;
   onClose: () => void;
   onCongratulated?: (id: string) => void;
+  /** MP1.5: when true, show "Send via Maytapi" button that invokes maytapi-send-1to1 and auto-advances. */
+  assistedSend?: boolean;
 }
 
 const APLGO_BRAND_URL = 'https://crm.onlinecourseformlm.com/aplgo.html';
