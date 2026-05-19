@@ -226,6 +226,7 @@ export function BirthdayPanel() {
                   { key: 'not_congratulated' as FilterType, label: 'Pending' },
                   { key: 'congratulated' as FilterType, label: 'Done' },
                   { key: 'unmatched' as FilterType, label: 'Unmatched' },
+                  { key: 'missing_phone' as FilterType, label: `Missing phone${counts.missing_phone ? ` (${counts.missing_phone})` : ''}` },
                 ].map(f => (
                   <button key={f.key} type="button" onClick={() => setFilter(fi => fi === f.key ? 'all' : f.key)}
                     className={`px-2 py-1 text-xs rounded-md transition-colors ${
