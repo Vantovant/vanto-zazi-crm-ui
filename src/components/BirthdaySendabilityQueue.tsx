@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import {
   CheckCircle2, PhoneOff, Link2, Copy, Wrench, SkipForward, Clock,
-  PlayCircle, History, ChevronDown, ChevronUp,
+  PlayCircle, History, ChevronDown, ChevronUp, PhoneCall, RefreshCw,
 } from 'lucide-react';
 import type { BirthdayEntry } from '@/hooks/useBirthdays';
 import {
@@ -15,6 +15,8 @@ interface Props {
   onFixUnmatched: (b: BirthdayEntry) => void;
   onFixDuplicate: (b: BirthdayEntry) => void;
   onChanged: () => void;
+  onBulkRepairPhones?: () => void | Promise<void>;
+  onReevaluate?: () => void | Promise<void>;
   // Expose a way to imperatively open the "next unresolved" item after each save.
   registerOpenNext?: (fn: () => void) => void;
 }
