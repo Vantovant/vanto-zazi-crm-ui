@@ -144,7 +144,37 @@ export function BirthdayPanel() {
             {birthdays.length > 0 && (
               <span className="px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-300 text-xs font-medium">{birthdays.length}</span>
             )}
-          </div>
+            </div>
+
+            {/* Phone Health Card (Phase 0 nightly metric) */}
+            <button
+              type="button"
+              onClick={() => setFilter(f => f === 'missing_phone' ? 'all' : 'missing_phone')}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border text-left transition-colors ${
+                phoneHealth.alert
+                  ? 'border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/15'
+                  : 'border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/15'
+              }`}
+              title="Click to view birthdays missing a sendable phone number"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                {phoneHealth.alert
+                  ? <AlertTriangle className="w-4 h-4 text-amber-300 shrink-0" />
+                  : <PhoneCall className="w-4 h-4 text-emerald-300 shrink-0" />}
+                <div className="min-w-0">
+                  <div className={`text-xs font-medium ${phoneHealth.alert ? 'text-amber-200' : 'text-emerald-200'}`}>
+                    Phone health · next 14 days
+                  </div>
+                  <div className="text-[11px] text-slate-400 truncate">
+                    {phoneHealth.sendable} of {phoneHealth.total} upcoming birthdays have a sendable phone
+                    {phoneHealth.alert && ' · below 80% threshold'}
+                  </div>
+                </div>
+              </div>
+              <div className={`text-lg font-bold ${phoneHealth.alert ? 'text-amber-300' : 'text-emerald-300'}`}>
+                {phoneHealth.pct}%
+              </div>
+            </button>
           {expanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
         </button>
 
