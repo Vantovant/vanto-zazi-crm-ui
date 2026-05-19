@@ -3,7 +3,7 @@ import {
   Cake, ClipboardPaste, Search, ExternalLink, Check,
   ChevronDown, ChevronUp, MessageCircle, Trash2, Filter, PartyPopper, Play,
   FlaskConical, Undo2, PhoneOff, PhoneCall, Link2, AlertTriangle,
-  ArrowUp, ArrowDown, Minus,
+  ArrowUp, ArrowDown, Minus, RefreshCw,
 } from 'lucide-react';
 import { classifyBirthday, daysUntil, classifyBirthdayEntry, daysUntilEntry } from '@/utils/birthdayParser';
 import { useBirthdays, type BirthdayEntry } from '@/hooks/useBirthdays';
