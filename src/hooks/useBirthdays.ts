@@ -3,9 +3,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCrm } from '@/contexts/CrmContext';
 import { safeMerge } from '@/utils/contactNormalization';
+import { auditRepaired } from '@/utils/birthdaySendability';
 import type { BirthdayRow } from '@/utils/birthdayParser';
 
 export interface BirthdayEntry {
+  pasted_phone?: string;
   id: string;
   contact_id: string | null;
   associate_id: string;
