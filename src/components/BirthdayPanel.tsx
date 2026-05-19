@@ -120,9 +120,18 @@ export function BirthdayPanel() {
   }, [markCongratulated]);
 
   const openAddPhone = useCallback((b: BirthdayEntry) => {
-    const contact = contacts.find(c => String(c.id) === b.contact_id);
-    if (contact) setEditingContact(contact);
-  }, [contacts]);
+    if (b.contact_id) setPhoneSuggestEntry(b);
+  }, []);
+
+  // Record daily phone-health snapshot (yesterday vs today trend).
+  const [trend, setTrend] = useState(() => readTrend());
+  useEffect(() => {
+    if (phoneHealth.total > 0) {
+      const next = recordHealthSnapshot(phoneHealth.pct);
+      setTrend(next);
+    }
+  }, [phoneHealth.pct, phoneHealth.total]);
+  const trendDelta = trend.today && trend.yesterday ? trend.today.pct - trend.yesterday.pct : null;
 
   const handleMatchContact = useCallback(async (b: BirthdayEntry) => {
     const input = window.prompt(
