@@ -3,9 +3,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCrm } from '@/contexts/CrmContext';
 import { safeMerge } from '@/utils/contactNormalization';
+import { auditRepaired } from '@/utils/birthdaySendability';
 import type { BirthdayRow } from '@/utils/birthdayParser';
 
 export interface BirthdayEntry {
+  pasted_phone?: string;
   id: string;
   contact_id: string | null;
   associate_id: string;
@@ -30,7 +32,7 @@ export interface BirthdayEntry {
 
 export function useBirthdays() {
   const { user } = useAuth();
-  const { contacts, updateContact } = useCrm();
+  const { contacts, updateContact, addContact } = useCrm();
   const [birthdays, setBirthdays] = useState<BirthdayEntry[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -81,56 +83,81 @@ export function useBirthdays() {
   useEffect(() => { fetchBirthdays(); }, [fetchBirthdays]);
 
   const importBirthdays = useCallback(async (rows: BirthdayRow[]) => {
-    if (!user) return { imported: 0, matched: 0, unmatched: 0 };
+    if (!user) return { imported: 0, matched: 0, unmatched: 0, created: 0 };
 
     let matched = 0;
     let unmatched = 0;
+    let created = 0;
     const phoneBackfills: Array<{ id: string; phone: string }> = [];
 
-    const inserts = rows.map(row => {
-      // Match by APLGoID
-      const contact = row.associateId
+    // First pass: for unmatched rows with a phone, create a minimal contact
+    // and pre-link the birthday. Never duplicates an existing APLGO ID match.
+    type PreparedRow = { row: BirthdayRow; contactId: string | null };
+    const prepared: PreparedRow[] = [];
+    for (const row of rows) {
+      const existing = row.associateId
         ? contacts.find(c => c.APLGoID === row.associateId)
         : null;
 
-      if (contact) matched++;
-      else unmatched++;
-
-      // Phase 0 phone backfill: if paste includes phone and contact has no phone, safeMerge it in.
-      if (contact && row.phone) {
-        const merged = safeMerge(
-          { phone_number: (contact.PhoneNumber || '').trim() },
-          { phone_number: row.phone.trim() },
-        );
-        if (merged.phone_number && !(contact.PhoneNumber || '').trim()) {
-          phoneBackfills.push({ id: String(contact.id), phone: String(merged.phone_number) });
+      if (existing) {
+        matched++;
+        // Phase 0 phone backfill: if paste includes phone and contact has no phone.
+        if (row.phone) {
+          const merged = safeMerge(
+            { phone_number: (existing.PhoneNumber || '').trim() },
+            { phone_number: row.phone.trim() },
+          );
+          if (merged.phone_number && !(existing.PhoneNumber || '').trim()) {
+            phoneBackfills.push({ id: String(existing.id), phone: String(merged.phone_number) });
+          }
         }
+        prepared.push({ row, contactId: String(existing.id) });
+        continue;
       }
 
-      // Format date as local YYYY-MM-DD to avoid UTC timezone shift
-      const formatLocal = (d: Date | null) => {
-        if (!d) return null;
-        const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        return `${y}-${m}-${day}`;
-      };
+      // Unmatched. Auto-create a contact only if a phone was pasted (otherwise
+      // there's nothing useful to seed). Anything else stays as an unmatched row.
+      if (row.phone && row.fullName) {
+        const res = await addContact({
+          FullName: row.fullName,
+          PhoneNumber: row.phone.trim(),
+          APLGoID: row.associateId || '',
+        } as any);
+        const newId = (res as any)?.data?.id;
+        if (newId) {
+          created++;
+          matched++;
+          prepared.push({ row, contactId: String(newId) });
+          continue;
+        }
+      }
+      unmatched++;
+      prepared.push({ row, contactId: null });
+    }
 
-      return {
-        user_id: user.id,
-        contact_id: contact ? String(contact.id) : null,
-        associate_id: row.associateId,
-        full_name: row.fullName,
-        first_name: row.firstName,
-        level: row.level,
-        birth_date_text: row.birthDateText,
-        birth_date: formatLocal(row.birthDate),
-        when_to_congratulate: row.whenToCongratulate,
-        congratulate_by_date: formatLocal(row.congratulateByDate),
-        status: contact ? 'not_congratulated' : 'unmatched',
-        cycle_year: new Date().getFullYear(),
-      };
-    });
+    const formatLocal = (d: Date | null) => {
+      if (!d) return null;
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+
+    const inserts = prepared.map(({ row, contactId }) => ({
+      user_id: user.id,
+      contact_id: contactId,
+      associate_id: row.associateId,
+      full_name: row.fullName,
+      first_name: row.firstName,
+      level: row.level,
+      birth_date_text: row.birthDateText,
+      birth_date: formatLocal(row.birthDate),
+      when_to_congratulate: row.whenToCongratulate,
+      congratulate_by_date: formatLocal(row.congratulateByDate),
+      status: contactId ? 'not_congratulated' : 'unmatched',
+      cycle_year: new Date().getFullYear(),
+      pasted_phone: (row.phone || '').trim(),
+    }));
 
     if (inserts.length > 0) {
       await supabase.from('contact_birthdays').insert(inserts as any);
@@ -143,16 +170,48 @@ export function useBirthdays() {
 
     if (inserts.length > 0) await fetchBirthdays();
 
-    return { imported: inserts.length, matched, unmatched };
-  }, [user, contacts, fetchBirthdays, updateContact]);
+    return { imported: inserts.length, matched, unmatched, created };
+  }, [user, contacts, fetchBirthdays, updateContact, addContact]);
 
   const linkContact = useCallback(async (birthdayId: string, contactId: string) => {
     await supabase
       .from('contact_birthdays')
       .update({ contact_id: contactId, status: 'not_congratulated' } as any)
       .eq('id', birthdayId);
+
+    // Apply pasted_phone to the freshly linked contact via safeMerge (never overwrite).
+    const entry = birthdays.find(b => b.id === birthdayId);
+    const contact = contacts.find(c => String(c.id) === contactId);
+    const pasted = (entry as any)?.pasted_phone?.trim?.() || '';
+    if (entry && contact && pasted && !(contact.PhoneNumber || '').trim()) {
+      await updateContact(String(contact.id), { PhoneNumber: pasted } as any);
+      auditRepaired(birthdayId, entry.full_name, pasted, 'link+pasted_phone');
+    }
     await fetchBirthdays();
-  }, [fetchBirthdays]);
+  }, [fetchBirthdays, birthdays, contacts, updateContact]);
+
+  /**
+   * Bulk repair: copy pasted_phone → contact.PhoneNumber for every birthday
+   * whose linked contact still has no phone. safeMerge is enforced by guard.
+   * Returns the number of contacts repaired.
+   */
+  const repairPhonesFromBirthdays = useCallback(async (): Promise<number> => {
+    let repaired = 0;
+    for (const b of birthdays) {
+      const pasted = ((b as any).pasted_phone || '').trim();
+      if (!pasted || !b.contact_id) continue;
+      const contact = contacts.find(c => String(c.id) === b.contact_id);
+      if (!contact) continue;
+      if ((contact.PhoneNumber || '').trim()) continue;
+      const ok = await updateContact(String(contact.id), { PhoneNumber: pasted } as any);
+      if (ok) {
+        repaired++;
+        auditRepaired(b.id, b.full_name, pasted, 'bulk_repair_from_birthdays');
+      }
+    }
+    if (repaired > 0) await fetchBirthdays();
+    return repaired;
+  }, [birthdays, contacts, updateContact, fetchBirthdays]);
 
   const markCongratulated = useCallback(async (id: string) => {
     await supabase
@@ -219,6 +278,7 @@ export function useBirthdays() {
     testToday,
     restoreOriginalDate,
     linkContact,
+    repairPhonesFromBirthdays,
     refetch: fetchBirthdays,
   };
 }

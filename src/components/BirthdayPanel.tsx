@@ -28,7 +28,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export function BirthdayPanel() {
-  const { birthdays, loading, importBirthdays, markCongratulated, deleteBirthday, clearAll, testToday, restoreOriginalDate, linkContact } = useBirthdays();
+  const { birthdays, loading, importBirthdays, markCongratulated, deleteBirthday, clearAll, testToday, restoreOriginalDate, linkContact, repairPhonesFromBirthdays, refetch } = useBirthdays();
   const { contacts } = useCrm();
   const [showPaste, setShowPaste] = useState(false);
   const [composerEntries, setComposerEntries] = useState<BirthdayEntry[] | null>(null);
@@ -255,9 +255,18 @@ export function BirthdayPanel() {
                 if (contact) setEditingContact(contact);
                 else handleMatchContact(b);
               }}
+              onBulkRepairPhones={async () => {
+                const n = await repairPhonesFromBirthdays();
+                window.alert(n === 0
+                  ? 'No contact phones needed repair from the pasted birthday list.'
+                  : `Copied pasted phone numbers to ${n} contact${n === 1 ? '' : 's'}.`);
+                setQueueRefresh(x => x + 1);
+              }}
+              onReevaluate={async () => { await refetch(); setQueueRefresh(x => x + 1); }}
               onChanged={() => setQueueRefresh(n => n + 1)}
               key={queueRefresh}
             />
+
 
             {/* Notification counters */}
 

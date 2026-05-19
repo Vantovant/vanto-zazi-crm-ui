@@ -238,6 +238,7 @@ export type Database = {
           level: string
           message_style: string
           original_congratulate_by_date: string | null
+          pasted_phone: string
           status: string
           updated_at: string
           user_id: string
@@ -258,6 +259,7 @@ export type Database = {
           level?: string
           message_style?: string
           original_congratulate_by_date?: string | null
+          pasted_phone?: string
           status?: string
           updated_at?: string
           user_id: string
@@ -278,6 +280,7 @@ export type Database = {
           level?: string
           message_style?: string
           original_congratulate_by_date?: string | null
+          pasted_phone?: string
           status?: string
           updated_at?: string
           user_id?: string
