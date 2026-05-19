@@ -1,12 +1,13 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   X, Copy, Check, ExternalLink, Send, ChevronLeft, ChevronRight,
-  Heart, Crown, Briefcase, Award, Loader2, Cake,
+  Heart, Crown, Briefcase, Award, Loader2, Cake, Zap, AlertTriangle,
 } from 'lucide-react';
 import { buildWhatsAppUrl } from '@/utils/whatsappPhone';
 import { useContactActivities } from '@/hooks/useContactActivities';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useAssistedBirthdaySend } from '@/hooks/useAssistedBirthdaySend';
 import type { BirthdayEntry } from '@/hooks/useBirthdays';
 
 export type BirthdayTone = 'warm' | 'royal' | 'spiritual' | 'professional';
@@ -16,6 +17,8 @@ interface BirthdayComposerModalProps {
   initialIndex?: number;
   onClose: () => void;
   onCongratulated?: (id: string) => void;
+  /** MP1.5: when true, show "Send via Maytapi" button that invokes maytapi-send-1to1 and auto-advances. */
+  assistedSend?: boolean;
 }
 
 const APLGO_BRAND_URL = 'https://crm.onlinecourseformlm.com/aplgo.html';
@@ -55,9 +58,11 @@ export function BirthdayComposerModal({
   initialIndex = 0,
   onClose,
   onCongratulated,
+  assistedSend = false,
 }: BirthdayComposerModalProps) {
   const { user } = useAuth();
   const { logActivity } = useContactActivities();
+  const { send: assistedSendFn } = useAssistedBirthdaySend();
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [tone, setTone] = useState<BirthdayTone>('warm');
   const [senderName, setSenderName] = useState('');
@@ -65,6 +70,8 @@ export function BirthdayComposerModal({
   const [copied, setCopied] = useState(false);
   const [logging, setLogging] = useState(false);
   const [logSuccess, setLogSuccess] = useState(false);
+  const [maytapiSending, setMaytapiSending] = useState(false);
+  const [maytapiError, setMaytapiError] = useState<string | null>(null);
 
   const entry = entries[currentIndex];
   const isBulk = entries.length > 1;
@@ -88,7 +95,31 @@ export function BirthdayComposerModal({
     setEditedMessage(message);
     setLogSuccess(false);
     setCopied(false);
+    setMaytapiError(null);
   }, [message, currentIndex]);
+
+  const advanceOrClose = useCallback(() => {
+    if (currentIndex < entries.length - 1) {
+      setTimeout(() => setCurrentIndex(i => i + 1), 700);
+    } else {
+      setTimeout(() => onClose(), 900);
+    }
+  }, [currentIndex, entries.length, onClose]);
+
+  const handleMaytapiSend = useCallback(async () => {
+    if (!entry) return;
+    setMaytapiError(null);
+    setMaytapiSending(true);
+    const result = await assistedSendFn(entry, editedMessage);
+    setMaytapiSending(false);
+    if (!result.ok) {
+      setMaytapiError(result.error || 'Send failed');
+      return;
+    }
+    setLogSuccess(true);
+    onCongratulated?.(entry.id);
+    advanceOrClose();
+  }, [entry, editedMessage, assistedSendFn, onCongratulated, advanceOrClose]);
 
   const handleCopy = useCallback(() => {
     navigator.clipboard.writeText(editedMessage);
@@ -197,7 +228,22 @@ export function BirthdayComposerModal({
           {logSuccess && (
             <div className="flex items-center gap-2 px-3 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
               <Check className="w-4 h-4 text-emerald-400" />
-              <span className="text-sm text-emerald-400">Logged & marked congratulated!</span>
+              <span className="text-sm text-emerald-400">
+                {assistedSend ? 'Sent via Maytapi & marked congratulated!' : 'Logged & marked congratulated!'}
+              </span>
+            </div>
+          )}
+
+          {maytapiError && (
+            <div className="flex items-start gap-2 px-3 py-2 bg-rose-500/10 border border-rose-500/20 rounded-lg">
+              <AlertTriangle className="w-4 h-4 text-rose-400 mt-0.5 shrink-0" />
+              <span className="text-xs text-rose-300">Maytapi send failed: {maytapiError}</span>
+            </div>
+          )}
+
+          {assistedSend && (
+            <div className="text-[11px] text-slate-400 bg-slate-900/60 border border-slate-700/60 rounded-lg px-3 py-2">
+              <span className="text-pink-300 font-medium">MP1.5 Assisted Send</span> — one click sends this single birthday via Maytapi, marks it congratulated, then opens the next eligible birthday. Signature is normalised to the Vanto brand line.
             </div>
           )}
 
@@ -228,11 +274,26 @@ export function BirthdayComposerModal({
               {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
               {copied ? 'Copied!' : 'Copy'}
             </button>
-            <button type="button" onClick={handleSendAndLog} disabled={logging}
-              className="flex items-center gap-1.5 px-3 py-2 text-sm bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white rounded-lg transition-colors font-medium">
-              {logging ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              Send & Log
-            </button>
+            {assistedSend ? (
+              <button type="button" onClick={handleMaytapiSend}
+                disabled={maytapiSending || !entry.contact_id || !(entry.phone_normalized || entry.phone_number) || entry.opt_out}
+                title={
+                  !entry.contact_id ? 'No linked contact' :
+                  !(entry.phone_normalized || entry.phone_number) ? 'No phone number' :
+                  entry.opt_out ? 'Contact opted out' :
+                  'Send this birthday via Maytapi (one click, then auto-advance)'
+                }
+                className="flex items-center gap-1.5 px-3 py-2 text-sm bg-pink-600 hover:bg-pink-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg transition-colors font-medium">
+                {maytapiSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+                Send via Maytapi
+              </button>
+            ) : (
+              <button type="button" onClick={handleSendAndLog} disabled={logging}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white rounded-lg transition-colors font-medium">
+                {logging ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                Send & Log
+              </button>
+            )}
           </div>
         </div>
       </div>

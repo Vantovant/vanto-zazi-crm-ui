@@ -33,6 +33,7 @@ export function BirthdayPanel() {
   const [showPaste, setShowPaste] = useState(false);
   const [composerEntries, setComposerEntries] = useState<BirthdayEntry[] | null>(null);
   const [composerIndex, setComposerIndex] = useState(0);
+  const [composerAssisted, setComposerAssisted] = useState(false);
   const [filter, setFilter] = useState<FilterType>('all');
   const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState(true);
@@ -107,9 +108,28 @@ export function BirthdayPanel() {
   }, []);
 
   const openComposer = useCallback((entries: BirthdayEntry[], idx: number) => {
+    setComposerAssisted(false);
     setComposerEntries(entries);
     setComposerIndex(idx);
   }, []);
+
+  // MP1.5 — today's eligible birthdays (linked contact, sendable phone, not opted out, not done).
+  const todaysEligible = useMemo(() => {
+    return birthdays.filter(b =>
+      b.status === 'not_congratulated' &&
+      classifyBirthdayEntry(b) === 'today' &&
+      b.contact_id &&
+      Boolean((b.phone_normalized || b.phone_number || '').trim()) &&
+      !b.opt_out
+    );
+  }, [birthdays]);
+
+  const openAssistedTodayComposer = useCallback(() => {
+    if (todaysEligible.length === 0) return;
+    setComposerAssisted(true);
+    setComposerEntries(todaysEligible);
+    setComposerIndex(0);
+  }, [todaysEligible]);
 
   const openBulkComposer = useCallback(() => {
     const selected = filtered.filter(b => selectedIds.has(b.id) && b.status !== 'congratulated');
@@ -265,6 +285,14 @@ export function BirthdayPanel() {
                 <ClipboardPaste className="w-3 h-3" />
                 Smart Paste
               </button>
+              {todaysEligible.length > 0 && (
+                <button type="button" onClick={openAssistedTodayComposer}
+                  title="MP1.5 Assisted Send — open today's first eligible birthday, send one-by-one via Maytapi"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white rounded-lg transition-colors shadow-sm shadow-pink-500/30">
+                  <PartyPopper className="w-3 h-3" />
+                  Send today's birthdays ({todaysEligible.length})
+                </button>
+              )}
               {birthdays.filter(b => b.status !== 'congratulated').length > 0 && (
                 <button type="button" onClick={() => setShowSession(true)}
                   className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors">
@@ -413,8 +441,9 @@ export function BirthdayPanel() {
         <BirthdayComposerModal
           entries={composerEntries}
           initialIndex={composerIndex}
-          onClose={() => setComposerEntries(null)}
+          onClose={() => { setComposerEntries(null); setComposerAssisted(false); }}
           onCongratulated={handleCongratulated}
+          assistedSend={composerAssisted}
         />
       )}
       {showSession && (
