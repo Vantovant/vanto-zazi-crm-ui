@@ -228,7 +228,22 @@ export function BirthdayComposerModal({
           {logSuccess && (
             <div className="flex items-center gap-2 px-3 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
               <Check className="w-4 h-4 text-emerald-400" />
-              <span className="text-sm text-emerald-400">Logged & marked congratulated!</span>
+              <span className="text-sm text-emerald-400">
+                {assistedSend ? 'Sent via Maytapi & marked congratulated!' : 'Logged & marked congratulated!'}
+              </span>
+            </div>
+          )}
+
+          {maytapiError && (
+            <div className="flex items-start gap-2 px-3 py-2 bg-rose-500/10 border border-rose-500/20 rounded-lg">
+              <AlertTriangle className="w-4 h-4 text-rose-400 mt-0.5 shrink-0" />
+              <span className="text-xs text-rose-300">Maytapi send failed: {maytapiError}</span>
+            </div>
+          )}
+
+          {assistedSend && (
+            <div className="text-[11px] text-slate-400 bg-slate-900/60 border border-slate-700/60 rounded-lg px-3 py-2">
+              <span className="text-pink-300 font-medium">MP1.5 Assisted Send</span> — one click sends this single birthday via Maytapi, marks it congratulated, then opens the next eligible birthday. Signature is normalised to the Vanto brand line.
             </div>
           )}
 
