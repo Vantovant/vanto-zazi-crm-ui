@@ -186,11 +186,6 @@ export function BirthdayPanel() {
                     {phoneHealth.alert && ' · below 80% threshold'}
                   </div>
                 </div>
-                  <div className="text-[11px] text-slate-400 truncate">
-                    {phoneHealth.sendable} of {phoneHealth.total} upcoming birthdays have a sendable phone
-                    {phoneHealth.alert && ' · below 80% threshold'}
-                  </div>
-                </div>
               </div>
               <div className="flex items-center gap-2">
                 {trendDelta !== null && trend.yesterday && (
