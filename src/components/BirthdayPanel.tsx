@@ -291,6 +291,22 @@ export function BirthdayPanel() {
                         </div>
                       </div>
                       <div className="flex items-center gap-1">
+                        {/* Missing phone: match contact or add phone */}
+                        {!hasSendablePhone(b) && (
+                          b.contact_id ? (
+                            <button type="button" onClick={() => openAddPhone(b)} title="Add phone number to matched contact"
+                              className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium bg-amber-500/15 hover:bg-amber-500/25 text-amber-200 rounded-md transition-colors">
+                              <PhoneOff className="w-3 h-3" />
+                              Add phone
+                            </button>
+                          ) : (
+                            <button type="button" onClick={() => handleMatchContact(b)} title="Match this birthday to an existing contact by APLGO ID"
+                              className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium bg-sky-500/15 hover:bg-sky-500/25 text-sky-200 rounded-md transition-colors">
+                              <Link2 className="w-3 h-3" />
+                              Match contact
+                            </button>
+                          )
+                        )}
                         {/* Test Today / Restore */}
                         {b.status !== 'congratulated' && !(b as any).original_congratulate_by_date && (
                           <button type="button" onClick={() => testToday(b.id)} title="Test Today — temporarily set to today"
