@@ -108,9 +108,28 @@ export function BirthdayPanel() {
   }, []);
 
   const openComposer = useCallback((entries: BirthdayEntry[], idx: number) => {
+    setComposerAssisted(false);
     setComposerEntries(entries);
     setComposerIndex(idx);
   }, []);
+
+  // MP1.5 — today's eligible birthdays (linked contact, sendable phone, not opted out, not done).
+  const todaysEligible = useMemo(() => {
+    return birthdays.filter(b =>
+      b.status === 'not_congratulated' &&
+      classifyBirthdayEntry(b) === 'today' &&
+      b.contact_id &&
+      Boolean((b.phone_normalized || b.phone_number || '').trim()) &&
+      !b.opt_out
+    );
+  }, [birthdays]);
+
+  const openAssistedTodayComposer = useCallback(() => {
+    if (todaysEligible.length === 0) return;
+    setComposerAssisted(true);
+    setComposerEntries(todaysEligible);
+    setComposerIndex(0);
+  }, [todaysEligible]);
 
   const openBulkComposer = useCallback(() => {
     const selected = filtered.filter(b => selectedIds.has(b.id) && b.status !== 'congratulated');
