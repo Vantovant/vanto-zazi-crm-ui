@@ -23,7 +23,8 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export function BirthdayPanel() {
-  const { birthdays, loading, importBirthdays, markCongratulated, deleteBirthday, clearAll, testToday, restoreOriginalDate } = useBirthdays();
+  const { birthdays, loading, importBirthdays, markCongratulated, deleteBirthday, clearAll, testToday, restoreOriginalDate, linkContact } = useBirthdays();
+  const { contacts } = useCrm();
   const [showPaste, setShowPaste] = useState(false);
   const [composerEntries, setComposerEntries] = useState<BirthdayEntry[] | null>(null);
   const [composerIndex, setComposerIndex] = useState(0);
@@ -32,6 +33,13 @@ export function BirthdayPanel() {
   const [expanded, setExpanded] = useState(true);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showSession, setShowSession] = useState(false);
+  const [editingContact, setEditingContact] = useState<Prospect | null>(null);
+
+  // Helper: does this birthday have a sendable phone? (matched contact with non-empty PhoneNumber)
+  const hasSendablePhone = useCallback((b: BirthdayEntry) => {
+    if (!b.contact_id) return false;
+    return Boolean((b.phone_number || '').trim());
+  }, []);
 
   // Counts
   const counts = useMemo(() => {
