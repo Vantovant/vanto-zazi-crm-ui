@@ -95,7 +95,31 @@ export function BirthdayComposerModal({
     setEditedMessage(message);
     setLogSuccess(false);
     setCopied(false);
+    setMaytapiError(null);
   }, [message, currentIndex]);
+
+  const advanceOrClose = useCallback(() => {
+    if (currentIndex < entries.length - 1) {
+      setTimeout(() => setCurrentIndex(i => i + 1), 700);
+    } else {
+      setTimeout(() => onClose(), 900);
+    }
+  }, [currentIndex, entries.length, onClose]);
+
+  const handleMaytapiSend = useCallback(async () => {
+    if (!entry) return;
+    setMaytapiError(null);
+    setMaytapiSending(true);
+    const result = await assistedSendFn(entry, editedMessage);
+    setMaytapiSending(false);
+    if (!result.ok) {
+      setMaytapiError(result.error || 'Send failed');
+      return;
+    }
+    setLogSuccess(true);
+    onCongratulated?.(entry.id);
+    advanceOrClose();
+  }, [entry, editedMessage, assistedSendFn, onCongratulated, advanceOrClose]);
 
   const handleCopy = useCallback(() => {
     navigator.clipboard.writeText(editedMessage);
