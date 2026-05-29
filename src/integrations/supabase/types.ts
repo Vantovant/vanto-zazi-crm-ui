@@ -561,36 +561,6 @@ export type Database = {
         }
         Relationships: []
       }
-      import_staging_expired_20260529: {
-        Row: {
-          aplgo_id: string | null
-          country: string | null
-          full_name: string | null
-          go_status: string | null
-          leg: string | null
-          level: string | null
-          phone_normalized: string | null
-        }
-        Insert: {
-          aplgo_id?: string | null
-          country?: string | null
-          full_name?: string | null
-          go_status?: string | null
-          leg?: string | null
-          level?: string | null
-          phone_normalized?: string | null
-        }
-        Update: {
-          aplgo_id?: string | null
-          country?: string | null
-          full_name?: string | null
-          go_status?: string | null
-          leg?: string | null
-          level?: string | null
-          phone_normalized?: string | null
-        }
-        Relationships: []
-      }
       integration_settings: {
         Row: {
           auto_send_appreciation_enabled: boolean
