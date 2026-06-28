@@ -232,7 +232,7 @@ export function Topbar({ onMenuToggle }: { onMenuToggle: () => void }) {
             <div className="text-right hidden sm:block">
               <p className="text-sm font-medium text-slate-200">{displayEmail}</p>
             </div>
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-teal-500 to-cyan-500 flex items-center justify-center text-white font-semibold text-sm">
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-brand-teal-500 to-brand-orange-500 flex items-center justify-center text-white font-semibold text-sm">
               {initials}
             </div>
           </div>

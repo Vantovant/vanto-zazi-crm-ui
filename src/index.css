@@ -2,6 +2,67 @@
 @tailwind components;
 @tailwind utilities;
 
+/* =========================================================
+   GetWell Grow — global brand tokens (derived from logo)
+   Teal #2A8A8F · Orange #E8732C · Navy #0F2A44 · Sand #F8EFE2
+   Accent companions: Pink #E89AB0 · Leaf #8FC079 · Ocean #4FB3D9
+   ========================================================= */
+:root {
+  /* Raw brand hex (use via var(--brand-*) when needed) */
+  --brand-teal: #2A8A8F;
+  --brand-teal-deep: #1C5A5E;
+  --brand-teal-soft: #5FAFB5;
+  --brand-orange: #E8732C;
+  --brand-orange-soft: #F4A26A;
+  --brand-pink: #E89AB0;
+  --brand-leaf: #8FC079;
+  --brand-ocean: #4FB3D9;
+  --brand-navy: #0F2A44;
+  --brand-sand: #F8EFE2;
+
+  /* shadcn semantic tokens (HSL triples) — dark app shell */
+  --background: 210 38% 8%;          /* deep navy/slate */
+  --foreground: 210 40% 96%;
+  --card: 215 32% 12%;
+  --card-foreground: 210 40% 96%;
+  --popover: 215 32% 12%;
+  --popover-foreground: 210 40% 96%;
+  --primary: 184 54% 36%;            /* brand teal */
+  --primary-foreground: 0 0% 100%;
+  --secondary: 215 25% 18%;
+  --secondary-foreground: 210 40% 96%;
+  --muted: 215 25% 18%;
+  --muted-foreground: 215 16% 65%;
+  --accent: 22 81% 54%;              /* brand orange */
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 75% 55%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 215 25% 22%;
+  --input: 215 25% 22%;
+  --ring: 184 54% 45%;
+  --radius: 0.625rem;
+
+  --sidebar-background: 210 38% 8%;
+  --sidebar-foreground: 210 40% 96%;
+  --sidebar-primary: 184 54% 36%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 22 81% 54%;
+  --sidebar-accent-foreground: 0 0% 100%;
+  --sidebar-border: 215 25% 18%;
+  --sidebar-ring: 184 54% 45%;
+
+  --chart-1: 184 54% 36%;            /* teal */
+  --chart-2: 22 81% 54%;             /* orange */
+  --chart-3: 340 62% 76%;            /* pink */
+  --chart-4: 96 38% 62%;             /* leaf */
+  --chart-5: 197 62% 58%;            /* ocean */
+
+  /* Reusable brand gradients */
+  --gradient-brand: linear-gradient(135deg, var(--brand-teal) 0%, var(--brand-orange) 100%);
+  --gradient-sunset: linear-gradient(135deg, var(--brand-orange) 0%, var(--brand-pink) 100%);
+  --gradient-shell: linear-gradient(180deg, hsl(var(--background)) 0%, hsl(215 32% 11%) 100%);
+}
+
 @layer base {
   html {
     -webkit-font-smoothing: antialiased;
@@ -9,26 +70,34 @@
   }
 
   body {
-    @apply font-sans text-slate-700;
+    @apply font-sans;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
   }
 }
 
 @layer components {
-  /* Custom scrollbar for webkit browsers */
+  .brand-gradient {
+    background-image: var(--gradient-brand);
+  }
+  .brand-gradient-text {
+    background-image: var(--gradient-brand);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
-
   ::-webkit-scrollbar-track {
     @apply bg-transparent;
   }
-
   ::-webkit-scrollbar-thumb {
-    @apply bg-slate-300 rounded-full;
+    @apply bg-slate-700 rounded-full;
   }
-
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-slate-400;
+    @apply bg-slate-600;
   }
 }

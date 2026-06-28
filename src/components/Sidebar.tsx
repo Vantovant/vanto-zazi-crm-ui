@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import logo from '@/assets/logo.jpg';
+import logo from '@/assets/getwellgrow-logo.png';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   LayoutDashboard,
@@ -62,8 +62,10 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
         {/* Logo */}
         <div className="h-14 flex items-center justify-between px-5 border-b border-slate-800">
           <div className="flex items-center gap-2.5">
-            <img src={logo} alt="Vanto Zazi logo" className="w-8 h-8 rounded-lg object-cover" />
-            <span className="font-semibold text-lg text-white tracking-tight">Vanto Zazi</span>
+            <img src={logo} alt="GetWell Grow logo" className="w-8 h-8 rounded-lg object-contain bg-white/5 p-0.5" />
+            <span className="font-semibold text-lg text-white tracking-tight">
+              <span className="text-brand-teal-300">GetWell</span> <span className="text-brand-orange-400">Grow</span>
+            </span>
           </div>
           <button type="button" onClick={onClose} className="lg:hidden p-1 rounded text-slate-400 hover:text-white">
             <X className="w-5 h-5" />
