@@ -37,8 +37,28 @@ function App() {
           <EnvStatusBanner />
           <PwaInstallBanner />
           <Routes>
+            {/* Public marketing site */}
+            <Route element={<MarketingLayout />}>
+              <Route path="/" element={<MarketingHome />} />
+              <Route path="/features" element={<MarketingFeatures />} />
+              <Route path="/how-it-works" element={<MarketingHowItWorks />} />
+              <Route path="/investors" element={<MarketingInvestors />} />
+              <Route path="/flagship" element={<MarketingFlagship />} />
+            </Route>
+
+            <Route path="/signin" element={<Auth />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route
+              path="/app"
+              element={
+                <ProtectedRoute>
+                  <Layout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<Navigate to="/dashboard" replace />} />
+            </Route>
             <Route
               path="/"
               element={
