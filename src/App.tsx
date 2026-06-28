@@ -21,6 +21,12 @@ import { Inventory } from './pages/Inventory';
 import { MomentumRun } from './pages/MomentumRun';
 import { SponsorIdReview } from './pages/SponsorIdReview';
 import { MonthlyActivityPush } from './pages/MonthlyActivityPush';
+import { MarketingLayout } from './marketing/MarketingLayout';
+import { Home as MarketingHome } from './marketing/pages/Home';
+import { Features as MarketingFeatures } from './marketing/pages/Features';
+import { HowItWorks as MarketingHowItWorks } from './marketing/pages/HowItWorks';
+import { Investors as MarketingInvestors } from './marketing/pages/Investors';
+import { Flagship as MarketingFlagship } from './marketing/pages/Flagship';
 
 function App() {
   return (
