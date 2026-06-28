@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Layout } from './components/Layout';
@@ -21,6 +21,12 @@ import { Inventory } from './pages/Inventory';
 import { MomentumRun } from './pages/MomentumRun';
 import { SponsorIdReview } from './pages/SponsorIdReview';
 import { MonthlyActivityPush } from './pages/MonthlyActivityPush';
+import { MarketingLayout } from './marketing/MarketingLayout';
+import { Home as MarketingHome } from './marketing/pages/Home';
+import { Features as MarketingFeatures } from './marketing/pages/Features';
+import { HowItWorks as MarketingHowItWorks } from './marketing/pages/HowItWorks';
+import { Investors as MarketingInvestors } from './marketing/pages/Investors';
+import { Flagship as MarketingFlagship } from './marketing/pages/Flagship';
 
 function App() {
   return (
@@ -31,17 +37,25 @@ function App() {
           <EnvStatusBanner />
           <PwaInstallBanner />
           <Routes>
+            {/* Public marketing site */}
+            <Route element={<MarketingLayout />}>
+              <Route path="/" element={<MarketingHome />} />
+              <Route path="/features" element={<MarketingFeatures />} />
+              <Route path="/how-it-works" element={<MarketingHowItWorks />} />
+              <Route path="/investors" element={<MarketingInvestors />} />
+              <Route path="/flagship" element={<MarketingFlagship />} />
+            </Route>
+
+            <Route path="/signin" element={<Auth />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route
-              path="/"
               element={
                 <ProtectedRoute>
                   <Layout />
                 </ProtectedRoute>
               }
             >
-              <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="contacts" element={<Contacts />} />
               <Route path="activities" element={<Activities />} />
