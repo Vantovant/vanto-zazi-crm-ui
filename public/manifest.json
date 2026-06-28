@@ -1,12 +1,12 @@
 {
-  "name": "Zazi CRM",
-  "short_name": "Zazi CRM",
-  "description": "Vanto Zazi CRM — Your Business Growth Command Centre",
+  "name": "GetWell Grow",
+  "short_name": "GetWell Grow",
+  "description": "GetWell Grow — Grow your team. Grow your wellness.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "theme_color": "#0f172a",
-  "background_color": "#0f172a",
+  "theme_color": "#0F2A44",
+  "background_color": "#0F2A44",
   "icons": [
     {
       "src": "/pwa-icon-192.png",

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import logo from '@/assets/logo.jpg';
+import logo from '@/assets/getwellgrow-logo.png';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -30,12 +30,16 @@ export function Auth() {
   if (user) return <Navigate to="/dashboard" replace />;
 
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 relative overflow-hidden">
+      <div className="absolute inset-0 pointer-events-none opacity-30" style={{ background: 'radial-gradient(circle at 20% 20%, #2A8A8F33, transparent 55%), radial-gradient(circle at 80% 80%, #E8732C33, transparent 55%)' }} />
+      <div className="w-full max-w-md relative">
         <div className="text-center mb-8">
-          <img src={logo} alt="Vanto Zazi logo" className="w-14 h-14 rounded-xl mx-auto mb-4 object-cover" />
-          <h1 className="text-2xl font-bold text-white">Vanto Zazi</h1>
-          <p className="text-slate-400 mt-1">
+          <img src={logo} alt="GetWell Grow logo" className="w-20 h-20 mx-auto mb-4 object-contain" />
+          <h1 className="text-2xl font-bold">
+            <span className="text-brand-teal-300">GetWell</span> <span className="text-brand-orange-400">Grow</span>
+          </h1>
+          <p className="text-slate-400 mt-1 text-sm tracking-wide">Grow your team. Grow your wellness.</p>
+          <p className="text-slate-500 mt-3 text-sm">
             {isSignUp ? 'Create your account' : 'Sign in to your account'}
           </p>
         </div>
