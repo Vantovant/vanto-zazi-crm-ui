@@ -17,28 +17,33 @@ export function MarketingLayout() {
   useEffect(() => { setOpen(false); window.scrollTo(0, 0); }, [pathname]);
 
   return (
-    <div className="min-h-screen bg-[#0F2A44] text-brand-sand">
-      <header className="sticky top-0 z-50 backdrop-blur-md bg-[#0F2A44]/85 border-b border-white/5">
+    <div className="min-h-screen bg-[#F8EFE2] text-[#0F2A44]">
+      <header className="sticky top-0 z-50 backdrop-blur-md bg-[#F8EFE2]/90 border-b border-[#0F2A44]/5">
         <div className="container mx-auto flex items-center justify-between py-3">
           <Link to="/" className="flex items-center gap-2">
-            <img src={logo} alt="GetWell Grow" className="w-9 h-9 object-contain" />
-            <span className="font-bold text-lg tracking-tight">
-              <span className="text-brand-teal-300">GetWell</span>{' '}
-              <span className="text-brand-orange-400">Grow</span>
-            </span>
+            <img src={logo} alt="GetWell Grow" className="w-10 h-10 object-contain" />
+            <div className="flex flex-col leading-tight">
+              <span className="font-bold text-lg tracking-tight">
+                <span className="text-[#2A8A8F]">GetWell</span>{' '}
+                <span className="text-[#E8732C]">Grow</span>
+              </span>
+              <span className="text-[10px] uppercase tracking-[0.18em] text-[#0F2A44]/60 font-medium">
+                Grow your team · Grow your wellness
+              </span>
+            </div>
           </Link>
 
-          <nav className="hidden lg:flex items-center gap-1">
+          <nav className="hidden lg:flex items-center gap-1 bg-white/60 rounded-full px-2 py-1 border border-[#0F2A44]/5">
             {nav.map((n) => (
               <NavLink
                 key={n.to}
                 to={n.to}
                 end={n.end}
                 className={({ isActive }) =>
-                  `px-3 py-2 rounded-md text-sm transition ${
+                  `px-4 py-2 rounded-full text-sm transition ${
                     isActive
-                      ? 'text-brand-orange-400 bg-white/5'
-                      : 'text-brand-sand/80 hover:text-white hover:bg-white/5'
+                      ? 'bg-[#0F2A44]/5 text-[#0F2A44] font-semibold'
+                      : 'text-[#0F2A44]/70 hover:text-[#0F2A44]'
                   }`
                 }
               >
@@ -50,20 +55,21 @@ export function MarketingLayout() {
           <div className="hidden lg:flex items-center gap-2">
             <Link
               to="/signin"
-              className="px-4 py-2 text-sm rounded-md text-brand-sand hover:text-white border border-white/10 hover:border-white/30 transition"
+              className="px-4 py-2 text-sm rounded-full text-[#0F2A44] hover:text-[#2A8A8F] transition font-medium"
             >
               Sign in
             </Link>
             <Link
               to="/signin"
-              className="px-4 py-2 text-sm rounded-md bg-brand-orange-500 hover:bg-brand-orange-600 text-white font-medium transition inline-flex items-center gap-1"
+              className="px-5 py-2.5 text-sm rounded-full text-white font-semibold transition inline-flex items-center gap-1.5 shadow-[0_8px_24px_-8px_rgba(232,115,44,0.5)] hover:shadow-[0_12px_28px_-8px_rgba(232,115,44,0.65)]"
+              style={{ background: 'linear-gradient(135deg, #2A8A8F 0%, #E8732C 100%)' }}
             >
               Get started <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
 
           <button
-            className="lg:hidden p-2 rounded-md hover:bg-white/5"
+            className="lg:hidden p-2 rounded-md hover:bg-[#0F2A44]/5"
             onClick={() => setOpen((v) => !v)}
             aria-label="Toggle menu"
           >
@@ -72,7 +78,7 @@ export function MarketingLayout() {
         </div>
 
         {open && (
-          <div className="lg:hidden border-t border-white/5 bg-[#0F2A44]">
+          <div className="lg:hidden border-t border-[#0F2A44]/5 bg-[#F8EFE2]">
             <div className="container mx-auto py-3 flex flex-col gap-1">
               {nav.map((n) => (
                 <NavLink
@@ -81,7 +87,7 @@ export function MarketingLayout() {
                   end={n.end}
                   className={({ isActive }) =>
                     `px-3 py-2 rounded-md text-sm ${
-                      isActive ? 'text-brand-orange-400 bg-white/5' : 'text-brand-sand/80'
+                      isActive ? 'text-[#2A8A8F] bg-white/70 font-semibold' : 'text-[#0F2A44]/80'
                     }`
                   }
                 >
@@ -90,9 +96,10 @@ export function MarketingLayout() {
               ))}
               <Link
                 to="/signin"
-                className="mt-2 px-3 py-2 rounded-md bg-brand-orange-500 text-white text-sm font-medium text-center"
+                className="mt-2 px-3 py-2 rounded-full text-white text-sm font-semibold text-center"
+                style={{ background: 'linear-gradient(135deg, #2A8A8F 0%, #E8732C 100%)' }}
               >
-                Sign in
+                Get started
               </Link>
             </div>
           </div>
@@ -103,38 +110,38 @@ export function MarketingLayout() {
         <Outlet />
       </main>
 
-      <footer className="border-t border-white/5 bg-[#0B2138] mt-24">
+      <footer className="border-t border-[#0F2A44]/10 bg-white/50 mt-24">
         <div className="container mx-auto py-12 grid gap-10 md:grid-cols-4">
           <div className="md:col-span-2">
             <div className="flex items-center gap-2 mb-3">
               <img src={logo} alt="GetWell Grow" className="w-8 h-8 object-contain" />
               <span className="font-bold">
-                <span className="text-brand-teal-300">GetWell</span>{' '}
-                <span className="text-brand-orange-400">Grow</span>
+                <span className="text-[#2A8A8F]">GetWell</span>{' '}
+                <span className="text-[#E8732C]">Grow</span>
               </span>
             </div>
-            <p className="text-sm text-brand-sand/70 max-w-sm">
+            <p className="text-sm text-[#0F2A44]/70 max-w-sm">
               The downline growth CRM for modern network-marketing teams. Grow your team. Grow your wellness.
             </p>
           </div>
           <div>
-            <h4 className="text-sm font-semibold text-white mb-3">Product</h4>
-            <ul className="space-y-2 text-sm text-brand-sand/70">
-              <li><Link to="/features" className="hover:text-white">Features</Link></li>
-              <li><Link to="/flagship" className="hover:text-white">Flagship modules</Link></li>
-              <li><Link to="/how-it-works" className="hover:text-white">How it works</Link></li>
+            <h4 className="text-sm font-semibold text-[#0F2A44] mb-3">Product</h4>
+            <ul className="space-y-2 text-sm text-[#0F2A44]/70">
+              <li><Link to="/features" className="hover:text-[#2A8A8F]">Features</Link></li>
+              <li><Link to="/flagship" className="hover:text-[#2A8A8F]">Flagship modules</Link></li>
+              <li><Link to="/how-it-works" className="hover:text-[#2A8A8F]">How it works</Link></li>
             </ul>
           </div>
           <div>
-            <h4 className="text-sm font-semibold text-white mb-3">Company</h4>
-            <ul className="space-y-2 text-sm text-brand-sand/70">
-              <li><Link to="/investors" className="hover:text-white">Investors</Link></li>
-              <li><Link to="/signin" className="hover:text-white">Sign in</Link></li>
-              <li><a href="mailto:hello@getwellgrow.app" className="hover:text-white">Contact</a></li>
+            <h4 className="text-sm font-semibold text-[#0F2A44] mb-3">Company</h4>
+            <ul className="space-y-2 text-sm text-[#0F2A44]/70">
+              <li><Link to="/investors" className="hover:text-[#2A8A8F]">Investors</Link></li>
+              <li><Link to="/signin" className="hover:text-[#2A8A8F]">Sign in</Link></li>
+              <li><a href="mailto:hello@getwellgrow.app" className="hover:text-[#2A8A8F]">Contact</a></li>
             </ul>
           </div>
         </div>
-        <div className="container mx-auto py-5 border-t border-white/5 text-xs text-brand-sand/50 flex flex-col sm:flex-row justify-between gap-2">
+        <div className="container mx-auto py-5 border-t border-[#0F2A44]/10 text-xs text-[#0F2A44]/50 flex flex-col sm:flex-row justify-between gap-2">
           <span>© {new Date().getFullYear()} GetWell Grow. All rights reserved.</span>
           <span>Grow your team. Grow your wellness.</span>
         </div>
