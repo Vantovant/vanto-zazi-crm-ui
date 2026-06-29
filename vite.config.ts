@@ -20,6 +20,7 @@ export default defineConfig(({ mode }) => ({
       includeAssets: ["pwa-icon-192.png", "pwa-icon-512.png"],
       manifest: false, // We use our own public/manifest.json
       workbox: {
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2}"],
         navigateFallback: "/index.html",
         navigateFallbackDenylist: [/^\/~oauth/, /^\/api\//, /^\/rest\//, /^\/auth\//],
