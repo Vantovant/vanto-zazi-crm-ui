@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Bell, UserPlus, ClipboardList, LogOut, Lock, X, Menu, Cpu, Cake } from 'lucide-react';
+import { Search, Bell, UserPlus, ClipboardList, LogOut, Lock, X, Menu, Cpu, Cake, Home } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCrm } from '@/contexts/CrmContext';
 import { useBirthdayCounts } from '@/hooks/useBirthdayCounts';
