@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Bell, UserPlus, ClipboardList, LogOut, Lock, X, Menu, Cpu, Cake } from 'lucide-react';
+import { Search, Bell, UserPlus, ClipboardList, LogOut, Lock, X, Menu, Cpu, Cake, Home } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCrm } from '@/contexts/CrmContext';
 import { useBirthdayCounts } from '@/hooks/useBirthdayCounts';
@@ -117,6 +117,16 @@ export function Topbar({ onMenuToggle }: { onMenuToggle: () => void }) {
 
         {/* Quick Actions + Right section */}
         <div className="flex items-center gap-1 sm:gap-3 shrink-0">
+          {/* Homepage (marketing site) */}
+          <a
+            href="/"
+            className="hidden sm:flex items-center gap-2 px-3 py-2 text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition-colors"
+            title="Go to GetWell Grow homepage"
+          >
+            <Home className="w-4 h-4" />
+            <span className="hidden lg:inline">Homepage</span>
+          </a>
+
           {/* Add Contact */}
           <button
             type="button"

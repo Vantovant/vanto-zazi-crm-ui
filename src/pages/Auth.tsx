@@ -1,10 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import logo from '@/assets/getwellgrow-logo.png';
-import { Navigate, useSearchParams } from 'react-router-dom';
+import { Navigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { env } from '@/lib/env';
-import { Mail, Lock, User, Loader2, ShieldX, ShieldCheck, Ticket, Eye, EyeOff } from 'lucide-react';
+import {
+  Mail, Lock, User, Loader2, Ticket, Eye, EyeOff,
+  Bot, MessageCircle, Users as UsersIcon, Cake, BarChart3,
+  ShieldCheck, KeyRound, Clock, ArrowLeft, Mail as MailIcon,
+} from 'lucide-react';
 
 export function Auth() {
   const { user, loading } = useAuth();
@@ -30,56 +34,188 @@ export function Auth() {
   if (user) return <Navigate to="/dashboard" replace />;
 
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 relative overflow-hidden">
-      <div className="absolute inset-0 pointer-events-none opacity-30" style={{ background: 'radial-gradient(circle at 20% 20%, #2A8A8F33, transparent 55%), radial-gradient(circle at 80% 80%, #E8732C33, transparent 55%)' }} />
-      <div className="w-full max-w-md relative">
-        <div className="text-center mb-8">
-          <img src={logo} alt="GetWell Grow logo" className="w-20 h-20 mx-auto mb-4 object-contain" />
-          <h1 className="text-2xl font-bold">
-            <span className="text-brand-teal-300">GetWell</span> <span className="text-brand-orange-400">Grow</span>
-          </h1>
-          <p className="text-slate-400 mt-1 text-sm tracking-wide">Grow your team. Grow your wellness.</p>
-          <p className="text-slate-500 mt-3 text-sm">
-            {isSignUp ? 'Create your account' : 'Sign in to your account'}
-          </p>
-        </div>
+    <div className="min-h-screen bg-slate-900 text-slate-100 relative overflow-hidden">
+      {/* ambient glow */}
+      <div
+        className="absolute inset-0 pointer-events-none opacity-40"
+        style={{
+          background:
+            'radial-gradient(circle at 15% 20%, rgba(42,138,143,0.35), transparent 55%), radial-gradient(circle at 85% 85%, rgba(232,115,44,0.25), transparent 55%)',
+        }}
+      />
 
-        <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
-          <AuthForm
-            isSignUp={isSignUp}
-            email={email}
-            setEmail={setEmail}
-            password={password}
-            setPassword={setPassword}
-            displayName={displayName}
-            setDisplayName={setDisplayName}
-            inviteCode={inviteCode}
-            setInviteCode={setInviteCode}
-            error={error}
-            setError={setError}
-            message={message}
-            setMessage={setMessage}
-            submitting={submitting}
-            setSubmitting={setSubmitting}
-          />
-
-          <div className="mt-6 text-center space-y-2">
-            <button
-              type="button"
-              onClick={() => { setIsSignUp(!isSignUp); setError(''); setMessage(''); }}
-              className="text-sm text-teal-400 hover:text-teal-300 transition-colors"
-            >
-              {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
-            </button>
-            {!isSignUp && (
-              <ForgotPasswordLink />
-            )}
+      {/* top bar */}
+      <header className="relative border-b border-slate-800/80">
+        <div className="container mx-auto flex items-center justify-between py-4">
+          <div className="flex items-center gap-3">
+            <img src={logo} alt="GetWell Grow" className="w-10 h-10 object-contain" />
+            <div className="leading-tight">
+              <div className="font-bold">
+                <span className="text-brand-teal-300">GetWell</span>{' '}
+                <span className="text-brand-orange-400">Grow</span>
+              </div>
+              <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500 font-medium">
+                getwellgrow.app/signin
+              </div>
+            </div>
           </div>
+          <a
+            href="/"
+            className="inline-flex items-center gap-2 text-sm text-slate-300 hover:text-white transition"
+          >
+            <ArrowLeft className="w-4 h-4" /> Back to homepage
+          </a>
+        </div>
+      </header>
+
+      <div className="relative container mx-auto py-10 lg:py-14">
+        <div className="grid lg:grid-cols-[1fr_1.05fr_1fr] gap-8 lg:gap-10 items-start">
+          {/* LEFT — Pitch */}
+          <aside className="space-y-6">
+            <div>
+              <span className="inline-block text-[11px] uppercase tracking-[0.18em] font-bold text-brand-orange-400">
+                Workspace sign-in
+              </span>
+              <h2 className="mt-3 text-2xl lg:text-3xl font-bold leading-tight">
+                WhatsApp-first CRM for downline-driven teams.
+              </h2>
+              <p className="mt-3 text-sm text-slate-300/85 leading-relaxed">
+                GetWell Grow is the autonomous Prospector, unified inbox, and follow-up engine for
+                network-marketing leaders. Purpose-built for APLGO and configurable for any MLM
+                company on request.
+              </p>
+            </div>
+            <div className="space-y-3">
+              {[
+                { icon: Bot, t: 'AI Prospector',
+                  d: 'Autonomous first-touch, intent detection, and follow-up scheduling — 24/7.' },
+                { icon: MessageCircle, t: 'Unified Inbox',
+                  d: 'WhatsApp (Maytapi) + SMS (Twilio) conversations in one shared, audited thread.' },
+                { icon: UsersIcon, t: 'CRM Pipeline',
+                  d: 'Prospect → Registered → Purchase → Status tracking with lead-temperature scoring.' },
+                { icon: Cake, t: 'Birthday Engine',
+                  d: 'Daily queue, Smart Phone Rescue, and MP1.5 Assisted Send — never miss a moment.' },
+                { icon: BarChart3, t: 'Activity Engine',
+                  d: 'Daily goals, neglected-contact alerts, and monthly appreciation push.' },
+              ].map(({ icon: Icon, t, d }) => (
+                <div key={t} className="flex gap-3 p-3 rounded-xl bg-slate-800/60 border border-slate-700/60">
+                  <div
+                    className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                    style={{ background: 'linear-gradient(135deg, #2A8A8F33, #E8732C33)' }}
+                  >
+                    <Icon className="w-4.5 h-4.5 text-brand-teal-300" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold text-white">{t}</div>
+                    <p className="text-xs text-slate-400 mt-0.5 leading-snug">{d}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </aside>
+
+          {/* CENTER — Auth card */}
+          <div className="lg:sticky lg:top-8">
+            <div className="rounded-2xl bg-slate-800/90 border border-slate-700 shadow-2xl backdrop-blur-sm">
+              <div className="p-7 pb-5">
+                <h1 className="text-2xl font-bold text-white">
+                  {isSignUp ? 'Create your account' : 'Welcome back'}
+                </h1>
+                <p className="text-sm text-slate-400 mt-1">
+                  {isSignUp ? 'Redeem your invite code to join the workspace' : 'Sign in to your workspace'}
+                </p>
+              </div>
+              <div className="px-7 pb-7">
+                <AuthForm
+                  isSignUp={isSignUp}
+                  email={email} setEmail={setEmail}
+                  password={password} setPassword={setPassword}
+                  displayName={displayName} setDisplayName={setDisplayName}
+                  inviteCode={inviteCode} setInviteCode={setInviteCode}
+                  error={error} setError={setError}
+                  message={message} setMessage={setMessage}
+                  submitting={submitting} setSubmitting={setSubmitting}
+                />
+
+                <div className="mt-6 text-center space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => { setIsSignUp(!isSignUp); setError(''); setMessage(''); }}
+                    className="text-sm text-brand-teal-300 hover:text-brand-teal-400 transition-colors"
+                  >
+                    {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
+                  </button>
+                  {!isSignUp && <ForgotPasswordLink />}
+                </div>
+
+                <p className="mt-5 text-center text-xs text-slate-500 flex items-center justify-center gap-1.5">
+                  <KeyRound className="w-3 h-3" /> Access is invite-only. Contact your admin for access.
+                </p>
+              </div>
+            </div>
+
+            <p className="mt-4 text-center text-[11px] text-slate-500">
+              By signing in you agree to the GetWell Grow workspace acceptable-use policy.
+            </p>
+          </div>
+
+          {/* RIGHT — Safety + access */}
+          <aside className="space-y-5">
+            <div className="rounded-2xl border border-slate-700/60 bg-slate-800/60 p-5">
+              <div className="text-[11px] uppercase tracking-[0.18em] font-bold text-slate-400">
+                Workspace safety
+              </div>
+              <ul className="mt-4 space-y-3">
+                {[
+                  { icon: ShieldCheck, t: 'Invite-only access with role-based permissions.' },
+                  { icon: Lock, t: 'Encrypted conversations and audited activity logs.' },
+                  { icon: Clock, t: 'Quiet-hour guards and per-contact rate limits.' },
+                  { icon: ShieldCheck, t: 'Anti-duplicate safety — one touch per prospect.' },
+                  { icon: ShieldCheck, t: 'MP1 manual-send rule — no WhatsApp bans, ever.' },
+                ].map(({ icon: Icon, t }) => (
+                  <li key={t} className="flex gap-2.5 text-sm text-slate-300/90">
+                    <Icon className="w-4 h-4 text-brand-teal-300 mt-0.5 flex-shrink-0" />
+                    <span>{t}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="rounded-2xl border border-slate-700/60 bg-slate-800/60 p-5">
+              <div className="text-[11px] uppercase tracking-[0.18em] font-bold text-slate-400">
+                Need access?
+              </div>
+              <p className="mt-3 text-sm text-slate-300/90 leading-relaxed">
+                This is a private workspace for GetWell Grow distributors and operators. If you
+                believe you should have access, reach out to your admin to receive an invite code.
+              </p>
+              <a
+                href="mailto:hello@getwellgrow.app"
+                className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-brand-orange-400 hover:text-brand-orange-300"
+              >
+                <MailIcon className="w-4 h-4" /> Contact your admin for an invitation
+              </a>
+            </div>
+
+            <div className="rounded-2xl border border-slate-700/60 bg-slate-800/60 p-5">
+              <div className="text-[11px] uppercase tracking-[0.18em] font-bold text-slate-400">
+                Explore first
+              </div>
+              <p className="mt-3 text-sm text-slate-300/90">New here?</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Link to="/" className="px-3 py-1.5 text-xs font-semibold rounded-full bg-slate-700 hover:bg-slate-600 text-slate-200">Homepage</Link>
+                <Link to="/features" className="px-3 py-1.5 text-xs font-semibold rounded-full bg-slate-700 hover:bg-slate-600 text-slate-200">Features</Link>
+                <Link to="/flagship" className="px-3 py-1.5 text-xs font-semibold rounded-full bg-slate-700 hover:bg-slate-600 text-slate-200">Flagship</Link>
+                <Link to="/how-it-works" className="px-3 py-1.5 text-xs font-semibold rounded-full bg-slate-700 hover:bg-slate-600 text-slate-200">How it works</Link>
+              </div>
+            </div>
+          </aside>
         </div>
       </div>
     </div>
   );
 }
+
 
 function AuthForm({
   isSignUp, email, setEmail, password, setPassword,
