@@ -24,6 +24,13 @@ const suiteApps = [
     status: 'Live',
   },
   {
+    name: 'Get Well Africa',
+    tagline: 'Plant-based wellness storefront — official APLGO Acumullit SA drop lozenges for Africa. Feel it in 30 seconds.',
+    href: 'https://getwellafrica.com',
+    accent: '#16A34A',
+    status: 'Live',
+  },
+  {
     name: 'More from VantoOS',
     tagline: 'New executive tools shipping across 2026 — one governance core, one AI gateway, one design language.',
     href: 'https://vantoos.com/suite',
