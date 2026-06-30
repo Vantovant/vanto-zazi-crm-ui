@@ -27,6 +27,7 @@ import { Features as MarketingFeatures } from './marketing/pages/Features';
 import { HowItWorks as MarketingHowItWorks } from './marketing/pages/HowItWorks';
 import { Investors as MarketingInvestors } from './marketing/pages/Investors';
 import { Flagship as MarketingFlagship } from './marketing/pages/Flagship';
+import { Suite as MarketingSuite } from './marketing/pages/Suite';
 
 function App() {
   return (
@@ -44,6 +45,7 @@ function App() {
               <Route path="/how-it-works" element={<MarketingHowItWorks />} />
               <Route path="/investors" element={<MarketingInvestors />} />
               <Route path="/flagship" element={<MarketingFlagship />} />
+              <Route path="/suite" element={<MarketingSuite />} />
             </Route>
 
             <Route path="/signin" element={<Auth />} />
