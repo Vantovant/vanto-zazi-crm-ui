@@ -232,15 +232,24 @@ Keep it punchy, motivational, and formatted with emojis and headers. Max 300 wor
     <div className="space-y-6">
       <DataStatusBanner dbActive={dbActive} />
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-white">Dashboard</h1>
           <p className="text-sm text-slate-400 mt-0.5">
             {loading ? 'Loading...' : 'Welcome back. Here\'s your daily overview.'}
           </p>
         </div>
-        <div className="text-sm text-slate-400">
-          {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+        <div className="flex items-center gap-3">
+          <a
+            href="/"
+            className="inline-flex items-center gap-2 text-sm text-slate-300 hover:text-white transition"
+            title="Back to GetWell Grow homepage"
+          >
+            <ArrowLeft className="w-4 h-4" /> Back to homepage
+          </a>
+          <div className="hidden sm:block text-sm text-slate-400">
+            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+          </div>
         </div>
       </div>
 
