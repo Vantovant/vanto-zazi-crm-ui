@@ -42,6 +42,20 @@ export function Investors() {
               Book a 20-min walkthrough
             </a>
           </div>
+
+          {/* Parent company */}
+          <div className="mt-10 p-6 rounded-2xl bg-white border border-[#0F2A44]/10 max-w-3xl">
+            <div className="text-[10px] uppercase tracking-widest font-bold text-[#D4AF37] mb-2">Parent company</div>
+            <p className="text-sm text-[#0F2A44]/80 leading-relaxed">
+              VantoOS is an African-built software house designing AI-powered operating systems for executives, founders,
+              and growing teams. VantoOS is the parent company behind the Executive AI Command Center, GetWell Hub,
+              GetWell Grow, and a growing suite of products that share one governance core, one AI gateway, and one
+              design language.{' '}
+              <a href="https://vantoos.com/investors" target="_blank" rel="noopener noreferrer" className="text-[#2A8A8F] hover:text-[#1C5A5E] font-semibold underline-offset-4 hover:underline">
+                See the VantoOS investor brief →
+              </a>
+            </p>
+          </div>
         </div>
       </section>
 

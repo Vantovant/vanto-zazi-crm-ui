@@ -8,6 +8,7 @@ const nav = [
   { to: '/features', label: 'Features' },
   { to: '/flagship', label: 'Flagship' },
   { to: '/how-it-works', label: 'How it works' },
+  { to: '/suite', label: 'Suite' },
   { to: '/investors', label: 'Investors' },
 ];
 
@@ -111,6 +112,26 @@ export function MarketingLayout() {
       </main>
 
       <footer className="border-t border-[#0F2A44]/10 bg-white/50 mt-24">
+        {/* VantoOS parent attribution band */}
+        <div className="border-b border-[#0F2A44]/10 bg-[#0F2A44] text-white/90">
+          <div className="container mx-auto py-5 flex flex-col md:flex-row items-center justify-between gap-3">
+            <div className="flex items-center gap-3 text-sm">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 text-[11px] font-bold tracking-wider uppercase text-[#D4AF37]">
+                Developed by VantoOS
+              </span>
+              <span className="text-white/70">
+                GetWell Grow is a product of the <a href="https://vantoos.com/suite" target="_blank" rel="noopener noreferrer" className="text-white font-semibold hover:text-[#D4AF37]">VantoOS Suite</a> — designed and developed by{' '}
+                <a href="https://vantoos.com" target="_blank" rel="noopener noreferrer" className="text-white font-semibold hover:text-[#D4AF37]">VantoOS</a>.
+              </span>
+            </div>
+            <div className="flex items-center gap-4 text-xs text-white/70">
+              <Link to="/suite" className="hover:text-[#D4AF37]">The Suite</Link>
+              <a href="https://getwellhub.dev" target="_blank" rel="noopener noreferrer" className="hover:text-[#D4AF37]">GetWell Hub</a>
+              <a href="https://vantoos.com/command-center" target="_blank" rel="noopener noreferrer" className="hover:text-[#D4AF37]">Command Center</a>
+            </div>
+          </div>
+        </div>
+
         <div className="container mx-auto py-12 grid gap-10 md:grid-cols-4">
           <div className="md:col-span-2">
             <div className="flex items-center gap-2 mb-3">
@@ -123,6 +144,7 @@ export function MarketingLayout() {
             <p className="text-sm text-[#0F2A44]/70 max-w-sm">
               The downline growth CRM for modern network-marketing teams. Grow your team. Grow your wellness.
             </p>
+            <p className="text-xs text-[#0F2A44]/55 mt-3">A VantoOS product · <a href="https://vantoos.com" target="_blank" rel="noopener noreferrer" className="hover:text-[#2A8A8F] font-semibold">vantoos.com</a></p>
           </div>
           <div>
             <h4 className="text-sm font-semibold text-[#0F2A44] mb-3">Product</h4>
@@ -130,19 +152,21 @@ export function MarketingLayout() {
               <li><Link to="/features" className="hover:text-[#2A8A8F]">Features</Link></li>
               <li><Link to="/flagship" className="hover:text-[#2A8A8F]">Flagship modules</Link></li>
               <li><Link to="/how-it-works" className="hover:text-[#2A8A8F]">How it works</Link></li>
+              <li><Link to="/suite" className="hover:text-[#2A8A8F]">Part of the Suite</Link></li>
             </ul>
           </div>
           <div>
             <h4 className="text-sm font-semibold text-[#0F2A44] mb-3">Company</h4>
             <ul className="space-y-2 text-sm text-[#0F2A44]/70">
               <li><Link to="/investors" className="hover:text-[#2A8A8F]">Investors</Link></li>
+              <li><a href="https://vantoos.com/company" target="_blank" rel="noopener noreferrer" className="hover:text-[#2A8A8F]">Parent: VantoOS</a></li>
               <li><Link to="/signin" className="hover:text-[#2A8A8F]">Sign in</Link></li>
               <li><a href="mailto:hello@getwellgrow.app" className="hover:text-[#2A8A8F]">Contact</a></li>
             </ul>
           </div>
         </div>
-        <div className="container mx-auto py-5 border-t border-[#0F2A44]/10 text-xs text-[#0F2A44]/50 flex flex-col sm:flex-row justify-between gap-2">
-          <span>© {new Date().getFullYear()} GetWell Grow. All rights reserved.</span>
+        <div className="container mx-auto py-5 border-t border-[#0F2A44]/10 text-xs text-[#0F2A44]/55 flex flex-col sm:flex-row justify-between gap-2">
+          <span>© {new Date().getFullYear()} VantoOS (Pty) Ltd. All rights reserved.</span>
           <span>Grow your team. Grow your wellness.</span>
         </div>
       </footer>

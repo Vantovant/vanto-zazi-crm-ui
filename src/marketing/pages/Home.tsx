@@ -255,6 +255,30 @@ export function Home() {
         </div>
       </section>
 
+      {/* Part of the VantoOS Suite — slim band */}
+      <section className="py-12 bg-[#0F2A44]">
+        <div className="container mx-auto">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-5 text-center md:text-left">
+            <div className="max-w-2xl">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase bg-white/10 text-[#D4AF37] mb-3">
+                Part of the VantoOS Suite
+              </span>
+              <p className="text-white/85 text-sm md:text-base leading-relaxed">
+                GetWell Grow is one of several products built by{' '}
+                <a href="https://vantoos.com" target="_blank" rel="noopener noreferrer" className="text-white font-semibold hover:text-[#D4AF37]">VantoOS</a>{' '}
+                — an African-built software house designing AI-powered operating systems for executives, founders, and growing teams.
+              </p>
+            </div>
+            <Link
+              to="/suite"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-white text-[#0F2A44] font-bold hover:bg-[#D4AF37] hover:text-white transition flex-shrink-0"
+            >
+              Explore the suite <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+        </div>
+      </section>
+
       {/* CTA */}
       <section className="py-24">
         <div className="container mx-auto">
