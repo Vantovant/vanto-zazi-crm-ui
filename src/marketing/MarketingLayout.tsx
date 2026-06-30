@@ -124,9 +124,10 @@ export function MarketingLayout() {
                 <a href="https://vantoos.com" target="_blank" rel="noopener noreferrer" className="text-white font-semibold hover:text-[#D4AF37]">VantoOS</a>.
               </span>
             </div>
-            <div className="flex items-center gap-4 text-xs text-white/70">
+            <div className="flex items-center gap-4 text-xs text-white/70 flex-wrap justify-center">
               <Link to="/suite" className="hover:text-[#D4AF37]">The Suite</Link>
               <a href="https://getwellhub.dev" target="_blank" rel="noopener noreferrer" className="hover:text-[#D4AF37]">GetWell Hub</a>
+              <a href="https://getwellafrica.com" target="_blank" rel="noopener noreferrer" className="hover:text-[#D4AF37]">Get Well Africa</a>
               <a href="https://vantoos.com/command-center" target="_blank" rel="noopener noreferrer" className="hover:text-[#D4AF37]">Command Center</a>
             </div>
           </div>
