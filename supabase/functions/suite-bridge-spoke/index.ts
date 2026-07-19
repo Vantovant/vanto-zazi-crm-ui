@@ -34,7 +34,7 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const APP_KEY = "getwellgrow.app"; // <-- change this per app
+const APP_KEY = "getwell_grow"; // <-- change this per app
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
