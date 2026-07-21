@@ -188,5 +188,111 @@ Deno.serve(async (req) => {
     return json({ ok: true, app: APP_KEY, sent: "snapshot", posted_back: postResult });
   }
 
+  // ---- contacts_pull → call hub /pull_contacts with a since cursor, upsert into hub_contacts_mirror ----
+  if (body?.kind === "contacts_pull") {
+    if (!hubUrl) return json({ error: "spoke_missing_hub_url" }, 500);
+    const sb = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
+
+    // Cursor: prefer explicit body.since, else max(hub_updated_at) already mirrored
+    let since: string | null = body?.since ?? null;
+    if (!since) {
+      const { data: cur } = await sb
+        .from("hub_contacts_mirror")
+        .select("hub_updated_at")
+        .order("hub_updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      since = cur?.hub_updated_at ?? null;
+    }
+
+    const limit = Math.min(Math.max(Number(body?.limit ?? 500), 1), 2000);
+
+    // Signed request back to the hub asking for contacts changed since cursor
+    const reqBody = { kind: "pull_contacts", since, limit };
+    const reqStr = JSON.stringify(reqBody);
+    const rts = Math.floor(Date.now() / 1000).toString();
+    const rnonce = crypto.randomUUID();
+    const rsig = await hmacSha256Hex(secret, `${rts}.${rnonce}.${APP_KEY}.${reqStr}`);
+    const target = new URL("/functions/v1/suite-bridge-hub", hubUrl).toString();
+
+    let hubResp: Response;
+    try {
+      hubResp = await fetch(target, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-bridge-app": APP_KEY,
+          "x-bridge-timestamp": rts,
+          "x-bridge-nonce": rnonce,
+          "x-bridge-signature": rsig,
+        },
+        body: JSON.stringify({ action: "pull", body: reqBody }),
+      });
+    } catch (e) {
+      return json({ ok: false, app: APP_KEY, error: "hub_unreachable", detail: String(e) }, 502);
+    }
+
+    const hubText = await hubResp.text();
+    if (!hubResp.ok) {
+      return json({ ok: false, app: APP_KEY, error: "hub_pull_failed", status: hubResp.status, body: hubText }, 502);
+    }
+
+    let hubJson: any = {};
+    try { hubJson = JSON.parse(hubText); } catch { /* keep */ }
+    const contacts: any[] = Array.isArray(hubJson?.contacts) ? hubJson.contacts : [];
+    const nextCursor: string | null = hubJson?.next_cursor ?? null;
+
+    let upserted = 0;
+    let deleted = 0;
+    const errors: string[] = [];
+
+    for (const c of contacts) {
+      if (!c?.id) continue;
+      const row = {
+        id: c.id,
+        full_name: c.full_name ?? null,
+        first_name: c.first_name ?? null,
+        last_name: c.last_name ?? null,
+        whatsapp_display_name: c.whatsapp_display_name ?? null,
+        phone_e164: c.phone_e164 ?? null,
+        email: c.email ?? null,
+        contact_type: c.contact_type ?? null,
+        lead_type: c.lead_type ?? null,
+        temperature: c.temperature ?? null,
+        tags: Array.isArray(c.tags) ? c.tags : null,
+        consent_whatsapp: c.consent_whatsapp ?? null,
+        consent_email: c.consent_email ?? null,
+        consent_sms: c.consent_sms ?? null,
+        notes: c.notes ?? null,
+        version: c.version ?? null,
+        is_deleted: c.is_deleted ?? false,
+        hub_updated_at: c.hub_updated_at ?? c.updated_at ?? new Date().toISOString(),
+        synced_at: new Date().toISOString(),
+      };
+      const { error } = await sb.from("hub_contacts_mirror").upsert(row, { onConflict: "id" });
+      if (error) {
+        errors.push(`${c.id}: ${error.message}`);
+      } else {
+        upserted++;
+        if (row.is_deleted) deleted++;
+      }
+    }
+
+    return json({
+      ok: true,
+      app: APP_KEY,
+      kind: "contacts_pull_result",
+      since,
+      received: contacts.length,
+      upserted,
+      deleted,
+      next_cursor: nextCursor,
+      errors: errors.slice(0, 10),
+    });
+  }
+
   return json({ ok: true, app: APP_KEY, received: body?.kind ?? "unknown" });
 });
