@@ -510,6 +510,72 @@ export type Database = {
           },
         ]
       }
+      hub_contacts_mirror: {
+        Row: {
+          consent_email: boolean | null
+          consent_sms: boolean | null
+          consent_whatsapp: boolean | null
+          contact_type: string | null
+          email: string | null
+          first_name: string | null
+          full_name: string | null
+          hub_updated_at: string | null
+          id: string
+          is_deleted: boolean
+          last_name: string | null
+          lead_type: string | null
+          notes: string | null
+          phone_e164: string | null
+          synced_at: string
+          tags: string[] | null
+          temperature: string | null
+          version: number
+          whatsapp_display_name: string | null
+        }
+        Insert: {
+          consent_email?: boolean | null
+          consent_sms?: boolean | null
+          consent_whatsapp?: boolean | null
+          contact_type?: string | null
+          email?: string | null
+          first_name?: string | null
+          full_name?: string | null
+          hub_updated_at?: string | null
+          id: string
+          is_deleted?: boolean
+          last_name?: string | null
+          lead_type?: string | null
+          notes?: string | null
+          phone_e164?: string | null
+          synced_at?: string
+          tags?: string[] | null
+          temperature?: string | null
+          version?: number
+          whatsapp_display_name?: string | null
+        }
+        Update: {
+          consent_email?: boolean | null
+          consent_sms?: boolean | null
+          consent_whatsapp?: boolean | null
+          contact_type?: string | null
+          email?: string | null
+          first_name?: string | null
+          full_name?: string | null
+          hub_updated_at?: string | null
+          id?: string
+          is_deleted?: boolean
+          last_name?: string | null
+          lead_type?: string | null
+          notes?: string | null
+          phone_e164?: string | null
+          synced_at?: string
+          tags?: string[] | null
+          temperature?: string | null
+          version?: number
+          whatsapp_display_name?: string | null
+        }
+        Relationships: []
+      }
       import_audit: {
         Row: {
           action: string
