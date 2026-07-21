@@ -103,6 +103,30 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
               </li>
             ))}
           </ul>
+
+          <div className="mt-5 mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+            Campaigns
+          </div>
+          <ul className="space-y-1">
+            {campaignNavItems.map((item) => (
+              <li key={item.path}>
+                <NavLink
+                  to={item.path}
+                  onClick={onClose}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
+                      isActive
+                        ? 'bg-orange-500/10 text-orange-400 border-l-2 border-orange-400 -ml-[2px] pl-[14px]'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                    }`
+                  }
+                >
+                  <item.icon className="w-5 h-5" />
+                  {item.label}
+                </NavLink>
+              </li>
+            ))}
+          </ul>
         </nav>
 
         {/* Install + Help at bottom */}
