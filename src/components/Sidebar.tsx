@@ -37,6 +37,12 @@ const baseNavItems = [
   { path: '/momentum', label: '90-Day Run', icon: Flame },
 ];
 
+const campaignNavItems = [
+  { path: '/campaigns/birthday', label: 'Birthday Campaign', icon: Cake },
+  { path: '/campaigns/activation', label: 'Activation Campaign', icon: Zap },
+  { path: '/campaigns/zoom', label: 'Zoom Invitation', icon: Video },
+];
+
 interface SidebarProps {
   mobileOpen: boolean;
   onClose: () => void;
