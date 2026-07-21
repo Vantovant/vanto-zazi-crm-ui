@@ -8,6 +8,7 @@
 // prospector_send_log, zazi_actions, or maytapi-send-1to1.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { inboundStop } from "../_shared/hub-bridge-client.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -426,6 +427,21 @@ Deno.serve(async (req) => {
       const replyPatch = { status: "replied", replied_at: new Date().toISOString(), reply_preview: (text ?? "").slice(0, 200) };
       for (const tbl of ["birthday_campaign_recipients", "activation_campaign_recipients", "zoom_campaign_recipients"]) {
         await admin.from(tbl).update(replyPatch).eq("phone_normalized", phoneNorm).is("replied_at", null);
+      }
+    }
+
+    // Phase B: propagate STOP / unsubscribe keywords to VantoOS hub DNC ledger.
+    if (phoneNorm && text) {
+      const lower = text.toLowerCase();
+      const stopKeywords = ["stop", "unsubscribe", "cancel", "opt out", "opt-out"];
+      const isStop = stopKeywords.some((k) => lower.includes(k));
+      if (isStop) {
+        await inboundStop({
+          phone: phoneNorm,
+          keyword: "STOP",
+          message_id: mid,
+          received_at: receivedAt,
+        });
       }
     }
 

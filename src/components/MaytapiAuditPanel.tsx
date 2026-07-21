@@ -4,6 +4,7 @@ import {
   Link2, Ban, MailOpen, Mail, Clock, Database, Download, X, ChevronDown, ChevronRight, MousePointerClick,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { HubDecisionsPanel } from './HubDecisionsPanel';
 
 /**
  * MAYTAPI AUDIT PANEL — H5 (read-only admin viewer)
@@ -74,6 +75,9 @@ export function MaytapiAuditPanel({ isAdmin }: { isAdmin: boolean | null }) {
   const [loading, setLoading] = useState(false);
   const [actorNames, setActorNames] = useState<Record<string, string>>({});
   const [contactNames, setContactNames] = useState<Record<string, string>>({});
+
+  // Tabs
+  const [activeTab, setActiveTab] = useState<'audit' | 'hub'>('audit');
 
   // Filters
   const [fAction, setFAction] = useState<'all' | AuditAction>('all');
@@ -276,7 +280,31 @@ export function MaytapiAuditPanel({ isAdmin }: { isAdmin: boolean | null }) {
 
   return (
     <div className="flex-1 flex flex-col mt-3 mx-2 sm:mx-4 mb-4 gap-3 min-h-0">
-      {/* Retention summary (collapsed by default) */}
+      {/* Tab switcher */}
+      <div className="flex items-center gap-1 rounded-lg border border-slate-700/70 bg-slate-900/40 p-1">
+        {[
+          { id: 'audit', label: 'Gate audit' },
+          { id: 'hub', label: 'Hub decisions (shadow)' },
+        ].map(t => (
+          <button
+            key={t.id}
+            onClick={() => setActiveTab(t.id as any)}
+            className={`flex-1 text-[12px] px-3 py-1.5 rounded-md transition-colors ${
+              activeTab === t.id
+                ? 'bg-slate-100 text-slate-900 font-medium'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'hub' ? (
+        <HubDecisionsPanel isAdmin={isAdmin} />
+      ) : (
+        <>
+          {/* Retention summary (collapsed by default) */}
       <section className="rounded-lg border border-slate-700/70 bg-slate-800/40">
         <button
           type="button"
@@ -591,7 +619,9 @@ export function MaytapiAuditPanel({ isAdmin }: { isAdmin: boolean | null }) {
           </div>
         );
       })()}
-    </div>
+    </>
+  )}
+</div>
   );
 }
 
