@@ -35,9 +35,15 @@ Deno.serve(async (req) => {
   if (!secret) return new Response(JSON.stringify({ error: "missing SUITE_BRIDGE_SECRET" }), { status: 500, headers: cors });
 
   const APP_KEY = "getwell_grow";
+  let reqPayload: Record<string, unknown> = { kind: "ping" };
+  try {
+    const parsed = await req.json();
+    if (parsed && typeof parsed === "object") reqPayload = parsed as Record<string, unknown>;
+  } catch { /* keep default ping */ }
+
   const ts = Math.floor(Date.now() / 1000).toString();
   const nonce = crypto.randomUUID();
-  const body = JSON.stringify({ kind: "ping" });
+  const body = JSON.stringify(reqPayload);
   const sig = await hmac(secret, `${ts}.${nonce}.${APP_KEY}.${body}`);
 
   const url = `${Deno.env.get("SUPABASE_URL")}/functions/v1/suite-bridge-spoke`;
