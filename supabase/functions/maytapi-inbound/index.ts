@@ -418,7 +418,15 @@ Deno.serve(async (req) => {
         console.log("[maytapi-inbound] insert_error", msgErr.code);
         await recordIdempotent(admin, idemKey, 500, { error: "insert_failed" });
         return jres(500, { error: "insert_failed" });
+    }
+
+    // CAMPAIGN REPLY STAMPING: mark any campaign recipient with matching phone as replied.
+    if (phoneNorm) {
+      const replyPatch = { status: "replied", replied_at: new Date().toISOString(), reply_preview: (text ?? "").slice(0, 200) };
+      for (const tbl of ["birthday_campaign_recipients", "activation_campaign_recipients", "zoom_campaign_recipients"]) {
+        await admin.from(tbl).update(replyPatch).eq("phone_normalized", phoneNorm).is("replied_at", null);
       }
+    }
     }
 
     // H3A: If matched via the linked gate, advance audit counters on that row
