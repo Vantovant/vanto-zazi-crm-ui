@@ -24,6 +24,7 @@ import {
 import type { Prospect } from '../data/mockData';
 import { EditContactModal } from './EditContactModal';
 import { AddToWaitingRoomModal } from './AddToWaitingRoomModal';
+import { CampaignEnrollButtons } from './CampaignEnrollButtons';
 import { useCrm } from '@/contexts/CrmContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useContactActivities, type ContactActivity } from '@/hooks/useContactActivities';
@@ -297,6 +298,10 @@ export function ContactDrawer({ prospect: initialProspect, onClose, onOpenTempla
                 </div>
               )}
             </div>
+
+            <CampaignEnrollButtons prospect={prospect} />
+
+
 
             {/* Waiting Room Status / Action */}
             <div className="px-4 pb-3">
