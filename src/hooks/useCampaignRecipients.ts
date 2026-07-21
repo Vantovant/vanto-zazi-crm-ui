@@ -88,18 +88,15 @@ export async function runTick(fn: "birthday-campaign-tick" | "activation-campaig
   return { data, error };
 }
 
-export async function loadCampaignSettings(scope: string) {
-  const { data } = await (supabase.from("integration_settings") as any)
-    .select("settings, id")
-    .eq("scope", scope)
+export async function loadCampaignSettings(campaignKey: string) {
+  const { data } = await (supabase.from("campaign_settings") as any)
+    .select("*")
+    .eq("campaign_key", campaignKey)
     .maybeSingle();
-  return { settings: (data?.settings ?? {}) as any, id: data?.id ?? null };
+  return data ?? { campaign_key: campaignKey, enabled: false, daily_cap: 40, per_tick_cap: 10 };
 }
 
-export async function saveCampaignSettings(scope: string, settings: any, existingId: string | null) {
-  if (existingId) {
-    await (supabase.from("integration_settings") as any).update({ settings }).eq("id", existingId);
-  } else {
-    await (supabase.from("integration_settings") as any).insert({ scope, settings });
-  }
+export async function saveCampaignSettings(campaignKey: string, patch: any) {
+  await (supabase.from("campaign_settings") as any)
+    .upsert({ campaign_key: campaignKey, ...patch }, { onConflict: "campaign_key" });
 }
