@@ -1,8 +1,11 @@
 // Shared choke-point sender for automated campaigns (Birthday / Activation / Zoom).
 // NOT to be reused for MP1/prospector paths — those go through maytapi-send-1to1.
 // Enforces: kill-switch, per-tick cap, 6h cooldown per phone, dry-run mode.
+// Phase B: calls VantoOS hub dnc_check before send and send_recorded after send
+// (shadow mode unless MAYTAPI_HUB_ENFORCE=true).
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { dncCheck, ENFORCE, sendRecorded } from "./hub-bridge-client.ts";
 
 const MAYTAPI_PRODUCT_ID = Deno.env.get("MAYTAPI_PRODUCT_ID") ?? "";
 const MAYTAPI_PHONE_ID = Deno.env.get("MAYTAPI_PHONE_ID") ?? "";
@@ -123,18 +126,42 @@ export async function runCampaignTick(opts: TickOptions) {
       continue;
     }
 
+    // Phase B: ask VantoOS hub if this phone is allowed for marketing sends.
+    let hubDecision: any = null;
+    const dnc = await dncCheck(phone, "marketing");
+    if (dnc) {
+      hubDecision = dnc.decision;
+      if (ENFORCE && dnc.result.allowed === false) {
+        results.skipped++;
+        await admin.from(opts.table).update({ status: "skipped", hub_decision: hubDecision, error: `hub:${dnc.result.reason}` }).eq("id", row.id);
+        results.rows.push({ id: row.id, status: "skipped", reason: `hub:${dnc.result.reason}`, hub: hubDecision });
+        continue;
+      }
+    }
+
     await admin.from(opts.table).update({ status: "executing", attempts: (row.attempts ?? 0) + 1, last_attempt_at: new Date().toISOString() }).eq("id", row.id);
 
     const send = await sendMaytapi(phone, body);
     if (!send.ok) {
       results.failed++;
-      await admin.from(opts.table).update({ status: "failed", error: send.error ?? "unknown" }).eq("id", row.id);
-      results.rows.push({ id: row.id, status: "failed", error: send.error });
+      await admin.from(opts.table).update({ status: "failed", error: send.error ?? "unknown", hub_decision: hubDecision }).eq("id", row.id);
+      results.rows.push({ id: row.id, status: "failed", error: send.error, hub: hubDecision });
       continue;
     }
     results.sent++;
-    await admin.from(opts.table).update({ status: "sent", sent_at: new Date().toISOString(), provider_message_id: send.msgId ?? null, error: null }).eq("id", row.id);
-    results.rows.push({ id: row.id, status: "sent", msgId: send.msgId });
+    const sentAt = new Date().toISOString();
+    const recorded = await sendRecorded({
+      spoke_event_id: row.id,
+      phone,
+      campaign_type: opts.campaignKey,
+      maytapi_message_id: send.msgId,
+      status: "sent",
+      sent_at: sentAt,
+      metadata: { table: opts.table },
+    });
+    if (recorded) hubDecision = recorded;
+    await admin.from(opts.table).update({ status: "sent", sent_at: sentAt, provider_message_id: send.msgId ?? null, error: null, hub_decision: hubDecision }).eq("id", row.id);
+    results.rows.push({ id: row.id, status: "sent", msgId: send.msgId, hub: hubDecision });
   }
   return results;
 }

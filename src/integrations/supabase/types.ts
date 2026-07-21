@@ -24,6 +24,7 @@ export type Database = {
           email: string | null
           error: string | null
           first_name: string | null
+          hub_decision: Json | null
           id: string
           last_attempt_at: string | null
           member_id: string | null
@@ -50,6 +51,7 @@ export type Database = {
           email?: string | null
           error?: string | null
           first_name?: string | null
+          hub_decision?: Json | null
           id?: string
           last_attempt_at?: string | null
           member_id?: string | null
@@ -76,6 +78,7 @@ export type Database = {
           email?: string | null
           error?: string | null
           first_name?: string | null
+          hub_decision?: Json | null
           id?: string
           last_attempt_at?: string | null
           member_id?: string | null
@@ -289,6 +292,7 @@ export type Database = {
           email: string | null
           error: string | null
           first_name: string | null
+          hub_decision: Json | null
           id: string
           last_attempt_at: string | null
           member_id: string | null
@@ -315,6 +319,7 @@ export type Database = {
           email?: string | null
           error?: string | null
           first_name?: string | null
+          hub_decision?: Json | null
           id?: string
           last_attempt_at?: string | null
           member_id?: string | null
@@ -341,6 +346,7 @@ export type Database = {
           email?: string | null
           error?: string | null
           first_name?: string | null
+          hub_decision?: Json | null
           id?: string
           last_attempt_at?: string | null
           member_id?: string | null
@@ -1740,6 +1746,7 @@ export type Database = {
           event_id: string
           event_name: string | null
           first_name: string | null
+          hub_decision: Json | null
           id: string
           last_attempt_at: string | null
           member_id: string | null
@@ -1767,6 +1774,7 @@ export type Database = {
           event_id: string
           event_name?: string | null
           first_name?: string | null
+          hub_decision?: Json | null
           id?: string
           last_attempt_at?: string | null
           member_id?: string | null
@@ -1794,6 +1802,7 @@ export type Database = {
           event_id?: string
           event_name?: string | null
           first_name?: string | null
+          hub_decision?: Json | null
           id?: string
           last_attempt_at?: string | null
           member_id?: string | null
