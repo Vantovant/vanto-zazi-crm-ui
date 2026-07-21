@@ -31,15 +31,14 @@ interface KillSettings {
 
 async function loadKillSwitch(campaign: string): Promise<KillSettings> {
   const { data } = await admin
-    .from("integration_settings")
-    .select("settings")
-    .eq("scope", "campaign_" + campaign)
+    .from("campaign_settings")
+    .select("enabled, daily_cap, per_tick_cap")
+    .eq("campaign_key", campaign)
     .maybeSingle();
-  const s = (data as any)?.settings ?? {};
   return {
-    enabled: s.enabled === true,
-    daily_cap: Number(s.daily_cap ?? 40),
-    per_tick_cap: Number(s.per_tick_cap ?? 10),
+    enabled: (data as any)?.enabled === true,
+    daily_cap: Number((data as any)?.daily_cap ?? 40),
+    per_tick_cap: Number((data as any)?.per_tick_cap ?? 10),
   };
 }
 
