@@ -284,6 +284,18 @@ Deno.serve(async (req) => {
         raw: { ack_type: ackType, msg_id: mid },
       }).select().maybeSingle().then(() => {/* swallow dup */}, () => {});
       updated++;
+
+      // CAMPAIGN STAMPING: mark delivered/read on any campaign recipient row
+      // whose provider_message_id matches this Maytapi msgId.
+      const stampPatch: Record<string, string> = {};
+      const lower = ackType.toLowerCase();
+      if (lower === "delivered" || lower === "device") stampPatch.delivered_at = new Date().toISOString();
+      if (lower === "read" || lower === "played") stampPatch.read_at = new Date().toISOString();
+      if (Object.keys(stampPatch).length > 0) {
+        for (const tbl of ["birthday_campaign_recipients", "activation_campaign_recipients", "zoom_campaign_recipients"]) {
+          await admin.from(tbl).update(stampPatch).eq("provider_message_id", mid);
+        }
+      }
     }
     return jres(200, { ok: true, acks: updated });
   }
