@@ -366,6 +366,33 @@ export type Database = {
           },
         ]
       }
+      campaign_settings: {
+        Row: {
+          active_windows: string
+          campaign_key: string
+          daily_cap: number
+          enabled: boolean
+          per_tick_cap: number
+          updated_at: string
+        }
+        Insert: {
+          active_windows?: string
+          campaign_key: string
+          daily_cap?: number
+          enabled?: boolean
+          per_tick_cap?: number
+          updated_at?: string
+        }
+        Update: {
+          active_windows?: string
+          campaign_key?: string
+          daily_cap?: number
+          enabled?: boolean
+          per_tick_cap?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       contact_activities: {
         Row: {
           activity_type: string
