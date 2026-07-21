@@ -14,6 +14,102 @@ export type Database = {
   }
   public: {
     Tables: {
+      activation_campaign_recipients: {
+        Row: {
+          activation_date: string | null
+          attempts: number
+          contact_id: string | null
+          created_at: string
+          delivered_at: string | null
+          email: string | null
+          error: string | null
+          first_name: string | null
+          id: string
+          last_attempt_at: string | null
+          member_id: string | null
+          name: string | null
+          order_id: string | null
+          pack_type: string | null
+          phone_normalized: string
+          provider_message_id: string | null
+          read_at: string | null
+          replied_at: string | null
+          reply_preview: string | null
+          sent_at: string | null
+          sponsor_name: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          activation_date?: string | null
+          attempts?: number
+          contact_id?: string | null
+          created_at?: string
+          delivered_at?: string | null
+          email?: string | null
+          error?: string | null
+          first_name?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          member_id?: string | null
+          name?: string | null
+          order_id?: string | null
+          pack_type?: string | null
+          phone_normalized: string
+          provider_message_id?: string | null
+          read_at?: string | null
+          replied_at?: string | null
+          reply_preview?: string | null
+          sent_at?: string | null
+          sponsor_name?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          activation_date?: string | null
+          attempts?: number
+          contact_id?: string | null
+          created_at?: string
+          delivered_at?: string | null
+          email?: string | null
+          error?: string | null
+          first_name?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          member_id?: string | null
+          name?: string | null
+          order_id?: string | null
+          pack_type?: string | null
+          phone_normalized?: string
+          provider_message_id?: string | null
+          read_at?: string | null
+          replied_at?: string | null
+          reply_preview?: string | null
+          sent_at?: string | null
+          sponsor_name?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activation_campaign_recipients_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activation_campaign_recipients_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       activity_goals: {
         Row: {
           created_at: string
@@ -180,6 +276,95 @@ export type Database = {
           would_send_at?: string
         }
         Relationships: []
+      }
+      birthday_campaign_recipients: {
+        Row: {
+          attempts: number
+          birth_date: string | null
+          congratulate_by_date: string | null
+          contact_id: string | null
+          created_at: string
+          cycle_year: number
+          delivered_at: string | null
+          email: string | null
+          error: string | null
+          first_name: string | null
+          id: string
+          last_attempt_at: string | null
+          member_id: string | null
+          name: string | null
+          phone_normalized: string
+          provider_message_id: string | null
+          read_at: string | null
+          replied_at: string | null
+          reply_preview: string | null
+          sent_at: string | null
+          status: string
+          tone: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          attempts?: number
+          birth_date?: string | null
+          congratulate_by_date?: string | null
+          contact_id?: string | null
+          created_at?: string
+          cycle_year: number
+          delivered_at?: string | null
+          email?: string | null
+          error?: string | null
+          first_name?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          member_id?: string | null
+          name?: string | null
+          phone_normalized: string
+          provider_message_id?: string | null
+          read_at?: string | null
+          replied_at?: string | null
+          reply_preview?: string | null
+          sent_at?: string | null
+          status?: string
+          tone?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          attempts?: number
+          birth_date?: string | null
+          congratulate_by_date?: string | null
+          contact_id?: string | null
+          created_at?: string
+          cycle_year?: number
+          delivered_at?: string | null
+          email?: string | null
+          error?: string | null
+          first_name?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          member_id?: string | null
+          name?: string | null
+          phone_normalized?: string
+          provider_message_id?: string | null
+          read_at?: string | null
+          replied_at?: string | null
+          reply_preview?: string | null
+          sent_at?: string | null
+          status?: string
+          tone?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "birthday_campaign_recipients_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       contact_activities: {
         Row: {
@@ -1515,6 +1700,98 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      zoom_campaign_recipients: {
+        Row: {
+          attempts: number
+          contact_id: string | null
+          created_at: string
+          delivered_at: string | null
+          email: string | null
+          error: string | null
+          event_date: string
+          event_id: string
+          event_name: string | null
+          first_name: string | null
+          id: string
+          last_attempt_at: string | null
+          member_id: string | null
+          name: string | null
+          phone_normalized: string
+          provider_message_id: string | null
+          read_at: string | null
+          reminder_stage: string
+          replied_at: string | null
+          reply_preview: string | null
+          sent_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          zoom_url: string
+        }
+        Insert: {
+          attempts?: number
+          contact_id?: string | null
+          created_at?: string
+          delivered_at?: string | null
+          email?: string | null
+          error?: string | null
+          event_date: string
+          event_id: string
+          event_name?: string | null
+          first_name?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          member_id?: string | null
+          name?: string | null
+          phone_normalized: string
+          provider_message_id?: string | null
+          read_at?: string | null
+          reminder_stage?: string
+          replied_at?: string | null
+          reply_preview?: string | null
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+          zoom_url: string
+        }
+        Update: {
+          attempts?: number
+          contact_id?: string | null
+          created_at?: string
+          delivered_at?: string | null
+          email?: string | null
+          error?: string | null
+          event_date?: string
+          event_id?: string
+          event_name?: string | null
+          first_name?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          member_id?: string | null
+          name?: string | null
+          phone_normalized?: string
+          provider_message_id?: string | null
+          read_at?: string | null
+          reminder_stage?: string
+          replied_at?: string | null
+          reply_preview?: string | null
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          zoom_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "zoom_campaign_recipients_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
