@@ -17,6 +17,9 @@ import {
   Flame,
   GitBranch,
   Crown,
+  Cake,
+  Zap,
+  Video,
 } from 'lucide-react';
 
 const OWNER_ID = 'b8028d7d-6a08-45ef-a369-b438c440bea3';
