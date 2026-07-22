@@ -58,24 +58,27 @@ Deno.serve(async (req) => {
     .maybeSingle();
   if (cErr || !contact) return json({ error: "contact_not_found" }, 404);
 
+  const contactPayload = {
+    id: contact.id,
+    external_id: contact.id,
+    full_name: contact.full_name,
+    first_name: (contact.full_name ?? "").split(" ")[0] || null,
+    phone_e164: contact.phone_normalized || contact.phone_number || null,
+    email: contact.email_normalized || contact.email_address || null,
+    country: contact.country || null,
+    city: contact.city || null,
+    lead_type: contact.lead_type || null,
+    temperature: contact.lead_temperature || null,
+    aplgo_id: contact.aplgo_id || null,
+    sponsor_name: contact.sponsor_name || null,
+    salutation_title: contact.salutation_title || null,
+    updated_at: new Date().toISOString(),
+  };
   const body = {
     kind: "contact_upsert",
     source_app: APP_KEY,
-    contact: {
-      external_id: contact.id,
-      full_name: contact.full_name,
-      first_name: (contact.full_name ?? "").split(" ")[0] || null,
-      phone_e164: contact.phone_normalized || contact.phone_number || null,
-      email: contact.email_normalized || contact.email_address || null,
-      country: contact.country || null,
-      city: contact.city || null,
-      lead_type: contact.lead_type || null,
-      temperature: contact.lead_temperature || null,
-      aplgo_id: contact.aplgo_id || null,
-      sponsor_name: contact.sponsor_name || null,
-      salutation_title: contact.salutation_title || null,
-      updated_at: new Date().toISOString(),
-    },
+    ...contactPayload,
+    contact: contactPayload,
   };
 
   // Sign over the INNER body (matches suite-bridge-spoke postBackToHub contract).
