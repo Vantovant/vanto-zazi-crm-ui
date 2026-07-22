@@ -3,14 +3,14 @@ import { runCampaignTick, corsHeaders } from "../_shared/campaign-send.ts";
 const APLGO_URL = "https://crm.onlinecourseformlm.com/aplgo.html";
 
 const TONES: Record<string, (first: string) => string> = {
-  warm: (n) => `Hi ${n} 🎉\n\nHappy Birthday to you! 🎂 Wishing you joy, favor, and a beautiful year ahead.`,
-  royal: (n) => `${n} 👑🎂\n\nToday we celebrate YOU! Crown up — it's YOUR day.`,
-  spiritual: (n) => `Dear ${n} 🕊️\n\nHappy Blessed Birthday! May the Lord pour His favor upon you this new year. 🙏✨`,
-  professional: (n) => `Hi ${n},\n\nHappy Birthday! 🎂 Wishing you a wonderful celebration and a year of success.`,
+  warm: (n) => `Hi Leader ${n} 🎉\n\nHappy Birthday to you! 🎂 Wishing you joy, favor, and a beautiful year ahead.`,
+  royal: (n) => `Leader ${n} 👑🎂\n\nToday we celebrate YOU! Crown up — it's YOUR day.`,
+  spiritual: (n) => `Dear Leader ${n} 🕊️\n\nHappy Blessed Birthday! May the Lord pour His favor upon you this new year. 🙏✨`,
+  professional: (n) => `Hi Leader ${n},\n\nHappy Birthday! 🎂 Wishing you a wonderful celebration and a year of success.`,
 };
 
 function buildBody(row: any): string {
-  const first = row.first_name || (row.name ?? "").split(" ")[0] || "friend";
+  const first = row.first_name || (row.name ?? "").split(" ")[0] || "Friend";
   const tone = TONES[row.tone] ? row.tone : "warm";
   return `${APLGO_URL}\n\n${TONES[tone](first)}\n\n— Your Team`;
 }
