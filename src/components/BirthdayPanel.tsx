@@ -134,6 +134,64 @@ export function BirthdayPanel() {
     setComposerIndex(0);
   }, [todaysEligible]);
 
+  // Enroll all eligible birthdays into the automated Birthday Campaign list.
+  const { user } = useAuth();
+  const [enrolling, setEnrolling] = useState(false);
+  const [enrollResult, setEnrollResult] = useState<string | null>(null);
+
+  const eligibleForCampaign = useMemo(() => {
+    return birthdays.filter(b =>
+      b.status !== 'congratulated' &&
+      b.contact_id &&
+      !b.opt_out &&
+      Boolean((b.phone_normalized || b.phone_number || '').trim())
+    );
+  }, [birthdays]);
+
+  const enrollAllInBirthdayCampaign = useCallback(async () => {
+    if (!user || eligibleForCampaign.length === 0) return;
+    setEnrolling(true);
+    setEnrollResult(null);
+    const cycle_year = new Date().getFullYear();
+    const payload = eligibleForCampaign
+      .map(b => {
+        const contact = contacts.find(c => String(c.id) === b.contact_id);
+        const phone = formatWhatsAppPhone(
+          b.phone_normalized || b.phone_number || contact?.PhoneNumber || '',
+          contact?.Country,
+        );
+        if (!phone) return null;
+        return {
+          user_id: user.id,
+          contact_id: b.contact_id,
+          name: b.full_name,
+          first_name: b.first_name || (b.full_name || '').split(' ')[0] || null,
+          phone_normalized: phone,
+          email: contact?.EmailAddress || null,
+          birth_date: b.birth_date,
+          congratulate_by_date: b.congratulate_by_date,
+          cycle_year,
+          tone: b.message_style || 'warm',
+          status: 'queued',
+        };
+      })
+      .filter(Boolean) as any[];
+
+    if (payload.length === 0) {
+      setEnrollResult('No sendable phones');
+      setEnrolling(false);
+      return;
+    }
+    const { data, error } = await (supabase.from('birthday_campaign_recipients') as any)
+      .upsert(payload, { onConflict: 'phone_normalized,cycle_year', ignoreDuplicates: true })
+      .select('id');
+    setEnrolling(false);
+    setEnrollResult(
+      error ? `Error: ${error.message}` : `Enrolled ${data?.length ?? 0} of ${payload.length} (duplicates skipped)`,
+    );
+    setTimeout(() => setEnrollResult(null), 5000);
+  }, [user, eligibleForCampaign, contacts]);
+
   const openBulkComposer = useCallback(() => {
     const selected = filtered.filter(b => selectedIds.has(b.id) && b.status !== 'congratulated');
     if (selected.length > 0) openComposer(selected, 0);
