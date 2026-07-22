@@ -378,12 +378,22 @@ export function Contacts() {
 
       {/* Bulk Actions Bar */}
       {selectedIds.size > 0 && (
-        <div className="flex items-center gap-3 px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg">
+        <div className="flex flex-wrap items-center gap-3 px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg">
           <span className="text-sm text-slate-300">{selectedIds.size} selected</span>
           <button
             type="button"
+            onClick={handleSyncSelected}
+            disabled={syncing || deleting}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg transition-colors"
+            title="Push selected contacts to the VantoOS hub (fans out to sister apps like email)"
+          >
+            {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Cloud className="w-4 h-4" />}
+            Sync to VantoOS hub
+          </button>
+          <button
+            type="button"
             onClick={handleDeleteSelected}
-            disabled={deleting}
+            disabled={deleting || syncing}
             className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white rounded-lg transition-colors"
           >
             {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
@@ -396,6 +406,9 @@ export function Contacts() {
           >
             Clear Selection
           </button>
+          {syncStatus && (
+            <span className="text-xs text-indigo-300 ml-auto">{syncStatus}</span>
+          )}
         </div>
       )}
 
