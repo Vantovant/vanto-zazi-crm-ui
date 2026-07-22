@@ -40,7 +40,7 @@ export function SyncContactToHubButton({ contactId, contactName }: Props) {
         type="button"
         onClick={sync}
         disabled={state === 'loading'}
-        title={err || `Sync ${contactName ?? 'contact'} to VantoOS hub (email app will locate this contact)`}
+        title={err || `Sync ${contactName ?? 'contact'} to VantoOS hub (fans out to sister apps)`}
         className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 transition-colors text-xs font-medium disabled:opacity-60"
       >
         {state === 'loading' ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -48,10 +48,10 @@ export function SyncContactToHubButton({ contactId, contactName }: Props) {
           : state === 'error' ? <AlertCircle className="w-3.5 h-3.5" />
           : <Cloud className="w-3.5 h-3.5" />}
         <span>
-          {state === 'loading' ? 'Syncing to VantoOS…'
-            : state === 'done' ? 'Synced to VantoOS'
+          {state === 'loading' ? 'Syncing to VantoOS hub…'
+            : state === 'done' ? 'Synced to VantoOS hub'
             : state === 'error' ? 'Retry sync'
-            : 'Sync to VantoOS (Email app)'}
+            : 'Sync to VantoOS hub'}
         </span>
       </button>
       {err && <p className="mt-1 text-[10px] text-rose-400">{err}</p>}
