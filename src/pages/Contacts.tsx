@@ -8,12 +8,14 @@ import {
   X,
   Loader2,
   Trash2,
+  Cloud,
 } from 'lucide-react';
 import { prospectColumns, filterOptions, type Prospect } from '../data/mockData';
 import { ContactDrawer } from '../components/ContactDrawer';
 import { AddContactModal } from '../components/AddContactModal';
 import { DataStatusBanner } from '../components/DataStatusBanner';
 import { useCrm } from '@/contexts/CrmContext';
+import { supabase } from '@/integrations/supabase/client';
 
 type FilterKey = keyof typeof filterOptions;
 
