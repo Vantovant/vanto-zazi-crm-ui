@@ -363,6 +363,17 @@ export function BirthdayPanel() {
                   Send today's birthdays ({todaysEligible.length})
                 </button>
               )}
+              {eligibleForCampaign.length > 0 && (
+                <button type="button" onClick={enrollAllInBirthdayCampaign} disabled={enrolling}
+                  title="Send all eligible birthdays (linked contact + sendable phone) to the automated Birthday Campaign list"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-fuchsia-600 hover:bg-fuchsia-500 disabled:opacity-50 text-white rounded-lg transition-colors">
+                  <Send className="w-3 h-3" />
+                  {enrolling ? 'Enrolling…' : `Enroll in Birthday Campaign (${eligibleForCampaign.length})`}
+                </button>
+              )}
+              {enrollResult && (
+                <span className="text-xs text-pink-300 self-center">{enrollResult}</span>
+              )}
               {birthdays.filter(b => b.status !== 'congratulated').length > 0 && (
                 <button type="button" onClick={() => setShowSession(true)}
                   className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors">
