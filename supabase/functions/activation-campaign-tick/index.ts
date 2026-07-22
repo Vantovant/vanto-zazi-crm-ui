@@ -1,10 +1,30 @@
 import { runCampaignTick, corsHeaders } from "../_shared/campaign-send.ts";
 
+// Monthly Activity thank-you library — tone scales with amount (ZAR).
 function buildBody(row: any): string {
-  const first = row.first_name || (row.name ?? "").split(" ")[0] || "friend";
-  const pack = row.pack_type ? ` (${row.pack_type})` : "";
-  const sponsor = row.sponsor_name ? `\n\nYour sponsor ${row.sponsor_name} is cheering you on!` : "";
-  return `Hi ${first} 🎉\n\nCongratulations on activating your APLGO position${pack} — welcome to the team!\n\nHere is your onboarding hub: https://crm.onlinecourseformlm.com/aplgo.html${sponsor}\n\n— Your APLGO Team`;
+  const first = row.first_name || (row.name ?? "").split(" ")[0] || "Leader";
+  const amt = Number(row.amount ?? 0);
+  const month = row.activity_month || "this month";
+  const amtStr = amt > 0 ? `R${amt.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}` : null;
+
+  let tier: "champion" | "strong" | "solid" | "starter";
+  if (amt >= 5000) tier = "champion";
+  else if (amt >= 2500) tier = "strong";
+  else if (amt >= 1000) tier = "solid";
+  else tier = "starter";
+
+  const library: Record<typeof tier, string> = {
+    champion:
+      `Leader ${first} 👑\n\nYour ${month} activity of ${amtStr} is CHAMPION-level — thank you for leading from the front. Your consistency is building a rank shift for the whole team. Keep the fire burning! 🔥\n\n— GetWell Grow`,
+    strong:
+      `Leader ${first} 🌟\n\nA huge thank you for your ${month} activity of ${amtStr}. That is a STRONG commitment and it moves the team forward every single week. We see you and we appreciate you. 💪\n\n— GetWell Grow`,
+    solid:
+      `Leader ${first} 🙏\n\nThank you for keeping your rank active in ${month} with ${amtStr}. Consistency wins in APLGO — every month you show up, your income and your team grow. Well done! 🌱\n\n— GetWell Grow`,
+    starter:
+      `Leader ${first} 🌿\n\nThank you for staying active in ${month}${amtStr ? ` with ${amtStr}` : ""}. Every activity month keeps your position and your commissions alive — proud of you for showing up. Let's push for more next month! 💚\n\n— GetWell Grow`,
+  };
+
+  return library[tier];
 }
 
 Deno.serve(async (req) => {
