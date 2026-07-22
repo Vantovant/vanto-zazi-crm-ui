@@ -77,10 +77,25 @@ export interface TickOptions {
   campaignKey: "birthday" | "activation" | "zoom";
   table: string;
   buildBody: (row: any) => string;
+  buildMetadata?: (row: any, body: string) => Record<string, unknown>;
   extraFilter?: (q: any) => any;
   dryRun?: boolean;
   cap?: number;
   forceIds?: string[];
+}
+
+async function loadContactSnapshot(contactId: string | null): Promise<Record<string, unknown> | null> {
+  if (!contactId) return null;
+  try {
+    const { data } = await admin
+      .from("contacts")
+      .select("id, name, first_name, last_name, email_address, phone_normalized, aplgo_id, lead_type, communication_status")
+      .eq("id", contactId)
+      .maybeSingle();
+    return (data as Record<string, unknown>) ?? null;
+  } catch {
+    return null;
+  }
 }
 
 interface KillSettings {
