@@ -3,11 +3,14 @@ import {
   Cake, ClipboardPaste, Search, ExternalLink, Check,
   ChevronDown, ChevronUp, MessageCircle, Trash2, Filter, PartyPopper, Play,
   FlaskConical, Undo2, PhoneOff, PhoneCall, Link2, AlertTriangle,
-  ArrowUp, ArrowDown, Minus,
+  ArrowUp, ArrowDown, Minus, Send,
 } from 'lucide-react';
 import { classifyBirthday, daysUntil, classifyBirthdayEntry, daysUntilEntry } from '@/utils/birthdayParser';
 import { useBirthdays, type BirthdayEntry } from '@/hooks/useBirthdays';
 import { useCrm } from '@/contexts/CrmContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { formatWhatsAppPhone } from '@/utils/whatsappPhone';
 import { BirthdaySmartPasteModal } from './BirthdaySmartPasteModal';
 import { BirthdayComposerModal } from './BirthdayComposerModal';
 import { BirthdaySessionModal } from './BirthdaySessionModal';
@@ -130,6 +133,64 @@ export function BirthdayPanel() {
     setComposerEntries(todaysEligible);
     setComposerIndex(0);
   }, [todaysEligible]);
+
+  // Enroll all eligible birthdays into the automated Birthday Campaign list.
+  const { user } = useAuth();
+  const [enrolling, setEnrolling] = useState(false);
+  const [enrollResult, setEnrollResult] = useState<string | null>(null);
+
+  const eligibleForCampaign = useMemo(() => {
+    return birthdays.filter(b =>
+      b.status !== 'congratulated' &&
+      b.contact_id &&
+      !b.opt_out &&
+      Boolean((b.phone_normalized || b.phone_number || '').trim())
+    );
+  }, [birthdays]);
+
+  const enrollAllInBirthdayCampaign = useCallback(async () => {
+    if (!user || eligibleForCampaign.length === 0) return;
+    setEnrolling(true);
+    setEnrollResult(null);
+    const cycle_year = new Date().getFullYear();
+    const payload = eligibleForCampaign
+      .map(b => {
+        const contact = contacts.find(c => String(c.id) === b.contact_id);
+        const phone = formatWhatsAppPhone(
+          b.phone_normalized || b.phone_number || contact?.PhoneNumber || '',
+          contact?.Country,
+        );
+        if (!phone) return null;
+        return {
+          user_id: user.id,
+          contact_id: b.contact_id,
+          name: b.full_name,
+          first_name: b.first_name || (b.full_name || '').split(' ')[0] || null,
+          phone_normalized: phone,
+          email: contact?.EmailAddress || null,
+          birth_date: b.birth_date,
+          congratulate_by_date: b.congratulate_by_date,
+          cycle_year,
+          tone: b.message_style || 'warm',
+          status: 'queued',
+        };
+      })
+      .filter(Boolean) as any[];
+
+    if (payload.length === 0) {
+      setEnrollResult('No sendable phones');
+      setEnrolling(false);
+      return;
+    }
+    const { data, error } = await (supabase.from('birthday_campaign_recipients') as any)
+      .upsert(payload, { onConflict: 'phone_normalized,cycle_year', ignoreDuplicates: true })
+      .select('id');
+    setEnrolling(false);
+    setEnrollResult(
+      error ? `Error: ${error.message}` : `Enrolled ${data?.length ?? 0} of ${payload.length} (duplicates skipped)`,
+    );
+    setTimeout(() => setEnrollResult(null), 5000);
+  }, [user, eligibleForCampaign, contacts]);
 
   const openBulkComposer = useCallback(() => {
     const selected = filtered.filter(b => selectedIds.has(b.id) && b.status !== 'congratulated');
@@ -301,6 +362,17 @@ export function BirthdayPanel() {
                   <PartyPopper className="w-3 h-3" />
                   Send today's birthdays ({todaysEligible.length})
                 </button>
+              )}
+              {eligibleForCampaign.length > 0 && (
+                <button type="button" onClick={enrollAllInBirthdayCampaign} disabled={enrolling}
+                  title="Send all eligible birthdays (linked contact + sendable phone) to the automated Birthday Campaign list"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-fuchsia-600 hover:bg-fuchsia-500 disabled:opacity-50 text-white rounded-lg transition-colors">
+                  <Send className="w-3 h-3" />
+                  {enrolling ? 'Enrolling…' : `Enroll in Birthday Campaign (${eligibleForCampaign.length})`}
+                </button>
+              )}
+              {enrollResult && (
+                <span className="text-xs text-pink-300 self-center">{enrollResult}</span>
               )}
               {birthdays.filter(b => b.status !== 'congratulated').length > 0 && (
                 <button type="button" onClick={() => setShowSession(true)}
