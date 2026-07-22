@@ -1,17 +1,19 @@
 import { runCampaignTick, corsHeaders } from "../_shared/campaign-send.ts";
 
-// Monthly Activity thank-you library — tone scales with amount (ZAR).
+function tierOf(row: any): "champion" | "strong" | "solid" | "starter" {
+  const amt = Number(row.amount ?? 0);
+  if (amt >= 5000) return "champion";
+  if (amt >= 2500) return "strong";
+  if (amt >= 1000) return "solid";
+  return "starter";
+}
+
 function buildBody(row: any): string {
   const first = row.first_name || (row.name ?? "").split(" ")[0] || "Leader";
   const amt = Number(row.amount ?? 0);
   const month = row.activity_month || "this month";
   const amtStr = amt > 0 ? `R${amt.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}` : null;
-
-  let tier: "champion" | "strong" | "solid" | "starter";
-  if (amt >= 5000) tier = "champion";
-  else if (amt >= 2500) tier = "strong";
-  else if (amt >= 1000) tier = "solid";
-  else tier = "starter";
+  const tier = tierOf(row);
 
   const library: Record<typeof tier, string> = {
     champion:
