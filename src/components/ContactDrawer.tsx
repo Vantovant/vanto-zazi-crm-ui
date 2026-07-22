@@ -301,6 +301,8 @@ export function ContactDrawer({ prospect: initialProspect, onClose, onOpenTempla
 
             <CampaignEnrollButtons prospect={prospect} />
 
+            <SyncContactToHubButton contactId={String(prospect.id)} contactName={prospect.FullName} />
+
 
 
             {/* Waiting Room Status / Action */}
