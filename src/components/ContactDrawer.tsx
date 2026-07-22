@@ -25,6 +25,7 @@ import type { Prospect } from '../data/mockData';
 import { EditContactModal } from './EditContactModal';
 import { AddToWaitingRoomModal } from './AddToWaitingRoomModal';
 import { CampaignEnrollButtons } from './CampaignEnrollButtons';
+import { SyncContactToHubButton } from './SyncContactToHubButton';
 import { useCrm } from '@/contexts/CrmContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useContactActivities, type ContactActivity } from '@/hooks/useContactActivities';
