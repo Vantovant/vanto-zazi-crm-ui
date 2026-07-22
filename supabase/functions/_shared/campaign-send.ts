@@ -231,6 +231,8 @@ export async function runCampaignTick(opts: TickOptions) {
       sentAt,
       campaignKey: opts.campaignKey,
     });
+    const contactSnapshot = await loadContactSnapshot((row as any).contact_id ?? null);
+    const extraMeta = opts.buildMetadata ? opts.buildMetadata(row, body) : {};
     const recorded = await sendRecorded({
       spoke_event_id: row.id,
       phone,
@@ -238,7 +240,17 @@ export async function runCampaignTick(opts: TickOptions) {
       maytapi_message_id: send.msgId,
       status: "sent",
       sent_at: sentAt,
-      metadata: { table: opts.table },
+      metadata: {
+        table: opts.table,
+        campaign: {
+          key: opts.campaignKey,
+          recipient_id: row.id,
+          user_id: (row as any).user_id ?? null,
+        },
+        contact: contactSnapshot,
+        body_preview: previewBody(body),
+        ...extraMeta,
+      },
     });
     if (recorded) hubDecision = recorded;
     await admin.from(opts.table).update({ status: "sent", sent_at: sentAt, provider_message_id: send.msgId ?? null, error: null, hub_decision: hubDecision }).eq("id", row.id);
