@@ -39,7 +39,7 @@ const baseNavItems = [
 
 const campaignNavItems = [
   { path: '/campaigns/birthday', label: 'Birthday Campaign', icon: Cake },
-  { path: '/campaigns/activation', label: 'Activation Campaign', icon: Zap },
+  { path: '/campaigns/activation', label: 'Monthly Activity Campaign', icon: Zap },
   { path: '/campaigns/zoom', label: 'Zoom Invitation', icon: Video },
 ];
 
