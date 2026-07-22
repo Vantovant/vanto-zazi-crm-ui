@@ -22,6 +22,12 @@ Deno.serve(async (req) => {
     campaignKey: "birthday",
     table: "birthday_campaign_recipients",
     buildBody,
+    buildMetadata: (row) => ({
+      template_hint: `birthday_${TONES[row.tone] ? row.tone : "warm"}`,
+      tone: TONES[row.tone] ? row.tone : "warm",
+      congratulate_by_date: row.congratulate_by_date ?? null,
+      cycle_year: row.cycle_year ?? null,
+    }),
     dryRun: !!body?.dry_run,
     cap: body?.cap,
     forceIds: body?.force_ids,

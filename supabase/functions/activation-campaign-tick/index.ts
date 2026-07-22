@@ -36,6 +36,12 @@ Deno.serve(async (req) => {
     campaignKey: "activation",
     table: "activation_campaign_recipients",
     buildBody,
+    buildMetadata: (row) => ({
+      template_hint: `activation_${tierOf(row)}`,
+      tone: tierOf(row),
+      activity_month: row.activity_month ?? null,
+      amount: Number(row.amount ?? 0),
+    }),
     dryRun: !!body?.dry_run,
     cap: body?.cap,
     forceIds: body?.force_ids,
