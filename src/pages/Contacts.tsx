@@ -100,6 +100,30 @@ export function Contacts() {
     setSelectedIds(new Set());
     setDeleting(false);
   };
+
+  const handleSyncSelected = async () => {
+    const ids = Array.from(selectedIds);
+    if (!ids.length) return;
+    if (!confirm(`Sync ${ids.length} contact(s) to VantoOS hub? Contacts without phone or email will be skipped.`)) return;
+    setSyncing(true);
+    let ok = 0, skipped = 0, failed = 0;
+    for (const id of ids) {
+      setSyncStatus(`Syncing ${ok + skipped + failed + 1} / ${ids.length}…`);
+      try {
+        const { data, error } = await supabase.functions.invoke('sync-contact-to-hub', {
+          body: { contact_id: id },
+        });
+        if (error) { failed++; continue; }
+        const d = data as any;
+        if (d?.ok) ok++;
+        else if (String(d?.body || '').includes('missing_name_or_identifier')) skipped++;
+        else failed++;
+      } catch { failed++; }
+    }
+    setSyncing(false);
+    setSyncStatus(`Done — ${ok} synced · ${skipped} skipped (no phone/email) · ${failed} failed`);
+    setTimeout(() => setSyncStatus(null), 8000);
+  };
   const filteredProspects = useMemo(() => {
     const rawQuery = searchQuery.trim();
     const query = rawQuery.toLowerCase();
