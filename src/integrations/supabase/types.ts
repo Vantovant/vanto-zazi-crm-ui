@@ -17,6 +17,8 @@ export type Database = {
       activation_campaign_recipients: {
         Row: {
           activation_date: string | null
+          activity_month: string | null
+          amount: number | null
           attempts: number
           contact_id: string | null
           created_at: string
@@ -44,6 +46,8 @@ export type Database = {
         }
         Insert: {
           activation_date?: string | null
+          activity_month?: string | null
+          amount?: number | null
           attempts?: number
           contact_id?: string | null
           created_at?: string
@@ -71,6 +75,8 @@ export type Database = {
         }
         Update: {
           activation_date?: string | null
+          activity_month?: string | null
+          amount?: number | null
           attempts?: number
           contact_id?: string | null
           created_at?: string
