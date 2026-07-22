@@ -78,10 +78,12 @@ Deno.serve(async (req) => {
     },
   };
 
-  const bodyStr = JSON.stringify({ action: "receive", body });
+  // Sign over the INNER body (matches suite-bridge-spoke postBackToHub contract).
+  const innerStr = JSON.stringify(body);
+  const httpBody = JSON.stringify({ action: "receive", body });
   const ts = Math.floor(Date.now() / 1000).toString();
   const nonce = crypto.randomUUID();
-  const sig = await hmacHex(secret, `${ts}.${nonce}.${APP_KEY}.${bodyStr}`);
+  const sig = await hmacHex(secret, `${ts}.${nonce}.${APP_KEY}.${innerStr}`);
   const target = new URL("/functions/v1/suite-bridge-hub", hubUrl).toString();
 
   let resp: Response;
@@ -95,7 +97,7 @@ Deno.serve(async (req) => {
         "x-bridge-nonce": nonce,
         "x-bridge-signature": sig,
       },
-      body: bodyStr,
+      body: httpBody,
     });
   } catch (e) {
     return json({ ok: false, error: "hub_unreachable", detail: String(e) }, 502);
