@@ -8,12 +8,14 @@ import {
   X,
   Loader2,
   Trash2,
+  Cloud,
 } from 'lucide-react';
 import { prospectColumns, filterOptions, type Prospect } from '../data/mockData';
 import { ContactDrawer } from '../components/ContactDrawer';
 import { AddContactModal } from '../components/AddContactModal';
 import { DataStatusBanner } from '../components/DataStatusBanner';
 import { useCrm } from '@/contexts/CrmContext';
+import { supabase } from '@/integrations/supabase/client';
 
 type FilterKey = keyof typeof filterOptions;
 
@@ -64,6 +66,8 @@ export function Contacts() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<string | null>(null);
 
   // Notify layout of selected contact for ZAZI copilot
   useEffect(() => {
@@ -95,6 +99,30 @@ export function Contacts() {
     }
     setSelectedIds(new Set());
     setDeleting(false);
+  };
+
+  const handleSyncSelected = async () => {
+    const ids = Array.from(selectedIds);
+    if (!ids.length) return;
+    if (!confirm(`Sync ${ids.length} contact(s) to VantoOS hub? Contacts without phone or email will be skipped.`)) return;
+    setSyncing(true);
+    let ok = 0, skipped = 0, failed = 0;
+    for (const id of ids) {
+      setSyncStatus(`Syncing ${ok + skipped + failed + 1} / ${ids.length}…`);
+      try {
+        const { data, error } = await supabase.functions.invoke('sync-contact-to-hub', {
+          body: { contact_id: id },
+        });
+        if (error) { failed++; continue; }
+        const d = data as any;
+        if (d?.ok) ok++;
+        else if (String(d?.body || '').includes('missing_name_or_identifier')) skipped++;
+        else failed++;
+      } catch { failed++; }
+    }
+    setSyncing(false);
+    setSyncStatus(`Done — ${ok} synced · ${skipped} skipped (no phone/email) · ${failed} failed`);
+    setTimeout(() => setSyncStatus(null), 8000);
   };
   const filteredProspects = useMemo(() => {
     const rawQuery = searchQuery.trim();
@@ -350,12 +378,22 @@ export function Contacts() {
 
       {/* Bulk Actions Bar */}
       {selectedIds.size > 0 && (
-        <div className="flex items-center gap-3 px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg">
+        <div className="flex flex-wrap items-center gap-3 px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg">
           <span className="text-sm text-slate-300">{selectedIds.size} selected</span>
           <button
             type="button"
+            onClick={handleSyncSelected}
+            disabled={syncing || deleting}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg transition-colors"
+            title="Push selected contacts to the VantoOS hub (fans out to sister apps like email)"
+          >
+            {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Cloud className="w-4 h-4" />}
+            Sync to VantoOS hub
+          </button>
+          <button
+            type="button"
             onClick={handleDeleteSelected}
-            disabled={deleting}
+            disabled={deleting || syncing}
             className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white rounded-lg transition-colors"
           >
             {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
@@ -368,6 +406,9 @@ export function Contacts() {
           >
             Clear Selection
           </button>
+          {syncStatus && (
+            <span className="text-xs text-indigo-300 ml-auto">{syncStatus}</span>
+          )}
         </div>
       )}
 

@@ -58,30 +58,35 @@ Deno.serve(async (req) => {
     .maybeSingle();
   if (cErr || !contact) return json({ error: "contact_not_found" }, 404);
 
+  const contactPayload = {
+    id: contact.id,
+    external_id: contact.id,
+    full_name: contact.full_name,
+    first_name: (contact.full_name ?? "").split(" ")[0] || null,
+    phone_e164: contact.phone_normalized || contact.phone_number || null,
+    email: contact.email_normalized || contact.email_address || null,
+    country: contact.country || null,
+    city: contact.city || null,
+    lead_type: contact.lead_type || null,
+    temperature: contact.lead_temperature || null,
+    aplgo_id: contact.aplgo_id || null,
+    sponsor_name: contact.sponsor_name || null,
+    salutation_title: contact.salutation_title || null,
+    updated_at: new Date().toISOString(),
+  };
   const body = {
     kind: "contact_upsert",
     source_app: APP_KEY,
-    contact: {
-      external_id: contact.id,
-      full_name: contact.full_name,
-      first_name: (contact.full_name ?? "").split(" ")[0] || null,
-      phone_e164: contact.phone_normalized || contact.phone_number || null,
-      email: contact.email_normalized || contact.email_address || null,
-      country: contact.country || null,
-      city: contact.city || null,
-      lead_type: contact.lead_type || null,
-      temperature: contact.lead_temperature || null,
-      aplgo_id: contact.aplgo_id || null,
-      sponsor_name: contact.sponsor_name || null,
-      salutation_title: contact.salutation_title || null,
-      updated_at: new Date().toISOString(),
-    },
+    ...contactPayload,
+    contact: contactPayload,
   };
 
-  const bodyStr = JSON.stringify({ action: "receive", body });
+  // Sign over the INNER body (matches suite-bridge-spoke postBackToHub contract).
+  const innerStr = JSON.stringify(body);
+  const httpBody = JSON.stringify({ action: "receive", body });
   const ts = Math.floor(Date.now() / 1000).toString();
   const nonce = crypto.randomUUID();
-  const sig = await hmacHex(secret, `${ts}.${nonce}.${APP_KEY}.${bodyStr}`);
+  const sig = await hmacHex(secret, `${ts}.${nonce}.${APP_KEY}.${innerStr}`);
   const target = new URL("/functions/v1/suite-bridge-hub", hubUrl).toString();
 
   let resp: Response;
@@ -95,7 +100,7 @@ Deno.serve(async (req) => {
         "x-bridge-nonce": nonce,
         "x-bridge-signature": sig,
       },
-      body: bodyStr,
+      body: httpBody,
     });
   } catch (e) {
     return json({ ok: false, error: "hub_unreachable", detail: String(e) }, 502);
