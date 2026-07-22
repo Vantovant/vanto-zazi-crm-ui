@@ -10,11 +10,68 @@ import { dncCheck, ENFORCE, sendRecorded } from "./hub-bridge-client.ts";
 const MAYTAPI_PRODUCT_ID = Deno.env.get("MAYTAPI_PRODUCT_ID") ?? "";
 const MAYTAPI_PHONE_ID = Deno.env.get("MAYTAPI_PHONE_ID") ?? "";
 const MAYTAPI_TOKEN = Deno.env.get("MAYTAPI_API_TOKEN") ?? "";
+const HASH_SALT = Deno.env.get("MAYTAPI_HASH_SALT") ?? "";
 
 const admin = createClient(
   Deno.env.get("SUPABASE_URL")!,
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
 );
+
+async function hmacHex(key: string, msg: string): Promise<string> {
+  const enc = new TextEncoder();
+  const k = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(key),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const sig = await crypto.subtle.sign("HMAC", k, enc.encode(msg));
+  return Array.from(new Uint8Array(sig))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function previewBody(text: string | null): string | null {
+  if (!text) return null;
+  return text.length > 140 ? text.slice(0, 140) + "…" : text;
+}
+
+// Mirror outbound campaign sends into maytapi_messages so the app's Maytapi
+// Inbox shows the full two-way thread (outbound + inbound replies). Best-effort
+// — must never break the send path.
+async function mirrorOutboundToInbox(params: {
+  userId: string;
+  contactId: string | null;
+  phoneNorm: string;
+  body: string;
+  msgId?: string;
+  sentAt: string;
+  campaignKey: string;
+}) {
+  try {
+    if (!HASH_SALT || !params.phoneNorm) return;
+    const phHash = await hmacHex(HASH_SALT, params.phoneNorm);
+    const last4 = params.phoneNorm.length >= 4 ? params.phoneNorm.slice(-4) : params.phoneNorm;
+    await admin.from("maytapi_messages").insert({
+      user_id: params.userId,
+      contact_id: params.contactId,
+      direction: "outbound",
+      maytapi_message_id: params.msgId ?? null,
+      phone_hash: phHash,
+      phone_e164: params.phoneNorm,
+      phone_last4: last4,
+      conversation_key: phHash,
+      body: params.body,
+      body_preview: previewBody(params.body),
+      status: "sent",
+      received_at: params.sentAt,
+      raw: { source: "campaign", campaign: params.campaignKey, msg_id: params.msgId ?? null },
+    });
+  } catch (_e) {
+    // swallow (duplicates, missing salt, etc.) — never block sends
+  }
+}
 
 export interface TickOptions {
   campaignKey: "birthday" | "activation" | "zoom";
