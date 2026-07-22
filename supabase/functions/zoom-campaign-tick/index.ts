@@ -18,11 +18,18 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   const body = await req.json().catch(() => ({}));
   const now = new Date();
-  // stage windows: send t_minus_48h between 46-50h, t_minus_24h between 22-26h, t_minus_2h between 1-3h
   const result = await runCampaignTick({
     campaignKey: "zoom",
     table: "zoom_campaign_recipients",
     buildBody,
+    buildMetadata: (row) => ({
+      template_hint: `zoom_${row.reminder_stage ?? "unknown"}`,
+      tone: "reminder",
+      reminder_stage: row.reminder_stage ?? null,
+      event_name: row.event_name ?? null,
+      event_date: row.event_date ?? null,
+      zoom_url: row.zoom_url ?? null,
+    }),
     dryRun: !!body?.dry_run,
     cap: body?.cap,
     forceIds: body?.force_ids,
