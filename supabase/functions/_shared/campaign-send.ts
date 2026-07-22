@@ -207,6 +207,15 @@ export async function runCampaignTick(opts: TickOptions) {
     }
     results.sent++;
     const sentAt = new Date().toISOString();
+    await mirrorOutboundToInbox({
+      userId: (row as any).user_id,
+      contactId: (row as any).contact_id ?? null,
+      phoneNorm: phone,
+      body,
+      msgId: send.msgId,
+      sentAt,
+      campaignKey: opts.campaignKey,
+    });
     const recorded = await sendRecorded({
       spoke_event_id: row.id,
       phone,
