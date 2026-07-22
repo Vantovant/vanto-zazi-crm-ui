@@ -233,6 +233,12 @@ export async function runCampaignTick(opts: TickOptions) {
     });
     const contactSnapshot = await loadContactSnapshot((row as any).contact_id ?? null);
     const extraMeta = opts.buildMetadata ? opts.buildMetadata(row, body) : {};
+    const resolvedEmail =
+      (extraMeta as any)?.email ??
+      (contactSnapshot as any)?.email_address ??
+      (row as any).email_address ??
+      (row as any).email ??
+      null;
     const recorded = await sendRecorded({
       spoke_event_id: row.id,
       phone,
@@ -242,6 +248,7 @@ export async function runCampaignTick(opts: TickOptions) {
       sent_at: sentAt,
       metadata: {
         table: opts.table,
+        email: resolvedEmail,
         campaign: {
           key: opts.campaignKey,
           recipient_id: row.id,
