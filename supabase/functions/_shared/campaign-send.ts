@@ -203,11 +203,36 @@ export async function runCampaignTick(opts: TickOptions) {
     const dnc = await dncCheck(phone, "marketing");
     if (dnc) {
       hubDecision = dnc.decision;
-      if (ENFORCE && dnc.result.allowed === false) {
-        results.skipped++;
-        await admin.from(opts.table).update({ status: "skipped", hub_decision: hubDecision, error: `hub:${dnc.result.reason}` }).eq("id", row.id);
-        results.rows.push({ id: row.id, status: "skipped", reason: `hub:${dnc.result.reason}`, hub: hubDecision });
-        continue;
+      if (dnc.result.allowed === false) {
+        // Suite-wide WhatsApp cap (Maytapi 24h restriction guard from the hub).
+        // Treat like a cooldown: keep the row queued so the retention scheduler
+        // picks it up in the next window; log blocked_until against the row.
+        // Also stop the tick early — no point hammering the hub with more
+        // dnc_check calls once the suite cap is reached.
+        if (dnc.result.reason === "suite_daily_cap") {
+          results.skipped++;
+          const blockedUntil = dnc.result.blocked_until ?? null;
+          await admin.from(opts.table).update({
+            status: "queued",
+            hub_decision: hubDecision,
+            error: `hub:suite_daily_cap${blockedUntil ? ` until ${blockedUntil}` : ""}`,
+          }).eq("id", row.id);
+          results.rows.push({
+            id: row.id,
+            status: "skipped",
+            reason: "hub:suite_daily_cap",
+            blocked_until: blockedUntil,
+            hub: hubDecision,
+          });
+          results.blocked = "suite_daily_cap";
+          break;
+        }
+        if (ENFORCE) {
+          results.skipped++;
+          await admin.from(opts.table).update({ status: "skipped", hub_decision: hubDecision, error: `hub:${dnc.result.reason}` }).eq("id", row.id);
+          results.rows.push({ id: row.id, status: "skipped", reason: `hub:${dnc.result.reason}`, hub: hubDecision });
+          continue;
+        }
       }
     }
 
