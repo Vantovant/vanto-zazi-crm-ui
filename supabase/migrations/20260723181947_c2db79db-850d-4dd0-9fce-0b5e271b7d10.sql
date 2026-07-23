@@ -1,0 +1,1 @@
+UPDATE public.campaign_settings SET enabled = false, daily_cap = 20 WHERE campaign_key IN ('birthday','activation','zoom');
