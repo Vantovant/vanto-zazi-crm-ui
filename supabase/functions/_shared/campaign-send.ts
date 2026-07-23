@@ -209,22 +209,26 @@ export async function runCampaignTick(opts: TickOptions) {
         // picks it up in the next window; log blocked_until against the row.
         // Also stop the tick early — no point hammering the hub with more
         // dnc_check calls once the suite cap is reached.
-        if (dnc.result.reason === "suite_daily_cap") {
+        // Any hub reason with a blocked_until (e.g. suite_daily_cap, suite_freeze)
+        // is a suite-wide window block: leave the row queued, log the window,
+        // and short-circuit the tick — no point burning more dnc_check calls.
+        if (dnc.result.blocked_until || dnc.result.reason === "suite_daily_cap" || dnc.result.reason === "suite_freeze") {
           results.skipped++;
           const blockedUntil = dnc.result.blocked_until ?? null;
+          const reason = dnc.result.reason ?? "suite_blocked";
           await admin.from(opts.table).update({
             status: "queued",
             hub_decision: hubDecision,
-            error: `hub:suite_daily_cap${blockedUntil ? ` until ${blockedUntil}` : ""}`,
+            error: `hub:${reason}${blockedUntil ? ` until ${blockedUntil}` : ""}`,
           }).eq("id", row.id);
           results.rows.push({
             id: row.id,
             status: "skipped",
-            reason: "hub:suite_daily_cap",
+            reason: `hub:${reason}`,
             blocked_until: blockedUntil,
             hub: hubDecision,
           });
-          results.blocked = "suite_daily_cap";
+          results.blocked = reason;
           break;
         }
         if (ENFORCE) {
