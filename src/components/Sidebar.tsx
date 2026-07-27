@@ -20,6 +20,7 @@ import {
   Cake,
   Zap,
   Video,
+  Contact,
 } from 'lucide-react';
 
 const OWNER_ID = 'b8028d7d-6a08-45ef-a369-b438c440bea3';
@@ -131,6 +132,20 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
 
         {/* Install + Help at bottom */}
         <div className="p-3 border-t border-slate-800 space-y-1">
+          <NavLink
+            to="/settings/google-contacts"
+            onClick={onClose}
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
+                isActive
+                  ? 'bg-teal-500/10 text-teal-300'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+              }`
+            }
+          >
+            <Contact className="w-5 h-5" />
+            Google Contacts
+          </NavLink>
           <NavLink
             to="/help"
             onClick={onClose}
