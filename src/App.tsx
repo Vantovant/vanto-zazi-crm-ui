@@ -24,6 +24,7 @@ import { MonthlyActivityPush } from './pages/MonthlyActivityPush';
 import { BirthdayCampaign } from './pages/campaigns/BirthdayCampaign';
 import { ActivationCampaign } from './pages/campaigns/ActivationCampaign';
 import { ZoomCampaign } from './pages/campaigns/ZoomCampaign';
+import { GoogleContactsSettings } from './pages/GoogleContactsSettings';
 import { MarketingLayout } from './marketing/MarketingLayout';
 import { Home as MarketingHome } from './marketing/pages/Home';
 import { Features as MarketingFeatures } from './marketing/pages/Features';
@@ -77,6 +78,7 @@ function App() {
               <Route path="campaigns/birthday" element={<BirthdayCampaign />} />
               <Route path="campaigns/activation" element={<ActivationCampaign />} />
               <Route path="campaigns/zoom" element={<ZoomCampaign />} />
+              <Route path="settings/google-contacts" element={<GoogleContactsSettings />} />
               <Route path="help" element={<PlaceholderPage title="Help" />} />
             </Route>
           </Routes>
