@@ -17,8 +17,12 @@ verify_jwt = false
 
 [functions.outbound-webhook]
 verify_jwt = false
+
 [functions.maytapi-send-1to1-harness]
 verify_jwt = false
 
 [functions.maytapi-inbound]
+verify_jwt = false
+
+[functions.google-contacts-auth-callback]
 verify_jwt = false
