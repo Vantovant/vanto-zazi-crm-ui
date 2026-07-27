@@ -734,6 +734,69 @@ export type Database = {
           },
         ]
       }
+      google_contacts_oauth_state: {
+        Row: {
+          created_at: string
+          expires_at: string
+          redirect_after: string | null
+          state: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          redirect_after?: string | null
+          state: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          redirect_after?: string | null
+          state?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      google_contacts_tokens: {
+        Row: {
+          access_token: string
+          created_at: string
+          expires_at: string | null
+          google_email: string | null
+          last_sync_at: string | null
+          refresh_token: string | null
+          scope: string | null
+          token_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string
+          expires_at?: string | null
+          google_email?: string | null
+          last_sync_at?: string | null
+          refresh_token?: string | null
+          scope?: string | null
+          token_type?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string
+          expires_at?: string | null
+          google_email?: string | null
+          last_sync_at?: string | null
+          refresh_token?: string | null
+          scope?: string | null
+          token_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       hub_contacts_mirror: {
         Row: {
           consent_email: boolean | null
