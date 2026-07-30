@@ -120,6 +120,7 @@ export function AddOrderModal({ onClose }: AddOrderModalProps) {
 
     setLoading(true);
     setError('');
+    setDuplicateWarning(null);
 
     let successCount = 0;
     for (const line of lines) {
@@ -163,7 +164,17 @@ export function AddOrderModal({ onClose }: AddOrderModalProps) {
           purchaseType: '',
           pvAmount: line.product.pv * line.quantity,
           source: 'manual',
+          force: forceDuplicate,
         });
+        if (result && (result as any).suspectDuplicate) {
+          const ex = (result as any).existing;
+          setDuplicateWarning(
+            `${selectedContactName} already has an order of R${Number(ex.amount).toLocaleString()} dated ${ex.order_date}` +
+            `${ex.product ? ` (${ex.product})` : ''}. Same person, same amount, same day — this looks like the same purchase captured twice.`,
+          );
+          setLoading(false);
+          return;
+        }
         if (result) successCount++;
       }
     }
