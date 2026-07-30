@@ -25,6 +25,7 @@ import { BirthdayCampaign } from './pages/campaigns/BirthdayCampaign';
 import { ActivationCampaign } from './pages/campaigns/ActivationCampaign';
 import { ZoomCampaign } from './pages/campaigns/ZoomCampaign';
 import { GoogleContactsSettings } from './pages/GoogleContactsSettings';
+import { ProspectorInboxPage } from './pages/ProspectorInboxPage';
 import { MarketingLayout } from './marketing/MarketingLayout';
 import { Home as MarketingHome } from './marketing/pages/Home';
 import { Features as MarketingFeatures } from './marketing/pages/Features';
@@ -79,6 +80,7 @@ function App() {
               <Route path="campaigns/activation" element={<ActivationCampaign />} />
               <Route path="campaigns/zoom" element={<ZoomCampaign />} />
               <Route path="settings/google-contacts" element={<GoogleContactsSettings />} />
+              <Route path="prospector" element={<ProspectorInboxPage />} />
               <Route path="help" element={<PlaceholderPage title="Help" />} />
             </Route>
           </Routes>
