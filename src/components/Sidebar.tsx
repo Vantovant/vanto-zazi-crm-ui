@@ -21,6 +21,7 @@ import {
   Zap,
   Video,
   Contact,
+  Brain,
 } from 'lucide-react';
 
 const OWNER_ID = 'b8028d7d-6a08-45ef-a369-b438c440bea3';
@@ -57,6 +58,7 @@ export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
         { path: '/monthly-activity-push', label: 'Monthly Activity Push', icon: Crown },
         { path: '/sponsor-review', label: 'Sponsor Review', icon: GitBranch },
         { path: '/team', label: 'Tester Dashboard', icon: BarChart3 },
+        { path: '/prospector', label: 'ZAZI Prospector', icon: Brain },
       ]
     : baseNavItems;
   return (
