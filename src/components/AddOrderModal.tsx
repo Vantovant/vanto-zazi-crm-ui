@@ -22,6 +22,8 @@ export function AddOrderModal({ onClose }: AddOrderModalProps) {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
+  const [forceDuplicate, setForceDuplicate] = useState(false);
 
   // Sales channel (Online vs Offline) — separate from purchase_type
   const [salesChannel, setSalesChannel] = useState<'Online' | 'Offline'>('Online');
@@ -213,6 +215,27 @@ export function AddOrderModal({ onClose }: AddOrderModalProps) {
           </div>
 
           <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4">
+            {duplicateWarning && (
+              <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 space-y-2">
+                <p className="text-sm text-amber-200">{duplicateWarning}</p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setForceDuplicate(true); setDuplicateWarning(null); }}
+                    className="px-3 py-1.5 text-xs rounded-md bg-amber-500/20 text-amber-100 hover:bg-amber-500/30"
+                  >
+                    It's a genuine second purchase — add anyway
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="px-3 py-1.5 text-xs rounded-md bg-slate-700 text-slate-200 hover:bg-slate-600"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
             {/* Contact Search */}
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-1.5">Contact *</label>
