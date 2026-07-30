@@ -8,26 +8,31 @@ function tierOf(row: any): "champion" | "strong" | "solid" | "starter" {
   return "starter";
 }
 
+const SIGNATURE = "— Vanto Vanto, APLGO (079 083 1530)";
+const SHOP_URL = "https://getwellafrica.com/shop";
+
 function buildBody(row: any): string {
   const first = row.first_name || (row.name ?? "").split(" ")[0] || "Leader";
   const amt = Number(row.amount ?? 0);
   const month = row.activity_month || "this month";
   const amtStr = amt > 0 ? `R${amt.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}` : null;
   const tier = tierOf(row);
+  const isNew = String(row.pack_type ?? "").toLowerCase() === "new";
+
+  if (isNew) {
+    return `Hi ${first} 👋\n\nThis is Vanto Vanto from APLGO. Thank you for your ${month} activity${amtStr ? ` of ${amtStr}` : ""} — welcome and well done! 🙏\n\nYou can order anytime here: ${SHOP_URL}\n\n${SIGNATURE}`;
+  }
 
   const library: Record<typeof tier, string> = {
-    champion:
-      `Leader ${first} 👑\n\nYour ${month} activity of ${amtStr} is CHAMPION-level — thank you for leading from the front. Your consistency is building a rank shift for the whole team. Keep the fire burning! 🔥\n\n— GetWell Grow`,
-    strong:
-      `Leader ${first} 🌟\n\nA huge thank you for your ${month} activity of ${amtStr}. That is a STRONG commitment and it moves the team forward every single week. We see you and we appreciate you. 💪\n\n— GetWell Grow`,
-    solid:
-      `Leader ${first} 🙏\n\nThank you for keeping your rank active in ${month} with ${amtStr}. Consistency wins in APLGO — every month you show up, your income and your team grow. Well done! 🌱\n\n— GetWell Grow`,
-    starter:
-      `Leader ${first} 🌿\n\nThank you for staying active in ${month}${amtStr ? ` with ${amtStr}` : ""}. Every activity month keeps your position and your commissions alive — proud of you for showing up. Let's push for more next month! 💚\n\n— GetWell Grow`,
+    champion: `Leader ${first} 👑\n\nThank you for your ${month} activity of ${amtStr} — champion level. You are leading from the front. 🔥\n\n${SIGNATURE}`,
+    strong: `Leader ${first} 🌟\n\nThank you for your ${month} activity of ${amtStr}. Strong commitment — it moves the whole team forward. 💪\n\n${SIGNATURE}`,
+    solid: `Leader ${first} 🙏\n\nThank you for staying active in ${month} with ${amtStr}. Consistency keeps your rank and your income growing. 🌱\n\n${SIGNATURE}`,
+    starter: `Leader ${first} 🌿\n\nThank you for staying active in ${month}${amtStr ? ` with ${amtStr}` : ""}. Every active month protects your position and commissions. 💚\n\n${SIGNATURE}`,
   };
 
   return library[tier];
 }
+
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
