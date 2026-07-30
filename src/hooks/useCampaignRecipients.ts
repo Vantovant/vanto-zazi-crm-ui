@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { cycleKeyFor, dedupeKeyFor } from "@/utils/campaignCycle";
 
 export type CampaignTable =
   | "birthday_campaign_recipients"
@@ -29,12 +30,22 @@ export interface CampaignRecipient {
 
 export interface CampaignStats {
   total: number; queued: number; sent: number; delivered: number; read: number; replied: number; failed: number;
+  /** Rows blocked by the once-per-cycle ledger (already messaged this cycle). */
+  alreadySent: number;
+  /** Queued rows that WOULD be suppressed if a tick ran now. */
+  duplicateQueued: number;
 }
+
+const CAMPAIGN_OF: Record<CampaignTable, string> = {
+  birthday_campaign_recipients: "birthday",
+  activation_campaign_recipients: "activation",
+  zoom_campaign_recipients: "zoom",
+};
 
 export function useCampaignRecipients(table: CampaignTable) {
   const [rows, setRows] = useState<CampaignRecipient[]>([]);
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState<CampaignStats>({ total: 0, queued: 0, sent: 0, delivered: 0, read: 0, replied: 0, failed: 0 });
+  const [stats, setStats] = useState<CampaignStats>({ total: 0, queued: 0, sent: 0, delivered: 0, read: 0, replied: 0, failed: 0, alreadySent: 0, duplicateQueued: 0 });
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -45,6 +56,19 @@ export function useCampaignRecipients(table: CampaignTable) {
       .limit(500);
     const list = (data ?? []) as CampaignRecipient[];
     setRows(list);
+
+    // Once-per-cycle suppression ledger: which queued rows are already covered?
+    const campaign = CAMPAIGN_OF[table];
+    const { data: ledger } = await (supabase.from("campaign_send_ledger") as any)
+      .select("dedupe_key")
+      .eq("campaign_key", campaign)
+      .limit(5000);
+    const sentKeys = new Set<string>(((ledger ?? []) as any[]).map(r => r.dedupe_key));
+    const duplicateQueued = list.filter(r =>
+      r.status === "queued" &&
+      sentKeys.has(dedupeKeyFor(campaign, r.phone_normalized, cycleKeyFor(campaign, r)))
+    ).length;
+
     setStats({
       total: list.length,
       queued: list.filter(r => r.status === "queued").length,
@@ -53,6 +77,8 @@ export function useCampaignRecipients(table: CampaignTable) {
       read: list.filter(r => r.read_at).length,
       replied: list.filter(r => r.replied_at).length,
       failed: list.filter(r => r.status === "failed").length,
+      alreadySent: list.filter(r => r.status === "skipped_duplicate").length,
+      duplicateQueued,
     });
     setLoading(false);
   }, [table]);
