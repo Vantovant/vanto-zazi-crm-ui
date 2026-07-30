@@ -244,6 +244,8 @@ export function SmartPasteOrdersModal({ onClose }: SmartPasteOrdersModalProps) {
         purchaseType: order.purchase_type,
         pvAmount: order.pv_amount,
         source: 'backoffice-paste',
+        // Paste already dedupes on product + amount + date + PV above.
+        force: true,
       });
       if (result) insertedCount++;
     }

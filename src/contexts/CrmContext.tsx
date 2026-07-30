@@ -16,7 +16,7 @@ interface CrmContextType {
   orders: Order[];
   ordersLoading: boolean;
   ordersDbActive: boolean;
-  addOrder: (o: Omit<Order, 'id'> & { contact_id?: string; dedupe_key?: string | null }) => Promise<unknown>;
+  addOrder: (o: Omit<Order, 'id'> & { contact_id?: string; dedupe_key?: string | null; force?: boolean }) => Promise<unknown>;
   updateOrder: (id: string, updates: Partial<Order>) => Promise<boolean>;
   deleteOrder: (id: string) => Promise<boolean>;
   refetchOrders: () => Promise<void>;

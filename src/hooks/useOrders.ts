@@ -69,14 +69,61 @@ export function useOrders() {
     fetchOrders();
   }, [fetchOrders]);
 
+  /**
+   * Same-person / same-amount / same-day guard.
+   *
+   * Buying twice in a month is legitimate, so we never block on name alone.
+   * But the SAME person, the SAME amount and the SAME order date is almost
+   * always the same purchase captured twice — we surface it for confirmation.
+   */
+  const findSuspectDuplicate = useCallback(async (params: {
+    contact_id?: string | null;
+    contactName?: string;
+    amount: number;
+    orderDate: string;
+  }) => {
+    if (!user || !params.orderDate) return null;
+    let q = (supabase.from('orders') as any)
+      .select('id, order_id, contact_name, product, amount, order_date, source, created_at')
+      .eq('user_id', user.id)
+      .eq('order_date', params.orderDate)
+      .eq('amount', params.amount)
+      .limit(1);
+    if (params.contact_id) q = q.eq('contact_id', params.contact_id);
+    else q = q.ilike('contact_name', (params.contactName || '').trim());
+    const { data, error } = await q;
+    if (error) {
+      console.warn('[useOrders] duplicate pre-check failed', error);
+      return null;
+    }
+    return (Array.isArray(data) && data.length > 0) ? data[0] : null;
+  }, [user]);
+
   const addOrder = async (
     order: Omit<Order, 'id'> & {
       contact_id?: string;
       /** MP0.1 — explicit dedupe_key override (preferred for monthly-activity-paste). */
       dedupe_key?: string | null;
+      /** Bypass the same-person/same-amount/same-date confirmation guard. */
+      force?: boolean;
     },
   ) => {
     if (!user) return null;
+
+    // Same person + same amount + same date → ask before creating a twin.
+    if (!order.force) {
+      const twin = await findSuspectDuplicate({
+        contact_id: order.contact_id ?? null,
+        contactName: order.contactName,
+        amount: order.amount,
+        orderDate: order.orderDate,
+      });
+      if (twin) {
+        return { id: 'suspect-duplicate', suspectDuplicate: true, existing: twin } as {
+          id: string; suspectDuplicate: true; existing: any;
+        };
+      }
+    }
 
     // Compute dedupe_key for paste-imported orders.
     // MP0.1: callers may now supply an explicit, position-independent dedupe_key
