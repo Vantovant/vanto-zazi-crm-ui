@@ -264,6 +264,27 @@ export async function runCampaignTick(opts: TickOptions) {
     if (!phone || phone.length < 8) { results.skipped++; results.rows.push({ id: row.id, status: "skipped", reason: "invalid_phone" }); continue; }
     if (await inCooldown(phone, opts.table)) { results.skipped++; results.rows.push({ id: row.id, status: "skipped", reason: "cooldown_6h" }); continue; }
 
+    // Once-per-cycle suppression: never message the same person twice for the
+    // same activity month / birthday year / zoom event, even if the queue was
+    // cleared and the list re-pasted.
+    const cycleKey = cycleKeyFor(opts.campaignKey, row);
+    const dedupeKey = dedupeKeyFor(opts.campaignKey, phone, cycleKey);
+    if (!opts.force) {
+      const prev = await alreadySentThisCycle((row as any).user_id, dedupeKey);
+      if (prev) {
+        results.skipped++;
+        if (!opts.dryRun) {
+          await admin.from(opts.table)
+            .update({ status: "skipped_duplicate", error: `already_sent:${prev}` })
+            .eq("id", row.id);
+        }
+        results.rows.push({ id: row.id, status: "skipped_duplicate", reason: "already_sent_this_cycle", cycle: cycleKey, previously_sent_at: prev });
+        continue;
+      }
+    }
+
+
+
     const body = opts.buildBody(row);
     if (opts.dryRun) {
       results.rows.push({ id: row.id, status: "dry_run", preview: body.slice(0, 80) });
