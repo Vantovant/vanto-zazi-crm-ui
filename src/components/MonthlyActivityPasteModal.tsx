@@ -274,6 +274,8 @@ export function MonthlyActivityPasteModal({ onClose, onComplete }: MonthlyActivi
         source: 'monthly-activity-paste',
         salesChannel: 'Online',
         dedupe_key: dedupeKey,
+        // MP0.1 signature (amount + levels + occurrence) already governs duplicates here.
+        force: true,
       });
       if (res && (res as any).duplicate) skipped++;
       else if (res) created++;
