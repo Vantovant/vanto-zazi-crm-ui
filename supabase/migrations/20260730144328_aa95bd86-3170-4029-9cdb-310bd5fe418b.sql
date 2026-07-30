@@ -1,0 +1,1 @@
+UPDATE public.campaign_settings SET enabled = true, updated_at = now() WHERE campaign_key = 'activation';
