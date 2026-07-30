@@ -55,6 +55,7 @@ Deno.serve(async (req) => {
     dryRun: !!body?.dry_run,
     cap: body?.cap,
     forceIds: body?.force_ids,
+    force: !!body?.force,
   });
   return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 });

@@ -378,6 +378,48 @@ export type Database = {
           },
         ]
       }
+      campaign_send_ledger: {
+        Row: {
+          campaign_key: string
+          contact_id: string | null
+          created_at: string
+          cycle_key: string
+          dedupe_key: string
+          id: string
+          maytapi_message_id: string | null
+          phone_normalized: string
+          recipient_id: string | null
+          sent_at: string
+          user_id: string
+        }
+        Insert: {
+          campaign_key: string
+          contact_id?: string | null
+          created_at?: string
+          cycle_key: string
+          dedupe_key: string
+          id?: string
+          maytapi_message_id?: string | null
+          phone_normalized: string
+          recipient_id?: string | null
+          sent_at?: string
+          user_id: string
+        }
+        Update: {
+          campaign_key?: string
+          contact_id?: string | null
+          created_at?: string
+          cycle_key?: string
+          dedupe_key?: string
+          id?: string
+          maytapi_message_id?: string | null
+          phone_normalized?: string
+          recipient_id?: string | null
+          sent_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       campaign_settings: {
         Row: {
           active_windows: string

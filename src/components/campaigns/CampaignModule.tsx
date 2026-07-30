@@ -51,10 +51,17 @@ export function CampaignModule({ title, description, table, tickFn, campaignKey,
     { label: "Read", value: stats.read, color: "text-violet-400" },
     { label: "Replied", value: stats.replied, color: "text-amber-400" },
     { label: "Failed", value: stats.failed, color: "text-rose-400" },
+    { label: "Already sent", value: stats.alreadySent, color: "text-slate-400" },
   ];
 
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
+      {stats.duplicateQueued > 0 && (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+          {stats.duplicateQueued} queued {stats.duplicateQueued === 1 ? "person was" : "people were"} already
+          messaged for this cycle — they will be skipped automatically and will not receive a second message.
+        </div>
+      )}
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-white flex items-center gap-2">

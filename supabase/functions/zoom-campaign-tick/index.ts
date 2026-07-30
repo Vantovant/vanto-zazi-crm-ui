@@ -33,6 +33,7 @@ Deno.serve(async (req) => {
     dryRun: !!body?.dry_run,
     cap: body?.cap,
     forceIds: body?.force_ids,
+    force: !!body?.force,
     extraFilter: (q) => q.gte("event_date", now.toISOString()),
   });
   return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });

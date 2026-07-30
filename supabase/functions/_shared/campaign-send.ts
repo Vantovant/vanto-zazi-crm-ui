@@ -82,7 +82,79 @@ export interface TickOptions {
   dryRun?: boolean;
   cap?: number;
   forceIds?: string[];
+  /** Deliberate resend: bypasses the once-per-cycle suppression ledger. */
+  force?: boolean;
 }
+
+const MONTHS: Record<string, string> = {
+  jan: "01", feb: "02", mar: "03", apr: "04", may: "05", jun: "06",
+  jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12",
+};
+
+/**
+ * Stable suppression cycle for a recipient row.
+ *  activation -> YYYY-MM of the activity month
+ *  birthday   -> YYYY of the birthday cycle
+ *  zoom       -> the event id
+ */
+export function cycleKeyFor(campaign: string, row: any): string {
+  const now = new Date();
+  if (campaign === "zoom") return String(row?.event_id ?? now.toISOString().slice(0, 10));
+  if (campaign === "birthday") return String(row?.cycle_year ?? now.getUTCFullYear());
+  const raw = String(row?.activity_month ?? "").trim().toLowerCase();
+  if (/^\d{4}-\d{2}$/.test(raw)) return raw;
+  const mon = MONTHS[raw.slice(0, 3)];
+  if (mon) {
+    const yr = raw.match(/(20\d{2})/)?.[1] ?? String(now.getUTCFullYear());
+    return `${yr}-${mon}`;
+  }
+  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+export function dedupeKeyFor(campaign: string, phone: string, cycle: string): string {
+  return `${campaign}:${phone}:${cycle}`;
+}
+
+/** Returns the previous send timestamp if this person was already messaged this cycle. */
+async function alreadySentThisCycle(userId: string, dedupeKey: string): Promise<string | null> {
+  const { data } = await admin
+    .from("campaign_send_ledger")
+    .select("sent_at")
+    .eq("user_id", userId)
+    .eq("dedupe_key", dedupeKey)
+    .limit(1)
+    .maybeSingle();
+  return (data as any)?.sent_at ?? null;
+}
+
+async function writeLedger(params: {
+  userId: string;
+  campaignKey: string;
+  phone: string;
+  cycleKey: string;
+  dedupeKey: string;
+  contactId: string | null;
+  recipientId: string;
+  msgId?: string;
+  sentAt: string;
+}) {
+  try {
+    await admin.from("campaign_send_ledger").insert({
+      user_id: params.userId,
+      campaign_key: params.campaignKey,
+      phone_normalized: params.phone,
+      cycle_key: params.cycleKey,
+      dedupe_key: params.dedupeKey,
+      contact_id: params.contactId,
+      recipient_id: params.recipientId,
+      maytapi_message_id: params.msgId ?? null,
+      sent_at: params.sentAt,
+    });
+  } catch (_e) {
+    // unique violation = already recorded; never break the send path
+  }
+}
+
 
 async function loadContactSnapshot(contactId: string | null): Promise<Record<string, unknown> | null> {
   if (!contactId) return null;
@@ -192,6 +264,27 @@ export async function runCampaignTick(opts: TickOptions) {
     if (!phone || phone.length < 8) { results.skipped++; results.rows.push({ id: row.id, status: "skipped", reason: "invalid_phone" }); continue; }
     if (await inCooldown(phone, opts.table)) { results.skipped++; results.rows.push({ id: row.id, status: "skipped", reason: "cooldown_6h" }); continue; }
 
+    // Once-per-cycle suppression: never message the same person twice for the
+    // same activity month / birthday year / zoom event, even if the queue was
+    // cleared and the list re-pasted.
+    const cycleKey = cycleKeyFor(opts.campaignKey, row);
+    const dedupeKey = dedupeKeyFor(opts.campaignKey, phone, cycleKey);
+    if (!opts.force) {
+      const prev = await alreadySentThisCycle((row as any).user_id, dedupeKey);
+      if (prev) {
+        results.skipped++;
+        if (!opts.dryRun) {
+          await admin.from(opts.table)
+            .update({ status: "skipped_duplicate", error: `already_sent:${prev}` })
+            .eq("id", row.id);
+        }
+        results.rows.push({ id: row.id, status: "skipped_duplicate", reason: "already_sent_this_cycle", cycle: cycleKey, previously_sent_at: prev });
+        continue;
+      }
+    }
+
+
+
     const body = opts.buildBody(row);
     if (opts.dryRun) {
       results.rows.push({ id: row.id, status: "dry_run", preview: body.slice(0, 80) });
@@ -251,6 +344,18 @@ export async function runCampaignTick(opts: TickOptions) {
     }
     results.sent++;
     const sentAt = new Date().toISOString();
+    await writeLedger({
+      userId: (row as any).user_id,
+      campaignKey: opts.campaignKey,
+      phone,
+      cycleKey,
+      dedupeKey,
+      contactId: (row as any).contact_id ?? null,
+      recipientId: row.id,
+      msgId: send.msgId,
+      sentAt,
+    });
+
     await mirrorOutboundToInbox({
       userId: (row as any).user_id,
       contactId: (row as any).contact_id ?? null,
