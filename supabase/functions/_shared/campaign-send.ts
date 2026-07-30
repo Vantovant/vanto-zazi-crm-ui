@@ -344,6 +344,18 @@ export async function runCampaignTick(opts: TickOptions) {
     }
     results.sent++;
     const sentAt = new Date().toISOString();
+    await writeLedger({
+      userId: (row as any).user_id,
+      campaignKey: opts.campaignKey,
+      phone,
+      cycleKey,
+      dedupeKey,
+      contactId: (row as any).contact_id ?? null,
+      recipientId: row.id,
+      msgId: send.msgId,
+      sentAt,
+    });
+
     await mirrorOutboundToInbox({
       userId: (row as any).user_id,
       contactId: (row as any).contact_id ?? null,
