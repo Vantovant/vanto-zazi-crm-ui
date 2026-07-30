@@ -23,12 +23,15 @@ function buildBody(row: any): string {
     return `Hi ${first} 👋\n\nThis is Vanto Vanto from APLGO. Thank you for your ${month} activity${amtStr ? ` of ${amtStr}` : ""} — welcome and well done! 🙏\n\nYou can order anytime here: ${SHOP_URL}\n\n${SIGNATURE}`;
   }
 
+  const order = `\n\nOrder anytime here: ${SHOP_URL}`;
+
   const library: Record<typeof tier, string> = {
-    champion: `Leader ${first} 👑\n\nThank you for your ${month} activity of ${amtStr} — champion level. You are leading from the front. 🔥\n\n${SIGNATURE}`,
-    strong: `Leader ${first} 🌟\n\nThank you for your ${month} activity of ${amtStr}. Strong commitment — it moves the whole team forward. 💪\n\n${SIGNATURE}`,
-    solid: `Leader ${first} 🙏\n\nThank you for staying active in ${month} with ${amtStr}. Consistency keeps your rank and your income growing. 🌱\n\n${SIGNATURE}`,
-    starter: `Leader ${first} 🌿\n\nThank you for staying active in ${month}${amtStr ? ` with ${amtStr}` : ""}. Every active month protects your position and commissions. 💚\n\n${SIGNATURE}`,
+    champion: `Leader ${first} 👑\n\nThank you for your ${month} activity of ${amtStr} — champion level. You are leading from the front. 🔥${order}\n\n${SIGNATURE}`,
+    strong: `Leader ${first} 🌟\n\nThank you for your ${month} activity of ${amtStr}. Strong commitment — it moves the whole team forward. 💪${order}\n\n${SIGNATURE}`,
+    solid: `Leader ${first} 🙏\n\nThank you for staying active in ${month} with ${amtStr}. Consistency keeps your rank and your income growing. 🌱${order}\n\n${SIGNATURE}`,
+    starter: `Leader ${first} 🌿\n\nThank you for staying active in ${month}${amtStr ? ` with ${amtStr}` : ""}. Every active month protects your position and commissions. 💚${order}\n\n${SIGNATURE}`,
   };
+
 
   return library[tier];
 }
