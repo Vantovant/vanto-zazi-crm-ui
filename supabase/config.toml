@@ -26,3 +26,7 @@ verify_jwt = false
 
 [functions.google-contacts-auth-callback]
 verify_jwt = false
+
+[functions.mcp-bridge]
+verify_jwt = false
+
