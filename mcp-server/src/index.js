@@ -43,18 +43,24 @@ async function callBridge(action, payload = {}) {
 
 // ---------------------------------------------------------------------------
 // MCP server + tools
-// Deliberately read-mostly / safety-scoped for this first version:
-//   - No WhatsApp send capability exposed (sending stays behind the app's own
-//     approval workflow in zazi_actions / maytapi-send-1to1, not this bridge).
+// Deliberately read-mostly / safety-scoped:
+//   - No WhatsApp send capability exposed anywhere (sending stays behind the
+//     app's own approval workflow in zazi_actions / maytapi-send-1to1).
+//   - WhatsApp inbox tools only ever surface MATCHED contacts — unmatched /
+//     unknown numbers (masked ••••XXXX in-app) are never reachable here.
 //   - No order creation/editing (orders are read-only here — financial data).
-//   - No delete of any kind.
+//   - No contact/inventory deletes. No duplicate-merge (detection only).
+//   - No Sponsor ID placeholder-contact creation (that page is "no automatic
+//     fixes" even in-app).
+//   - No Prospector approve/reject/snooze/send — draft review only.
 //   - update_contact only ever touches fields explicitly provided.
 //   - add_contact_note is strictly additive.
+//   - create_contact runs the same duplicate check the app's own UI runs.
 // ---------------------------------------------------------------------------
 function buildServer() {
   const server = new McpServer({
     name: "vanto-zazi-mcp",
-    version: "1.0.0",
+    version: "1.1.0",
   });
 
   server.registerTool(
@@ -132,6 +138,39 @@ function buildServer() {
   );
 
   server.registerTool(
+    "create_contact",
+    {
+      title: "Create a new contact",
+      description:
+        "Add a new contact to the CRM. Runs the same duplicate check the app's own " +
+        "Add Contact flow runs (matching phone_number/email_address against existing " +
+        "contacts) — if a likely duplicate is found, it returns that existing contact " +
+        "instead of creating a new one, unless force=true is passed. Defaults mirror " +
+        "the app: lead_temperature=Warm, communication_status=New, " +
+        "registration_status='Not Registered', lead_type=Prospect, country='South Africa'.",
+      inputSchema: {
+        full_name: z.string().describe("Required. Contact's full name."),
+        phone_number: z.string().optional(),
+        email_address: z.string().optional(),
+        city: z.string().optional(),
+        province: z.string().optional(),
+        country: z.string().optional().describe("Defaults to South Africa if omitted"),
+        lead_temperature: z.string().optional().describe("Defaults to Warm"),
+        communication_status: z.string().optional().describe("Defaults to New"),
+        registration_status: z.string().optional().describe("Defaults to Not Registered"),
+        lead_type: z.string().optional().describe("Defaults to Prospect"),
+        sponsor_name: z.string().optional(),
+        additional_notes: z.string().optional(),
+        force: z.boolean().optional().describe("Set true to create even if a phone/email duplicate is found"),
+      },
+    },
+    async (args) => {
+      const data = await callBridge("create_contact", args);
+      return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+    }
+  );
+
+  server.registerTool(
     "add_contact_note",
     {
       title: "Log an activity / note for a contact",
@@ -181,6 +220,175 @@ function buildServer() {
     },
     async () => {
       const data = await callBridge("get_prospector_status");
+      return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+    }
+  );
+
+  server.registerTool(
+    "get_prospector_drafts",
+    {
+      title: "Get Zazi AI Prospector draft detail",
+      description:
+        "Full detail for prospector-drafted outreach (zazi_actions), including the " +
+        "proposed message text, supervisor quality/safety scores, and block reasons — " +
+        "the same detail shown in the in-app Prospector Inbox review screen. " +
+        "Read-only — no approve/reject/snooze/send action is exposed here; sending " +
+        "stays a one-by-one, human-approved action in the app.",
+      inputSchema: {
+        status: z.string().optional().describe("Filter by status: draft, approved, rejected, snoozed, sent"),
+        limit: z.number().int().positive().max(100).optional().describe("Max results, default 25, max 100"),
+      },
+    },
+    async (args) => {
+      const data = await callBridge("get_prospector_drafts", args);
+      return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+    }
+  );
+
+  server.registerTool(
+    "list_inventory",
+    {
+      title: "List offline inventory",
+      description: "Read tracked stock levels from the Offline Inventory page. Read-only.",
+      inputSchema: {},
+    },
+    async () => {
+      const data = await callBridge("list_inventory");
+      return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+    }
+  );
+
+  server.registerTool(
+    "update_inventory_stock",
+    {
+      title: "Set inventory stock quantity",
+      description:
+        "Set the absolute stock quantity for a product, by inventory id or by " +
+        "product_name (creates a new inventory row if that product doesn't exist yet). " +
+        "Same operation as the inline stock edit in the app's Inventory page.",
+      inputSchema: {
+        id: z.string().optional().describe("Inventory row UUID (preferred if known)"),
+        product_name: z.string().optional().describe("Product name — used if id is omitted; will create the row if it doesn't exist"),
+        quantity: z.number().int().nonnegative().describe("New absolute stock quantity"),
+      },
+    },
+    async (args) => {
+      const data = await callBridge("update_inventory_stock", args);
+      return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+    }
+  );
+
+  server.registerTool(
+    "get_deals_summary",
+    {
+      title: "Get Deals summary",
+      description:
+        "Derived view of activated distributors (contacts with lead_type = " +
+        "'Purchase_Status'), matching the Deals page: split into 'Activation Only' " +
+        "vs 'With GO-Status', with order totals per contact. Read-only, computed on " +
+        "each call (not a stored table).",
+      inputSchema: {
+        limit: z.number().int().positive().max(100).optional().describe("Max deals returned, default 50, max 100"),
+      },
+    },
+    async (args) => {
+      const data = await callBridge("get_deals_summary", args);
+      return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+    }
+  );
+
+  server.registerTool(
+    "find_duplicate_contacts",
+    {
+      title: "Find duplicate contacts",
+      description:
+        "Detects contacts sharing the same normalized phone or email, matching the " +
+        "Duplicates page's grouping logic. Detection only — no merge or delete tool " +
+        "is exposed via MCP; resolving duplicates stays an in-app, human-confirmed " +
+        "action since it permanently deletes contact rows.",
+      inputSchema: {},
+    },
+    async () => {
+      const data = await callBridge("find_duplicate_contacts");
+      return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+    }
+  );
+
+  server.registerTool(
+    "get_sponsor_id_audit",
+    {
+      title: "Get Sponsor ID Review audit",
+      description:
+        "Read-only audit matching the Sponsor ID Review page: counts of exact / " +
+        "ambiguous / missing aplgo_id matches against sponsor_name references, " +
+        "self-match risks, and a list of sponsor IDs with no matching upline contact " +
+        "yet. No writes — this page is explicitly 'no automatic fixes' even in-app, " +
+        "and placeholder-upline creation is not exposed here.",
+      inputSchema: {},
+    },
+    async () => {
+      const data = await callBridge("get_sponsor_id_audit");
+      return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+    }
+  );
+
+  server.registerTool(
+    "list_birthdays",
+    {
+      title: "List birthdays",
+      description:
+        "Read the Birthday WhatsApp Engine list (contact_birthdays) for a cycle year " +
+        "(defaults to the current year), optionally filtered by status " +
+        "(not_congratulated/congratulated/unmatched). Each entry includes a computed " +
+        "'timing' bucket: today, tomorrow, this_week, upcoming, or past. Read-only — " +
+        "no send/enroll/congratulate action is exposed here.",
+      inputSchema: {
+        status: z.string().optional().describe("Filter: not_congratulated, congratulated, or unmatched"),
+        cycle_year: z.number().int().optional().describe("Defaults to the current year"),
+        limit: z.number().int().positive().max(200).optional().describe("Max results, default 100, max 200"),
+      },
+    },
+    async (args) => {
+      const data = await callBridge("list_birthdays", args);
+      return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+    }
+  );
+
+  server.registerTool(
+    "list_whatsapp_conversations",
+    {
+      title: "List WhatsApp conversations",
+      description:
+        "Read-only summary of WhatsApp conversations from the Maytapi inbox — last " +
+        "message preview, timestamp, and unread count per contact. MATCHED CONTACTS " +
+        "ONLY: unmatched/unknown numbers are never surfaced here, mirroring the app's " +
+        "own privacy gate for unlinked numbers. No reply/send capability.",
+      inputSchema: {
+        limit: z.number().int().positive().max(300).optional().describe("Max messages scanned, default 200, max 300"),
+      },
+    },
+    async (args) => {
+      const data = await callBridge("list_whatsapp_conversations", args);
+      return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+    }
+  );
+
+  server.registerTool(
+    "get_whatsapp_thread",
+    {
+      title: "Get a WhatsApp conversation thread",
+      description:
+        "Full message history for one contact's WhatsApp conversation, oldest first. " +
+        "Requires contact_id (not a raw conversation key) — this is a deliberate " +
+        "guardrail so an unmatched/masked-number thread can never be requested " +
+        "through this tool. Read-only.",
+      inputSchema: {
+        contact_id: z.string().describe("UUID of the contact whose thread to read"),
+        limit: z.number().int().positive().max(200).optional().describe("Max messages, default 100, max 200"),
+      },
+    },
+    async (args) => {
+      const data = await callBridge("get_whatsapp_thread", args);
       return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
     }
   );
