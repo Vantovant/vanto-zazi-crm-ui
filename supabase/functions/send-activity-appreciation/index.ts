@@ -43,7 +43,7 @@
 //   - Daily cap defaults to 20/day (the standing 1-on-1 pacing rule), reading
 //     integration_settings.auto_send_daily_cap if set.
 //   - Quiet hours reuse auto_send_quiet_start_hour / auto_send_quiet_end_hour.
-//   - do_not_contact / Unsubscribed / no-phone contacts are skipped, not queued.
+//   - Opted-out (auto_send_opt_out) / Unsubscribed / no-phone contacts are skipped, not queued.
 //   - dry_run=true returns the exact candidate list + fully rendered messages without
 //     sending anything or writing any marker — this is the "show me an example before I
 //     approve" preview step.
@@ -190,7 +190,7 @@ Deno.serve(async (req) => {
     // ── Contacts map ──
     const contactIds = [...new Set(orders.map((o: any) => o.contact_id).filter(Boolean))];
     const { data: contacts } = await admin.from('contacts')
-      .select('id, full_name, phone_normalized, communication_status, do_not_contact')
+      .select('id, full_name, phone_normalized, communication_status, auto_send_opt_out')
       .in('id', contactIds);
     const cmap = new Map((contacts || []).map((c: any) => [c.id, c]));
 
@@ -217,7 +217,7 @@ Deno.serve(async (req) => {
         skipped++;
         continue;
       }
-      if (c.do_not_contact || c.communication_status === 'Unsubscribed') {
+      if (c.auto_send_opt_out || c.communication_status === 'Unsubscribed') {
         attempts.push({ order_id: o.id, contact_id: o.contact_id, skipped: 'opted_out' });
         skipped++;
         continue;
