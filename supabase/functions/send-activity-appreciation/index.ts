@@ -40,6 +40,10 @@
 //   - One entry marker per order id. An order that already has a matching
 //     [monthly_activity_appreciation_entry:oid:<id>] marker in contact_activities is
 //     skipped, full stop.
+//   - Shared-phone guard: if the phone number on file for a contact also belongs to a
+//     DIFFERENT identity (different aplgo_id/name — e.g. a downline registered using
+//     someone else's phone), the send is skipped and flagged rather than risking a
+//     message reaching the wrong person under the wrong name.
 //   - Daily cap defaults to 20/day (the standing 1-on-1 pacing rule), reading
 //     integration_settings.auto_send_daily_cap if set.
 //   - Quiet hours reuse auto_send_quiet_start_hour / auto_send_quiet_end_hour.
@@ -51,11 +55,16 @@
 // USAGE
 // -----------------
 //   POST body: { month?: "2026-07" (defaults to current SAST month),
+//                months?: ["2026-07", "2026-08"] (use instead of "month" when a single
+//                  paste covers more than one month — each month is still tracked and
+//                  marked independently, this just avoids two separate calls),
 //                dry_run?: boolean (default false),
 //                limit?: number (optional extra cap on top of the daily cap) }
 //
-//   Typical flow: call with dry_run:true first, review the "attempts" preview list,
-//   then call again with dry_run:false (or omitted) to actually send.
+//   Typical flow: call with dry_run:true first, review the "attempts" preview list
+//   (check especially for "phone_shared_with_another_identity" skips — those need a
+//   human decision, not an automatic send), then call again with dry_run:false to
+//   actually send.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
@@ -108,12 +117,17 @@ Deno.serve(async (req) => {
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     const reqBody = await req.json().catch(() => ({}));
-    const monthKey = monthKeyOf(reqBody.month);
-    const { start, end, label } = monthBounds(monthKey);
+    // Accepts either a single month ("month": "2026-07") or multiple in one call
+    // ("months": ["2026-07", "2026-08"]) — for when a paste covers more than one
+    // month at once. Each month is still processed and marked independently;
+    // this just avoids needing two separate calls for one paste.
+    const monthKeys: string[] = Array.isArray(reqBody.months) && reqBody.months.length > 0
+      ? reqBody.months.map((m: string) => monthKeyOf(m))
+      : [monthKeyOf(reqBody.month)];
     const dryRun = !!reqBody.dry_run;
     const requestedLimit = typeof reqBody.limit === 'number' ? reqBody.limit : null;
 
-    // ── Settings / caps / quiet hours (reuses existing columns — no schema change needed) ──
+    // ── Settings / caps / quiet hours (shared across all requested months) ──
     const { data: settings } = await admin.from('integration_settings')
       .select('auto_send_daily_cap, auto_send_quiet_start_hour, auto_send_quiet_end_hour, maytapi_enabled')
       .eq('user_id', user.id).maybeSingle();
@@ -129,6 +143,7 @@ Deno.serve(async (req) => {
     }
 
     // ── Today's already-sent count through THIS function specifically (mode=activity_appreciation) ──
+    // Shared across all months in this call — the cap is a daily pacing limit, not a per-month one.
     const todayStart = new Date();
     todayStart.setUTCHours(0, 0, 0, 0);
     const { data: todaySends } = await admin.from('prospector_send_log')
@@ -163,126 +178,196 @@ Deno.serve(async (req) => {
     const { data: profile } = await admin.from('profiles').select('display_name, email').eq('id', user.id).maybeSingle();
     const senderName = profile?.display_name || 'Vanto';
 
-    // ── Candidates: source-agnostic — Smart Paste, Monthly Activity Paste, or manual entry all qualify ──
-    const { data: orders } = await admin.from('orders')
-      .select('id, contact_id, contact_name, product, amount, order_date, source')
-      .eq('user_id', user.id)
-      .eq('purchase_type', 'Activity')
-      .gte('order_date', start)
-      .lt('order_date', end)
-      .order('order_date', { ascending: true });
-
-    if (!orders || orders.length === 0) {
-      return json({ ok: true, month: monthKey, month_label: label, dry_run: dryRun, candidates: 0, sent: 0, skipped: 0, attempts: [] });
-    }
-
-    // ── Already-sent entry keys for this month (the dedupe check) ──
-    const { data: doneActs } = await admin.from('contact_activities')
+    // ── Already-sent entry keys — global, not month-scoped, since entry keys are order-id-based
+    //    (a single fetch covers dedupe for every month requested in this call) ──
+    const { data: doneActs, error: doneActsErr } = await admin.from('contact_activities')
       .select('summary')
       .eq('user_id', user.id)
       .ilike('summary', `%[monthly_activity_appreciation_entry:%`);
+    if (doneActsErr) return json({ ok: false, error: 'dedupe_lookup_failed', details: doneActsErr.message });
     const doneKeys = new Set<string>();
     for (const a of (doneActs || [])) {
       const m = (a.summary || '').match(/\[monthly_activity_appreciation_entry:([^\]]+)\]/i);
       if (m) doneKeys.add(m[1].trim());
     }
 
-    // ── Contacts map ──
-    const contactIds = [...new Set(orders.map((o: any) => o.contact_id).filter(Boolean))];
-    const { data: contacts } = await admin.from('contacts')
-      .select('id, full_name, phone_normalized, communication_status, auto_send_opt_out')
-      .in('id', contactIds);
-    const cmap = new Map((contacts || []).map((c: any) => [c.id, c]));
-
     const attempts: any[] = [];
-    let sent = 0, skipped = 0;
+    const perMonth: any[] = [];
+    let totalCandidates = 0, sent = 0, skipped = 0;
 
-    for (const o of orders) {
-      const entryKey = `oid:${o.id}`;
+    for (const monthKey of monthKeys) {
+      const { start, end, label } = monthBounds(monthKey);
 
-      if (doneKeys.has(entryKey)) {
-        attempts.push({ order_id: o.id, contact_id: o.contact_id, contact_name: o.contact_name, skipped: 'already_sent' });
-        skipped++;
+      // ── Candidates for this month: source-agnostic — Smart Paste, Monthly Activity Paste,
+      //    or manual entry all qualify, as long as purchase_type='Activity' ──
+      const { data: orders, error: ordersErr } = await admin.from('orders')
+        .select('id, contact_id, contact_name, product, amount, order_date, source')
+        .eq('user_id', user.id)
+        .eq('purchase_type', 'Activity')
+        .gte('order_date', start)
+        .lt('order_date', end)
+        .order('order_date', { ascending: true });
+
+      if (ordersErr) return json({ ok: false, error: 'orders_fetch_failed', month: monthKey, details: ordersErr.message });
+
+      if (!orders || orders.length === 0) {
+        perMonth.push({ month: monthKey, month_label: label, candidates: 0, sent: 0, skipped: 0 });
         continue;
       }
-      if (!o.contact_id) {
-        attempts.push({ order_id: o.id, contact_name: o.contact_name, skipped: 'no_contact_matched' });
-        skipped++;
-        continue;
+      totalCandidates += orders.length;
+
+      // ── Contacts map for this month's candidates (chunked + error-checked: a silently-swallowed
+      //     error here previously made every non-deduped order look like "contact_not_found") ──
+      const contactIds = [...new Set(orders.map((o: any) => o.contact_id).filter(Boolean))];
+      const cmap = new Map<string, any>();
+      const contactFetchErrors: string[] = [];
+      const CHUNK = 50;
+      for (let i = 0; i < contactIds.length; i += CHUNK) {
+        const chunk = contactIds.slice(i, i + CHUNK);
+        const { data: contactsChunk, error: contactsErr } = await admin.from('contacts')
+          .select('id, full_name, phone_normalized, communication_status, auto_send_opt_out, aplgo_id')
+          .in('id', chunk);
+        if (contactsErr) {
+          contactFetchErrors.push(contactsErr.message);
+          continue;
+        }
+        for (const c of (contactsChunk || [])) cmap.set(c.id, c);
+      }
+      if (contactFetchErrors.length > 0) {
+        return json({ ok: false, error: 'contacts_fetch_failed', month: monthKey, details: contactFetchErrors });
       }
 
-      const c = cmap.get(o.contact_id);
-      if (!c) {
-        attempts.push({ order_id: o.id, contact_id: o.contact_id, skipped: 'contact_not_found' });
-        skipped++;
-        continue;
+      // ── Shared-phone guard ──
+      // People sometimes register a downline using their own phone (or someone else's) —
+      // the number on file then belongs to more than one distinct identity (different
+      // aplgo_id / different name). Sending under one contact's name to a phone that's
+      // actually someone else's device is worse than leaving them Pending, so any phone
+      // shared across contacts with a *different* aplgo_id is flagged and skipped rather
+      // than sent to automatically. This checks against the full contacts table, not just
+      // this month's candidates, since the collision may involve a contact outside this batch.
+      const candidatePhones = [...new Set(
+        Array.from(cmap.values()).map((c: any) => (c.phone_normalized || '').trim()).filter(Boolean)
+      )];
+      const phoneOwners = new Map<string, Set<string>>(); // phone -> set of "name (aplgo_id)"
+      if (candidatePhones.length > 0) {
+        for (let i = 0; i < candidatePhones.length; i += 50) {
+          const chunk = candidatePhones.slice(i, i + 50);
+          const { data: overlap } = await admin.from('contacts')
+            .select('phone_normalized, full_name, aplgo_id')
+            .in('phone_normalized', chunk);
+          for (const row of (overlap || [])) {
+            const key = row.phone_normalized;
+            const identity = `${row.full_name || 'unknown'} (${row.aplgo_id || 'no-id'})`;
+            if (!phoneOwners.has(key)) phoneOwners.set(key, new Set());
+            phoneOwners.get(key)!.add(identity);
+          }
+        }
       }
-      if (c.auto_send_opt_out || c.communication_status === 'Unsubscribed') {
-        attempts.push({ order_id: o.id, contact_id: o.contact_id, skipped: 'opted_out' });
-        skipped++;
-        continue;
-      }
-      const phoneDigits = (c.phone_normalized || '').replace(/\D/g, '');
-      if (!phoneDigits || phoneDigits.length < 9) {
-        attempts.push({ order_id: o.id, contact_id: o.contact_id, skipped: 'no_phone' });
-        skipped++;
-        continue;
+      function phoneCollision(c: any): string | null {
+        const owners = phoneOwners.get((c.phone_normalized || '').trim());
+        if (!owners || owners.size <= 1) return null;
+        const distinctIds = new Set([...owners].map((o) => o.split('(').pop()));
+        if (distinctIds.size <= 1) return null; // same person, duplicate row — not a collision
+        return [...owners].join(' / ');
       }
 
-      const firstName = (c.full_name || o.contact_name || '').split(' ')[0] || 'there';
-      const message = renderTemplate(template.body, {
-        firstName,
-        month: label,
-        amount: Number(o.amount || 0).toLocaleString(),
-        senderName,
-      });
+      let monthSent = 0, monthSkipped = 0;
 
-      if (dryRun) {
-        attempts.push({
-          order_id: o.id, contact_id: o.contact_id, contact_name: c.full_name,
-          entry_key: entryKey, amount: o.amount, source: o.source,
-          preview: message, would_send: true,
+      for (const o of orders) {
+        const entryKey = `oid:${o.id}`;
+
+        if (doneKeys.has(entryKey)) {
+          attempts.push({ month: monthKey, order_id: o.id, contact_id: o.contact_id, contact_name: o.contact_name, skipped: 'already_sent' });
+          skipped++; monthSkipped++;
+          continue;
+        }
+        if (!o.contact_id) {
+          attempts.push({ month: monthKey, order_id: o.id, contact_name: o.contact_name, skipped: 'no_contact_matched' });
+          skipped++; monthSkipped++;
+          continue;
+        }
+
+        const c = cmap.get(o.contact_id);
+        if (!c) {
+          attempts.push({ month: monthKey, order_id: o.id, contact_id: o.contact_id, skipped: 'contact_not_found' });
+          skipped++; monthSkipped++;
+          continue;
+        }
+        if (c.auto_send_opt_out || c.communication_status === 'Unsubscribed') {
+          attempts.push({ month: monthKey, order_id: o.id, contact_id: o.contact_id, skipped: 'opted_out' });
+          skipped++; monthSkipped++;
+          continue;
+        }
+        const phoneDigits = (c.phone_normalized || '').replace(/\D/g, '');
+        if (!phoneDigits || phoneDigits.length < 9) {
+          attempts.push({ month: monthKey, order_id: o.id, contact_id: o.contact_id, skipped: 'no_phone' });
+          skipped++; monthSkipped++;
+          continue;
+        }
+        const collision = phoneCollision(c);
+        if (collision) {
+          attempts.push({ month: monthKey, order_id: o.id, contact_id: o.contact_id, contact_name: c.full_name, skipped: 'phone_shared_with_another_identity', shared_with: collision });
+          skipped++; monthSkipped++;
+          continue;
+        }
+
+        const firstName = (c.full_name || o.contact_name || '').split(' ')[0] || 'there';
+        const message = renderTemplate(template.body, {
+          firstName,
+          month: label,
+          amount: Number(o.amount || 0).toLocaleString(),
+          senderName,
         });
-        continue;
+
+        if (dryRun) {
+          attempts.push({
+            month: monthKey, order_id: o.id, contact_id: o.contact_id, contact_name: c.full_name,
+            entry_key: entryKey, amount: o.amount, source: o.source,
+            preview: message, would_send: true,
+          });
+          continue;
+        }
+
+        if (sent >= remaining) {
+          attempts.push({ month: monthKey, order_id: o.id, contact_id: o.contact_id, skipped: 'daily_cap_reached' });
+          skipped++; monthSkipped++;
+          continue;
+        }
+
+        const result = await sendOne(admin, user.id, o.contact_id, message, `appr:${entryKey}:${monthKey}`);
+        attempts.push({ month: monthKey, order_id: o.id, contact_id: o.contact_id, contact_name: c.full_name, entry_key: entryKey, ...result });
+
+        if (result.ok && result.message_id) {
+          const monthMarker = `[monthly_activity_appreciation:${monthKey}]`;
+          const entryMarker = `[monthly_activity_appreciation_entry:${entryKey}]`;
+          const msgMarker = `[maytapi_message:${result.message_id}]`;
+          await admin.from('contact_activities').insert({
+            user_id: user.id,
+            contact_id: o.contact_id,
+            activity_type: 'whatsapp',
+            summary: `Sent monthly activity appreciation [send-activity-appreciation] | ${monthKey} | ${monthMarker} ${entryMarker} ${msgMarker}`,
+            notes: `${message}\n\n${monthMarker} ${entryMarker} ${msgMarker}`,
+            next_action: '',
+          });
+          sent++; monthSent++;
+          doneKeys.add(entryKey);
+        }
       }
 
-      if (sent >= remaining) {
-        attempts.push({ order_id: o.id, contact_id: o.contact_id, skipped: 'daily_cap_reached' });
-        skipped++;
-        continue;
-      }
-
-      const result = await sendOne(admin, user.id, o.contact_id, message, `appr:${entryKey}:${monthKey}`);
-      attempts.push({ order_id: o.id, contact_id: o.contact_id, contact_name: c.full_name, entry_key: entryKey, ...result });
-
-      if (result.ok && result.message_id) {
-        const monthMarker = `[monthly_activity_appreciation:${monthKey}]`;
-        const entryMarker = `[monthly_activity_appreciation_entry:${entryKey}]`;
-        const msgMarker = `[maytapi_message:${result.message_id}]`;
-        await admin.from('contact_activities').insert({
-          user_id: user.id,
-          contact_id: o.contact_id,
-          activity_type: 'whatsapp',
-          summary: `Sent monthly activity appreciation [send-activity-appreciation] | ${monthKey} | ${monthMarker} ${entryMarker} ${msgMarker}`,
-          notes: `${message}\n\n${monthMarker} ${entryMarker} ${msgMarker}`,
-          next_action: '',
-        });
-        sent++;
-        doneKeys.add(entryKey);
-      }
+      perMonth.push({ month: monthKey, month_label: label, candidates: orders.length, sent: monthSent, skipped: monthSkipped });
     }
 
     return json({
       ok: true,
-      month: monthKey,
-      month_label: label,
+      months: monthKeys,
       dry_run: dryRun,
       template_used: template.template_name,
-      candidates: orders.length,
+      candidates: totalCandidates,
       sent,
       skipped,
       daily_cap: dailyCap,
       sent_today_before_this_run: sentToday,
+      per_month: perMonth,
       attempts,
     });
   } catch (e) {
