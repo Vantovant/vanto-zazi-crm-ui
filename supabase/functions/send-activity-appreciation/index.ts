@@ -77,6 +77,11 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
+// maytapi-send-1to1 hard-enforces this exact format on every message it sends
+// (see verifyFirstTouchFormat in that function) — these are not configurable per-call.
+const MAYTAPI_BRANDED_URL = 'https://crm.onlinecourseformlm.com/aplgo.html';
+const MAYTAPI_REQUIRED_SENDER_EMAIL = 'vanto@onlinecourseformlm.com';
+
 function monthKeyOf(input?: string): string {
   if (input && /^\d{4}-\d{2}$/.test(input)) return input;
   const now = new Date();
@@ -312,18 +317,25 @@ Deno.serve(async (req) => {
         }
 
         const firstName = (c.full_name || o.contact_name || '').split(' ')[0] || 'there';
-        const message = renderTemplate(template.body, {
+        const bodyText = renderTemplate(template.body, {
           firstName,
           month: label,
           amount: Number(o.amount || 0).toLocaleString(),
           senderName,
         });
+        // maytapi-send-1to1 hard-requires this exact format (verifyFirstTouchFormat):
+        // first line = the branded URL exactly, plus a signature containing "— Vanto"
+        // and "vanto@onlinecourseformlm.com". The message_templates library entry stays
+        // clean and human-editable; this wrapper is applied only at send time so what's
+        // shown in dry_run preview is exactly what will actually go out.
+        const message = `${MAYTAPI_BRANDED_URL}\n\n${bodyText}\n\n— Vanto\n${MAYTAPI_REQUIRED_SENDER_EMAIL}`;
 
         if (dryRun) {
           attempts.push({
             month: monthKey, order_id: o.id, contact_id: o.contact_id, contact_name: c.full_name,
             entry_key: entryKey, amount: o.amount, source: o.source,
             preview: message, would_send: true,
+            note: 'This will send as a media message (branded APLGO image) via maytapi-send-1to1, not plain text — that function enforces this format for every send.',
           });
           continue;
         }
@@ -334,7 +346,7 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        const result = await sendOne(admin, user.id, o.contact_id, message, `appr:${entryKey}:${monthKey}`);
+        const result = await sendOne(admin, authHeader, user.id, o.contact_id, message, `appr:${entryKey}:${monthKey}`);
         attempts.push({ month: monthKey, order_id: o.id, contact_id: o.contact_id, contact_name: c.full_name, entry_key: entryKey, ...result });
 
         if (result.ok && result.message_id) {
@@ -379,9 +391,15 @@ function json(o: unknown, status = 200) {
   return new Response(JSON.stringify(o), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 }
 
-// ── Single-row send via the locked maytapi-send-1to1 function (same call pattern as auto-send-micro-live) ──
+// ── Single-row send via the locked maytapi-send-1to1 function ──
+// IMPORTANT: maytapi-send-1to1 validates a real user session via auth.getUser(token),
+// then checks that user has the 'admin' role in user_roles. It does NOT accept the
+// service-role key as a bearer token — passing that causes an "Invalid JWT" rejection
+// (this was caught and fixed after the first live send attempt failed exactly this way).
+// The caller's own Authorization header must be forwarded through.
 async function sendOne(
   admin: ReturnType<typeof createClient>,
+  callerAuthHeader: string,
   userId: string,
   contactId: string,
   finalMessage: string,
@@ -432,7 +450,7 @@ async function sendOne(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        Authorization: callerAuthHeader,
         'x-auto-send-mode': 'activity_appreciation',
       },
       body: JSON.stringify({ zazi_action_id: zaziActionId, test_mode: true }),
