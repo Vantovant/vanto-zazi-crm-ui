@@ -107,6 +107,17 @@ function sastHour(): number {
   return sast.getUTCHours();
 }
 
+// Randomized 8–20 second pause between consecutive real sends. Deliberately not a
+// fixed interval — a perfectly even gap is itself a detectable automated pattern.
+// With daily_cap defaulting to 10, worst case this adds under 3 minutes total,
+// comfortably inside Edge Function execution limits. If the cap is raised well
+// beyond that later, this budget is worth re-checking against the platform's
+// function timeout.
+async function humanPause(): Promise<void> {
+  const ms = 8000 + Math.floor(Math.random() * 12000); // 8–20s
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
@@ -345,6 +356,12 @@ Deno.serve(async (req) => {
           skipped++; monthSkipped++;
           continue;
         }
+
+        // Pace real sends — no gap before the very first one, then a randomized
+        // human-like pause before each subsequent send in this run. Firing 1-on-1
+        // messages back-to-back is exactly the pattern WhatsApp/Maytapi flags as
+        // automated, risking the number being throttled or banned.
+        if (sent > 0) await humanPause();
 
         const result = await sendOne(admin, authHeader, user.id, o.contact_id, message, `appr:${entryKey}:${monthKey}`);
         attempts.push({ month: monthKey, order_id: o.id, contact_id: o.contact_id, contact_name: c.full_name, entry_key: entryKey, ...result });
