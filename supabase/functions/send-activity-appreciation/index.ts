@@ -123,12 +123,21 @@ Deno.serve(async (req) => {
 
   try {
     const authHeader = req.headers.get('Authorization') || '';
-    const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: userRes } = await userClient.auth.getUser();
+    const bearerToken = authHeader.replace(/^Bearer\s+/i, '');
+    if (!bearerToken) return json({ ok: false, error: 'unauthorized', reason: 'missing_authorization_header' }, 401);
+
+    // Pass the token explicitly to getUser(token) rather than relying on the client's
+    // global headers to propagate into the auth module — this matches the pattern
+    // maytapi-send-1to1 itself uses, and is more reliable across supabase-js versions.
+    // Also surfaces the real error instead of collapsing every failure into a bare
+    // "unauthorized" — a genuinely valid, unexpired token returning 401 with no
+    // detail was hard to diagnose during testing precisely because of this.
+    const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const { data: userRes, error: userErr } = await userClient.auth.getUser(bearerToken);
     const user = userRes?.user;
-    if (!user) return json({ ok: false, error: 'unauthorized' }, 401);
+    if (userErr || !user) {
+      return json({ ok: false, error: 'unauthorized', reason: userErr?.message || 'no_user_resolved' }, 401);
+    }
 
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
