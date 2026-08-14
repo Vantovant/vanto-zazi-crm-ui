@@ -10,12 +10,14 @@ import {
   Eye,
   SkipForward,
   Search,
+  Send,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCrm } from '@/contexts/CrmContext';
 import { useContactActivities } from '@/hooks/useContactActivities';
 import { useWaitingRoom } from '@/hooks/useWaitingRoom';
 import { ActivityAppreciationModal } from '@/components/ActivityAppreciationModal';
+import { MonthlyActivityAppreciationModal } from '@/components/MonthlyActivityAppreciationModal';
 import { ContactDrawer } from '@/components/ContactDrawer';
 import {
   normalizeActivityMonth,
@@ -70,6 +72,7 @@ export function MonthlyActivityPush() {
     order: PushOrder;
     month: string;
   } | null>(null);
+  const [showBulkSend, setShowBulkSend] = useState(false);
 
   // Optimistic local marks (entry-scoped) — survive until activities refetches
   const [optimisticDone, setOptimisticDone] = useState<Set<string>>(new Set());
@@ -252,6 +255,17 @@ export function MonthlyActivityPush() {
               </option>
             ))}
           </select>
+          {effectiveMonthKey && (
+            <button
+              type="button"
+              onClick={() => setShowBulkSend(true)}
+              title="Preview and send this month's appreciation messages, one-by-one via Maytapi, capped at the daily limit"
+              className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors whitespace-nowrap"
+            >
+              <Send className="w-3.5 h-3.5" />
+              Send Appreciation
+            </button>
+          )}
           <a
             href="/orders"
             className="px-3 py-2 text-xs sm:text-sm rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700/70 whitespace-nowrap"
@@ -364,6 +378,13 @@ export function MonthlyActivityPush() {
               });
             }
           }}
+        />
+      )}
+      {showBulkSend && effectiveMonthKey && (
+        <MonthlyActivityAppreciationModal
+          monthKey={effectiveMonthKey}
+          monthLabel={monthDisplay || effectiveMonthKey}
+          onClose={() => setShowBulkSend(false)}
         />
       )}
     </div>
