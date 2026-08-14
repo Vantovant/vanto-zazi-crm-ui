@@ -99,6 +99,48 @@ export function useOrders() {
     return (Array.isArray(data) && data.length > 0) ? data[0] : null;
   }, [user]);
 
+  /**
+   * Date-range overlap check for Monthly Activity pastes (upgrade).
+   * Looks across ALL prior monthly-activity-paste orders for these contacts —
+   * regardless of which calendar-month bucket they were filed under — and
+   * flags any whose tagged activity_period overlaps the range being pasted now.
+   * Purely additive: only meaningful for callers that pass activity_period_start/end.
+   */
+  const findOverlappingActivityPeriods = useCallback(async (
+    contactIds: string[],
+    periodStart: string,
+    periodEnd: string,
+  ): Promise<Map<string, { start: string; end: string }[]>> => {
+    const result = new Map<string, { start: string; end: string }[]>();
+    if (!user || contactIds.length === 0 || !periodStart || !periodEnd) return result;
+
+    const { data, error } = await (supabase.from('orders') as any)
+      .select('contact_id, activity_period_start, activity_period_end')
+      .eq('user_id', user.id)
+      .eq('source', 'monthly-activity-paste')
+      .not('activity_period_start', 'is', null)
+      .not('activity_period_end', 'is', null)
+      .in('contact_id', contactIds);
+
+    if (error) {
+      console.warn('[useOrders] overlap pre-check failed', error);
+      return result;
+    }
+
+    (data || []).forEach((row: any) => {
+      const start = row.activity_period_start as string;
+      const end = row.activity_period_end as string;
+      // Overlap test: existing.start <= newEnd AND existing.end >= newStart
+      if (start <= periodEnd && end >= periodStart) {
+        const cid = String(row.contact_id);
+        const list = result.get(cid) || [];
+        list.push({ start, end });
+        result.set(cid, list);
+      }
+    });
+    return result;
+  }, [user]);
+
   const addOrder = async (
     order: Omit<Order, 'id'> & {
       contact_id?: string;
@@ -106,6 +148,9 @@ export function useOrders() {
       dedupe_key?: string | null;
       /** Bypass the same-person/same-amount/same-date confirmation guard. */
       force?: boolean;
+      /** Optional actual date-range this entry was pasted for (Monthly Activity upgrade). Record-keeping only — does not affect dedupe_key. */
+      activity_period_start?: string | null;
+      activity_period_end?: string | null;
     },
   ) => {
     if (!user) return null;
@@ -162,6 +207,8 @@ export function useOrders() {
       source: order.source || 'manual',
     };
     if (dedupe_key) insertPayload.dedupe_key = dedupe_key;
+    if (order.activity_period_start) insertPayload.activity_period_start = order.activity_period_start;
+    if (order.activity_period_end) insertPayload.activity_period_end = order.activity_period_end;
 
     const { data, error } = await supabase
       .from('orders')
@@ -219,5 +266,5 @@ export function useOrders() {
     return true;
   };
 
-  return { orders, loading, dbActive, addOrder, updateOrder, deleteOrder, refetch: fetchOrders };
+  return { orders, loading, dbActive, addOrder, updateOrder, deleteOrder, findOverlappingActivityPeriods, refetch: fetchOrders };
 }
