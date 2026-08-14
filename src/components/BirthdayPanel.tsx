@@ -31,7 +31,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export function BirthdayPanel() {
-  const { birthdays, loading, importBirthdays, markCongratulated, deleteBirthday, clearAll, testToday, restoreOriginalDate, linkContact, repairPhonesFromBirthdays, refetch } = useBirthdays();
+  const { birthdays, loading, importBirthdays, findDuplicates, markCongratulated, deleteBirthday, clearAll, testToday, restoreOriginalDate, linkContact, repairPhonesFromBirthdays, refetch } = useBirthdays();
   const { contacts } = useCrm();
   const [showPaste, setShowPaste] = useState(false);
   const [composerEntries, setComposerEntries] = useState<BirthdayEntry[] | null>(null);
@@ -516,7 +516,7 @@ export function BirthdayPanel() {
       </div>
 
       {showPaste && (
-        <BirthdaySmartPasteModal onClose={() => setShowPaste(false)} onImport={importBirthdays} />
+        <BirthdaySmartPasteModal onClose={() => setShowPaste(false)} onImport={importBirthdays} onCheckDuplicates={findDuplicates} />
       )}
       {composerEntries && (
         <BirthdayComposerModal
