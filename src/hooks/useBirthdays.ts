@@ -23,11 +23,29 @@ export interface BirthdayEntry {
   congratulated_at: string | null;
   cycle_year: number;
   created_at: string;
+  // Batch/date-range provenance (added for duplicate-avoidance upgrade)
+  import_range_start?: string | null;
+  import_range_end?: string | null;
+  import_batch_label?: string | null;
   // Joined from contact
   phone_number?: string;
   phone_normalized?: string | null;
   country?: string;
   opt_out?: boolean;
+}
+
+/** Range metadata for a Smart Paste batch — purely for labeling/audit, not a filter on the dedup check. */
+export interface ImportRange {
+  start: string | null; // YYYY-MM-DD
+  end: string | null; // YYYY-MM-DD
+  label?: string | null;
+}
+
+/** Result of checking one parsed row against everything already in this cycle_year. */
+export interface DuplicateCheck {
+  isDuplicate: boolean;
+  existingStatus?: string;
+  existingBatchLabel?: string | null;
 }
 
 export function useBirthdays() {
@@ -82,8 +100,52 @@ export function useBirthdays() {
 
   useEffect(() => { fetchBirthdays(); }, [fetchBirthdays]);
 
-  const importBirthdays = useCallback(async (rows: BirthdayRow[]) => {
-    if (!user) return { imported: 0, matched: 0, unmatched: 0, created: 0 };
+  /**
+   * Duplicate-avoidance check (upgrade). Matches parsed rows against everything
+   * already imported this cycle_year — by associate_id first, falling back to
+   * full_name + birth_date_text for rows with no APLGO ID. Deliberately checks
+   * the WHOLE cycle_year regardless of the batch's date range, since the same
+   * person can appear in overlapping/adjacent APLGO exports (e.g. a late-July
+   * pull and an early-August pull both catching the same birthday).
+   *
+   * Call this BEFORE importBirthdays so the paste preview can show what's new
+   * vs. already present, and let the operator exclude duplicates from the import.
+   */
+  const findDuplicates = useCallback(async (rows: BirthdayRow[]): Promise<DuplicateCheck[]> => {
+    if (!user || rows.length === 0) return rows.map(() => ({ isDuplicate: false }));
+
+    const cycle_year = new Date().getFullYear();
+    const { data } = await supabase
+      .from('contact_birthdays')
+      .select('associate_id, full_name, birth_date_text, status, import_batch_label')
+      .eq('user_id', user.id)
+      .eq('cycle_year', cycle_year);
+
+    const byAssociate = new Map<string, { status: string; label?: string | null }>();
+    const byNameDate = new Map<string, { status: string; label?: string | null }>();
+    (data || []).forEach((r: any) => {
+      const entry = { status: r.status, label: r.import_batch_label };
+      if (r.associate_id) byAssociate.set(String(r.associate_id), entry);
+      const key = `${(r.full_name || '').trim().toLowerCase()}|${(r.birth_date_text || '').trim().toLowerCase()}`;
+      byNameDate.set(key, entry);
+    });
+
+    return rows.map((row) => {
+      let hit: { status: string; label?: string | null } | undefined;
+      if (row.associateId && byAssociate.has(row.associateId)) {
+        hit = byAssociate.get(row.associateId);
+      } else {
+        const key = `${(row.fullName || '').trim().toLowerCase()}|${(row.birthDateText || '').trim().toLowerCase()}`;
+        hit = byNameDate.get(key);
+      }
+      return hit
+        ? { isDuplicate: true, existingStatus: hit.status, existingBatchLabel: hit.label }
+        : { isDuplicate: false };
+    });
+  }, [user]);
+
+  const importBirthdays = useCallback(async (rows: BirthdayRow[], range?: ImportRange) => {
+    if (!user) return { imported: 0, matched: 0, unmatched: 0, created: 0, skippedDuplicates: 0 };
 
     let matched = 0;
     let unmatched = 0;
@@ -157,6 +219,9 @@ export function useBirthdays() {
       status: contactId ? 'not_congratulated' : 'unmatched',
       cycle_year: new Date().getFullYear(),
       pasted_phone: (row.phone || '').trim(),
+      import_range_start: range?.start || null,
+      import_range_end: range?.end || null,
+      import_batch_label: range?.label || null,
     }));
 
     if (inserts.length > 0) {
@@ -170,7 +235,7 @@ export function useBirthdays() {
 
     if (inserts.length > 0) await fetchBirthdays();
 
-    return { imported: inserts.length, matched, unmatched, created };
+    return { imported: inserts.length, matched, unmatched, created, skippedDuplicates: 0 };
   }, [user, contacts, fetchBirthdays, updateContact, addContact]);
 
   const linkContact = useCallback(async (birthdayId: string, contactId: string) => {
@@ -271,6 +336,7 @@ export function useBirthdays() {
     birthdays,
     loading,
     importBirthdays,
+    findDuplicates,
     markCongratulated,
     updateStatus,
     deleteBirthday,
