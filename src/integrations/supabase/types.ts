@@ -33,6 +33,8 @@ export type Database = {
           name: string | null
           order_id: string | null
           pack_type: string | null
+          period_end: string | null
+          period_start: string | null
           phone_normalized: string
           provider_message_id: string | null
           read_at: string | null
@@ -62,6 +64,8 @@ export type Database = {
           name?: string | null
           order_id?: string | null
           pack_type?: string | null
+          period_end?: string | null
+          period_start?: string | null
           phone_normalized: string
           provider_message_id?: string | null
           read_at?: string | null
@@ -91,6 +95,8 @@ export type Database = {
           name?: string | null
           order_id?: string | null
           pack_type?: string | null
+          period_end?: string | null
+          period_start?: string | null
           phone_normalized?: string
           provider_message_id?: string | null
           read_at?: string | null
@@ -731,6 +737,101 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      expired_campaign_recipients: {
+        Row: {
+          attempts: number
+          contact_id: string | null
+          created_at: string
+          date_inactive: string | null
+          delivered_at: string | null
+          email: string | null
+          error: string | null
+          first_name: string | null
+          former_go_status: string | null
+          hub_decision: Json | null
+          id: string
+          last_attempt_at: string | null
+          member_id: string | null
+          name: string | null
+          period_end: string | null
+          period_start: string | null
+          phone_normalized: string
+          provider_message_id: string | null
+          read_at: string | null
+          replied_at: string | null
+          reply_preview: string | null
+          sent_at: string | null
+          sponsor_name: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          attempts?: number
+          contact_id?: string | null
+          created_at?: string
+          date_inactive?: string | null
+          delivered_at?: string | null
+          email?: string | null
+          error?: string | null
+          first_name?: string | null
+          former_go_status?: string | null
+          hub_decision?: Json | null
+          id?: string
+          last_attempt_at?: string | null
+          member_id?: string | null
+          name?: string | null
+          period_end?: string | null
+          period_start?: string | null
+          phone_normalized: string
+          provider_message_id?: string | null
+          read_at?: string | null
+          replied_at?: string | null
+          reply_preview?: string | null
+          sent_at?: string | null
+          sponsor_name?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          attempts?: number
+          contact_id?: string | null
+          created_at?: string
+          date_inactive?: string | null
+          delivered_at?: string | null
+          email?: string | null
+          error?: string | null
+          first_name?: string | null
+          former_go_status?: string | null
+          hub_decision?: Json | null
+          id?: string
+          last_attempt_at?: string | null
+          member_id?: string | null
+          name?: string | null
+          period_end?: string | null
+          period_start?: string | null
+          phone_normalized?: string
+          provider_message_id?: string | null
+          read_at?: string | null
+          replied_at?: string | null
+          reply_preview?: string | null
+          sent_at?: string | null
+          sponsor_name?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expired_campaign_recipients_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       follow_up_states: {
         Row: {
