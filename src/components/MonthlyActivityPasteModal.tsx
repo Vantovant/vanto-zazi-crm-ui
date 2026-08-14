@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   X, ClipboardPaste, Loader2, Check, Sparkles, MessageCircle, AlertTriangle,
-  Calendar, Users, ShieldAlert,
+  Calendar, Users, ShieldAlert, CalendarRange,
 } from 'lucide-react';
 import { useCrm } from '@/contexts/CrmContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -17,6 +17,8 @@ interface MatchedRow extends MonthlyActivityRow {
   matchStatus: 'matched' | 'unmatched';
   matchMethod: 'local-cache' | 'exact-db' | 'none';
   selected: boolean;
+  /** Upgrade: true if this contact already has an order tagged with an overlapping activity_period. */
+  periodOverlap?: { start: string; end: string }[];
 }
 
 function dbContactToProspect(row: any): Prospect {
@@ -68,17 +70,24 @@ function getCurrentMonthYear() {
 }
 
 export function MonthlyActivityPasteModal({ onClose, onComplete }: MonthlyActivityPasteModalProps) {
-  const { contacts, addOrder, refetchOrders } = useCrm();
+  const { contacts, addOrder, refetchOrders, findOverlappingActivityPeriods } = useCrm();
   const { user } = useAuth();
   const { addToWaitingRoom } = useWaitingRoom();
   const [pastedText, setPastedText] = useState('');
   const [activityMonth, setActivityMonth] = useState(getCurrentMonthYear());
+  // Upgrade: optional date range this specific paste actually covers (e.g. mid-cycle
+  // 15 Jul – 15 Aug). Purely additive record-keeping + overlap warning — does NOT
+  // replace or affect Activity Month, which still drives dedupe_key/month grouping.
+  const [periodStart, setPeriodStart] = useState('');
+  const [periodEnd, setPeriodEnd] = useState('');
   const [step, setStep] = useState<'input' | 'preview' | 'done'>('input');
   const [matchedRows, setMatchedRows] = useState<MatchedRow[]>([]);
   const [saving, setSaving] = useState(false);
   const [matching, setMatching] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState({ created: 0, skipped: 0, flagged: 0 });
+
+  const periodRangeValid = !periodStart || !periodEnd || periodStart <= periodEnd;
 
   const handleParse = async () => {
     if (!pastedText.trim()) { setError('Please paste monthly activity data.'); return; }
@@ -137,6 +146,20 @@ export function MonthlyActivityPasteModal({ onClose, onComplete }: MonthlyActivi
       }
     }
 
+    // Upgrade: if a date range was given, check for overlaps against prior
+    // pastes tagged with a period — purely a heads-up, never blocks saving.
+    if (periodStart && periodEnd) {
+      const contactIds = Array.from(new Set(rows.map(r => r.contact?.id).filter(Boolean).map(id => String(id))));
+      const overlaps = await findOverlappingActivityPeriods(contactIds, periodStart, periodEnd);
+      if (overlaps.size > 0) {
+        rows = rows.map(r => {
+          if (!r.contact) return r;
+          const hits = overlaps.get(String(r.contact.id));
+          return hits && hits.length > 0 ? { ...r, periodOverlap: hits } : r;
+        });
+      }
+    }
+
     setMatchedRows(rows);
     setStep('preview');
     setMatching(false);
@@ -154,6 +177,7 @@ export function MonthlyActivityPasteModal({ onClose, onComplete }: MonthlyActivi
   const selectedRows = matchedRows.filter(r => r.selected && r.contact);
   const matchedCount = matchedRows.filter(r => r.contact).length;
   const unmatchedCount = matchedRows.filter(r => !r.contact).length;
+  const overlapCount = matchedRows.filter(r => r.periodOverlap && r.periodOverlap.length > 0).length;
   const totalAmount = selectedRows.reduce((s, r) => s + r.amount, 0);
 
   const handleSave = async () => {
@@ -168,6 +192,7 @@ export function MonthlyActivityPasteModal({ onClose, onComplete }: MonthlyActivi
     // sig = user|monthKey|aplgoUserId|amount|displayedLevel|actualLevel
     // dedupe_key = ma|{sig}|#{occurrence_within_this_paste}
     // Cross-batch repeats default to skipped or Needs Review (never auto-promote).
+    // UNCHANGED by the date-range upgrade below — monthKey still drives this.
     const monthKey = normalizeActivityMonth(activityMonth) || activityMonth.replace(/\s/g, '');
     const buildSig = (row: typeof selectedRows[number]) =>
       [
@@ -274,6 +299,8 @@ export function MonthlyActivityPasteModal({ onClose, onComplete }: MonthlyActivi
         source: 'monthly-activity-paste',
         salesChannel: 'Online',
         dedupe_key: dedupeKey,
+        activity_period_start: periodStart || null,
+        activity_period_end: periodEnd || null,
         // MP0.1 signature (amount + levels + occurrence) already governs duplicates here.
         force: true,
       });
@@ -323,7 +350,37 @@ export function MonthlyActivityPasteModal({ onClose, onComplete }: MonthlyActivi
           <div className="flex-1 overflow-y-auto p-6 space-y-4">
             {step === 'input' && (
               <>
-                {/* Activity Month */}
+                {/* Upgrade: date range this paste actually covers — sits above Activity Month, entirely optional */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                    <CalendarRange className="w-4 h-4 inline mr-1.5" />
+                    Date range for this paste <span className="text-slate-500 font-normal">(optional — lets you paste mid-cycle without waiting for month-end)</span>
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="date"
+                      value={periodStart}
+                      onChange={e => setPeriodStart(e.target.value)}
+                      className="flex-1 px-3 py-2 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                    />
+                    <span className="text-slate-500 text-xs">to</span>
+                    <input
+                      type="date"
+                      value={periodEnd}
+                      onChange={e => setPeriodEnd(e.target.value)}
+                      className="flex-1 px-3 py-2 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                    />
+                  </div>
+                  {!periodRangeValid && (
+                    <p className="text-xs text-rose-400 mt-1">End date must be on or after the start date.</p>
+                  )}
+                  <p className="text-[11px] text-slate-500 mt-1.5">
+                    This does not replace Activity Month below — it's an extra check that warns you if someone in this
+                    paste already has an entry from a previous paste whose date range overlaps this one.
+                  </p>
+                </div>
+
+                {/* Activity Month — unchanged, still drives duplicate detection & monthly grouping */}
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-1.5">
                     <Calendar className="w-4 h-4 inline mr-1.5" />
@@ -381,8 +438,20 @@ export function MonthlyActivityPasteModal({ onClose, onComplete }: MonthlyActivi
                   <div className="flex gap-2 flex-wrap">
                     <span className="text-xs px-2 py-1 rounded bg-emerald-500/20 text-emerald-400">Month: {activityMonth}</span>
                     <span className="text-xs px-2 py-1 rounded bg-teal-500/20 text-teal-400">Type: Monthly Activity</span>
+                    {periodStart && periodEnd && (
+                      <span className="text-xs px-2 py-1 rounded bg-sky-500/20 text-sky-300">Period: {periodStart} – {periodEnd}</span>
+                    )}
                   </div>
                 </div>
+
+                {/* Upgrade: overlap warning banner */}
+                {overlapCount > 0 && (
+                  <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300">
+                    <ShieldAlert className="w-4 h-4 inline mr-1.5" />
+                    {overlapCount} {overlapCount === 1 ? 'row has' : 'rows have'} a previous paste with an overlapping date range —
+                    check the "Period" column below before saving. This is a heads-up only; nothing is blocked automatically.
+                  </div>
+                )}
 
                 <div className="flex items-center justify-between">
                   <button type="button" onClick={toggleAll} className="text-xs text-slate-400 hover:text-slate-200 transition-colors">
@@ -406,6 +475,9 @@ export function MonthlyActivityPasteModal({ onClose, onComplete }: MonthlyActivi
                         <th className="px-3 py-2 text-left text-xs font-semibold text-slate-400">Amount</th>
                         <th className="px-3 py-2 text-left text-xs font-semibold text-slate-400">Method</th>
                         <th className="px-3 py-2 text-left text-xs font-semibold text-slate-400">Status</th>
+                        {periodStart && periodEnd && (
+                          <th className="px-3 py-2 text-left text-xs font-semibold text-slate-400">Period</th>
+                        )}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-700/50">
@@ -415,7 +487,7 @@ export function MonthlyActivityPasteModal({ onClose, onComplete }: MonthlyActivi
                           onClick={() => row.contact && toggleRow(idx)}
                           className={`transition-colors ${row.contact ? 'cursor-pointer hover:bg-slate-700/30' : 'opacity-60'} ${
                             row.selected ? 'bg-slate-800/80' : 'bg-slate-800/30'
-                          }`}
+                          } ${row.periodOverlap?.length ? 'bg-amber-500/5' : ''}`}
                         >
                           <td className="px-3 py-2.5">
                             <div className={`w-4 h-4 rounded border flex items-center justify-center ${
@@ -460,6 +532,20 @@ export function MonthlyActivityPasteModal({ onClose, onComplete }: MonthlyActivi
                               </span>
                             )}
                           </td>
+                          {periodStart && periodEnd && (
+                            <td className="px-3 py-2.5">
+                              {row.periodOverlap?.length ? (
+                                <span
+                                  className="text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-medium"
+                                  title={row.periodOverlap.map(p => `${p.start} – ${p.end}`).join(', ')}
+                                >
+                                  ⚠ Overlaps prior paste
+                                </span>
+                              ) : (
+                                <span className="text-xs px-2 py-0.5 rounded bg-slate-700/60 text-slate-400">New period</span>
+                              )}
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>
@@ -519,7 +605,7 @@ export function MonthlyActivityPasteModal({ onClose, onComplete }: MonthlyActivi
                 <button
                   type="button"
                   onClick={handleParse}
-                  disabled={matching}
+                  disabled={matching || !periodRangeValid}
                   className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition-colors"
                 >
                   {matching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
