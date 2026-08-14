@@ -16,10 +16,11 @@ interface CrmContextType {
   orders: Order[];
   ordersLoading: boolean;
   ordersDbActive: boolean;
-  addOrder: (o: Omit<Order, 'id'> & { contact_id?: string; dedupe_key?: string | null; force?: boolean }) => Promise<unknown>;
+  addOrder: (o: Omit<Order, 'id'> & { contact_id?: string; dedupe_key?: string | null; force?: boolean; activity_period_start?: string | null; activity_period_end?: string | null }) => Promise<unknown>;
   updateOrder: (id: string, updates: Partial<Order>) => Promise<boolean>;
   deleteOrder: (id: string) => Promise<boolean>;
   refetchOrders: () => Promise<void>;
+  findOverlappingActivityPeriods: (contactIds: string[], periodStart: string, periodEnd: string) => Promise<Map<string, { start: string; end: string }[]>>;
   dbActive: boolean;
 }
 
@@ -32,7 +33,7 @@ export function CrmProvider({ children }: { children: ReactNode }) {
   } = useContacts();
   const {
     orders, loading: ordersLoading, dbActive: ordersDbActive,
-    addOrder, updateOrder, deleteOrder, refetch: refetchOrders,
+    addOrder, updateOrder, deleteOrder, refetch: refetchOrders, findOverlappingActivityPeriods,
   } = useOrders();
 
   const dbActive = contactsDbActive && ordersDbActive;
@@ -42,7 +43,7 @@ export function CrmProvider({ children }: { children: ReactNode }) {
       contacts, contactsLoading, contactsDbActive,
       addContact, updateContact, deleteContact, refetchContacts, checkDuplicate,
       orders, ordersLoading, ordersDbActive,
-      addOrder, updateOrder, deleteOrder, refetchOrders,
+      addOrder, updateOrder, deleteOrder, refetchOrders, findOverlappingActivityPeriods,
       dbActive,
     }}>
       {children}
