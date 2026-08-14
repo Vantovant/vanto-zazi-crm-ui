@@ -501,6 +501,9 @@ export type Database = {
           first_name: string
           full_name: string
           id: string
+          import_batch_label: string | null
+          import_range_end: string | null
+          import_range_start: string | null
           level: string
           message_style: string
           original_congratulate_by_date: string | null
@@ -522,6 +525,9 @@ export type Database = {
           first_name?: string
           full_name?: string
           id?: string
+          import_batch_label?: string | null
+          import_range_end?: string | null
+          import_range_start?: string | null
           level?: string
           message_style?: string
           original_congratulate_by_date?: string | null
@@ -543,6 +549,9 @@ export type Database = {
           first_name?: string
           full_name?: string
           id?: string
+          import_batch_label?: string | null
+          import_range_end?: string | null
+          import_range_start?: string | null
           level?: string
           message_style?: string
           original_congratulate_by_date?: string | null
