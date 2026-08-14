@@ -1342,6 +1342,8 @@ export type Database = {
       }
       orders: {
         Row: {
+          activity_period_end: string | null
+          activity_period_start: string | null
           amount: number
           badges: string[]
           contact_id: string | null
@@ -1362,6 +1364,8 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          activity_period_end?: string | null
+          activity_period_start?: string | null
           amount?: number
           badges?: string[]
           contact_id?: string | null
@@ -1382,6 +1386,8 @@ export type Database = {
           user_id: string
         }
         Update: {
+          activity_period_end?: string | null
+          activity_period_start?: string | null
           amount?: number
           badges?: string[]
           contact_id?: string | null
