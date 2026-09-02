@@ -41,11 +41,13 @@ function buildBirthdayMessage(
   const level = entry.level ? `\nYour level: ${entry.level}` : '';
   const birthdayDate = entry.birth_date_text || '';
 
+  // Every recipient is addressed with the "Leader" prefix, permanently
+  // (Vanto's standing instruction, 2026-09-02) — applies to all 4 tones.
   const messages: Record<BirthdayTone, string> = {
-    warm: `Hi ${firstName} 🎉\n\nHappy Birthday to you! 🎂\n\nWishing you joy, strength, favor, and a beautiful year ahead.\n\nMay this new season bring growth, peace, and great grace into your life.${level}\n\nEnjoy your special day! 🌟`,
-    royal: `${fullName} 👑🎂\n\nToday we celebrate YOU!\n\nHappy Birthday — you are royalty, and this day marks another year of greatness.\n\nMay your new year be filled with abundance, favor, and extraordinary blessings.${level}\n\nCrown up. It's YOUR day! 🎉🏆`,
-    spiritual: `Dear ${firstName} 🕊️\n\nHappy Blessed Birthday! 🎂\n\nMay the Lord pour out His favor, protection, and wisdom upon you this new year.\n\nYou are a blessing to everyone around you. May this season bring divine connections, growth, and peace beyond understanding.${level}\n\nCelebrate with gratitude — the best is yet to come. 🙏✨`,
-    professional: `Hi ${fullName},\n\nHappy Birthday! 🎂\n\nWishing you a wonderful celebration and a year filled with success, growth, and good health.${level}\n\nKind regards`,
+    warm: `Hi Leader ${firstName} 🎉\n\nHappy Birthday to you! 🎂\n\nWishing you joy, strength, favor, and a beautiful year ahead.\n\nMay this new season bring growth, peace, and great grace into your life.${level}\n\nEnjoy your special day! 🌟`,
+    royal: `Leader ${fullName} 👑🎂\n\nToday we celebrate YOU!\n\nHappy Birthday — you are royalty, and this day marks another year of greatness.\n\nMay your new year be filled with abundance, favor, and extraordinary blessings.${level}\n\nCrown up. It's YOUR day! 🎉🏆`,
+    spiritual: `Dear Leader ${firstName} 🕊️\n\nHappy Blessed Birthday! 🎂\n\nMay the Lord pour out His favor, protection, and wisdom upon you this new year.\n\nYou are a blessing to everyone around you. May this season bring divine connections, growth, and peace beyond understanding.${level}\n\nCelebrate with gratitude — the best is yet to come. 🙏✨`,
+    professional: `Hi Leader ${fullName},\n\nHappy Birthday! 🎂\n\nWishing you a wonderful celebration and a year filled with success, growth, and good health.${level}\n\nKind regards`,
   };
 
   const body = messages[tone];
