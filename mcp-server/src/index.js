@@ -48,7 +48,12 @@ async function callBridge(action, payload = {}) {
 //     app's own approval workflow in zazi_actions / maytapi-send-1to1).
 //   - WhatsApp inbox tools only ever surface MATCHED contacts — unmatched /
 //     unknown numbers (masked ••••XXXX in-app) are never reachable here.
-//   - No order creation/editing (orders are read-only here — financial data).
+//   - No order editing (orders are otherwise read-only here — financial data).
+//     paste_monthly_activity is the one deliberate write path, and it is a
+//     server-side mirror of the app's own Monthly Activity Paste modal (same
+//     parsing, matching, and MP0.1 dedupe/Needs-Review rules), not a bypass
+//     of them. It defaults to dry_run:true — nothing is written until the
+//     caller explicitly reviews the preview and passes dry_run:false.
 //   - No contact/inventory deletes. No duplicate-merge (detection only).
 //   - No Sponsor ID placeholder-contact creation (that page is "no automatic
 //     fixes" even in-app).
@@ -65,7 +70,7 @@ async function callBridge(action, payload = {}) {
 function buildServer() {
   const server = new McpServer({
     name: "vanto-zazi-mcp",
-    version: "1.2.0",
+    version: "1.3.0",
   });
 
   server.registerTool(
@@ -200,7 +205,7 @@ function buildServer() {
       description:
         "Read orders, optionally filtered by status (Pending/Paid/Delivered/Activated) " +
         "or contact_id. Returns up to 100. Read-only — order creation/editing is not " +
-        "exposed here.",
+        "exposed here (except via paste_monthly_activity, see that tool).",
       inputSchema: {
         status: z.string().optional().describe("Filter by status, e.g. Pending, Paid, Delivered, Activated"),
         contact_id: z.string().optional().describe("Filter by contact UUID"),
@@ -209,6 +214,51 @@ function buildServer() {
     },
     async (args) => {
       const data = await callBridge("list_orders", args);
+      return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+    }
+  );
+
+  server.registerTool(
+    "paste_monthly_activity",
+    {
+      title: "Paste a Monthly Activity report (Smart Paste)",
+      description:
+        "Server-side mirror of the app's 'Monthly Activity Paste' modal (Orders page): " +
+        "parses raw pasted APLGO activity-report text, matches each APLGO ID to a " +
+        "contact, and creates Activity orders — using the exact same parsing format, " +
+        "MP0.1 stable-signature dedupe, and same-report-twin/Needs-Review rules the " +
+        "in-app modal uses, so this cannot silently diverge from what a human pasting " +
+        "in the app would get. " +
+        "\n\nINPUT FORMAT (pasted_text): level headers followed by comma-separated " +
+        "entries, e.g. \"Level 1\\n1318879(5): 1,275.00 R, 1392817: 1,260.00 R\". The " +
+        "number before the colon is the APLGO ID; an optional (N) is a level override; " +
+        "the amount is in ZAR." +
+        "\n\nDRY RUN IS MANDATORY FIRST STEP: dry_run defaults to true. Call once with " +
+        "dry_run left as default (or explicitly true) and review the returned 'rows' " +
+        "— check matched vs unmatched APLGO IDs, and especially any " +
+        "'would_flag_needs_review' rows (ambiguous repeats that will NOT be created, " +
+        "just routed to the in-app Waiting Room for owner review). Only call again with " +
+        "dry_run:false once that preview has been reviewed and confirmed." +
+        "\n\nUnmatched APLGO IDs are never inserted — those contacts need to exist in " +
+        "the CRM first (see create_contact).",
+      inputSchema: {
+        pasted_text: z.string().describe(
+          "Raw report text. Format: \"Level 1\\n1318879(5): 1,275.00 R, 1392817: 1,260.00 R\\n\\nLevel 2\\n...\""
+        ),
+        activity_month: z.string().describe(
+          "The activity month this paste covers, e.g. \"August 2026\" or \"2026-08\". Drives dedupe grouping — same convention as the in-app modal."
+        ),
+        period_start: z.string().optional().describe(
+          "Optional YYYY-MM-DD — the actual date range this specific paste covers (e.g. for a mid-cycle paste). Purely additive record-keeping + overlap warning, does not affect dedupe."
+        ),
+        period_end: z.string().optional().describe("Optional YYYY-MM-DD, paired with period_start."),
+        dry_run: z.boolean().optional().describe(
+          "Defaults to true. MUST be explicitly set to false to actually write anything. Always review a dry_run:true preview first."
+        ),
+      },
+    },
+    async (args) => {
+      const data = await callBridge("paste_monthly_activity", args);
       return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
     }
   );
