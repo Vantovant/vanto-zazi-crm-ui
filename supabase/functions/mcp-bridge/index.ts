@@ -36,6 +36,48 @@ function estimatedMinValue(goStatus: string): number {
   return 375
 }
 
+// Birthday message templates — mirrors src/components/BirthdayComposerModal.tsx's
+// buildBirthdayMessage() EXACTLY (kept in sync manually; this bridge action must
+// never invent its own copy). TONE_CONFIG label/description are duplicated here
+// too, for list_birthday_message_tones, since the icon/color fields in the
+// component are UI-only and not relevant server-side.
+const APLGO_BRAND_URL = 'https://crm.onlinecourseformlm.com/aplgo.html'
+
+const BIRTHDAY_TONES: Array<{ key: string; label: string; description: string }> = [
+  { key: 'warm', label: 'Warm', description: 'Friendly and heartfelt' },
+  { key: 'royal', label: 'Royal', description: 'Celebratory and majestic' },
+  { key: 'spiritual', label: 'Spiritual', description: 'Uplifting and graceful' },
+  { key: 'professional', label: 'Professional', description: 'Simple and respectful' },
+]
+
+function buildBirthdayMessageBody(
+  tone: string,
+  firstName: string,
+  fullName: string,
+  levelLine: string,
+): string {
+  const bodies: Record<string, string> = {
+    warm: `Hi ${firstName} 🎉\n\nHappy Birthday to you! 🎂\n\nWishing you joy, strength, favor, and a beautiful year ahead.\n\nMay this new season bring growth, peace, and great grace into your life.${levelLine}\n\nEnjoy your special day! 🌟`,
+    royal: `${fullName} 👑🎂\n\nToday we celebrate YOU!\n\nHappy Birthday — you are royalty, and this day marks another year of greatness.\n\nMay your new year be filled with abundance, favor, and extraordinary blessings.${levelLine}\n\nCrown up. It's YOUR day! 🎉🏆`,
+    spiritual: `Dear ${firstName} 🕊️\n\nHappy Blessed Birthday! 🎂\n\nMay the Lord pour out His favor, protection, and wisdom upon you this new year.\n\nYou are a blessing to everyone around you. May this season bring divine connections, growth, and peace beyond understanding.${levelLine}\n\nCelebrate with gratitude — the best is yet to come. 🙏✨`,
+    professional: `Hi ${fullName},\n\nHappy Birthday! 🎂\n\nWishing you a wonderful celebration and a year filled with success, growth, and good health.${levelLine}\n\nKind regards`,
+  }
+  return bodies[tone]
+}
+
+function buildBirthdayMessage(
+  tone: string,
+  firstName: string,
+  fullName: string,
+  levelLine: string,
+  senderName: string,
+  senderEmail: string,
+): string {
+  const body = buildBirthdayMessageBody(tone, firstName, fullName, levelLine)
+  const signature = senderName ? `\n\n— ${senderName}${senderEmail ? `\n${senderEmail}` : ''}` : ''
+  return `${APLGO_BRAND_URL}\n\n${body}${signature}`
+}
+
 const norm = (s: unknown) => String(s ?? '').trim()
 
 Deno.serve(async (req) => {
@@ -638,6 +680,111 @@ Deno.serve(async (req) => {
         })
 
         return json({ ok: true, count: withTiming.length, birthdays: withTiming })
+      }
+
+      case 'list_birthday_message_tones': {
+        // Static reference, no DB call. Mirrors BirthdayComposerModal.tsx's
+        // TONE_CONFIG (label/description only — icon/color are UI-only).
+        return json({ ok: true, tones: BIRTHDAY_TONES })
+      }
+
+      case 'compose_birthday_message': {
+        const ownerId = await resolveOwnerUserId()
+        if (!ownerId) return json({ error: 'owner_not_configured' }, 500)
+
+        const birthdayId = body.birthday_id ? String(body.birthday_id) : null
+        const associateId = body.associate_id ? String(body.associate_id) : null
+        if (!birthdayId && !associateId) return json({ error: 'birthday_id_or_associate_id_required' }, 400)
+
+        const allTones = body.all_tones === true
+        const requestedTone = (body.tone ? String(body.tone) : 'warm').toLowerCase()
+        const validTones = BIRTHDAY_TONES.map((t) => t.key)
+        if (!allTones && !validTones.includes(requestedTone)) {
+          return json({ error: 'invalid_tone', message: `tone must be one of ${validTones.join(', ')}` }, 400)
+        }
+
+        const cycleYear = Number.isInteger(Number(body.cycle_year)) ? Number(body.cycle_year) : new Date().getFullYear()
+
+        // Same source row list_birthdays reads from (contact_birthdays), plus
+        // 'level' which list_birthdays doesn't currently select but the
+        // composer template needs (mirrors BirthdayEntry.level in useBirthdays.ts).
+        let bQuery = supabase.from('contact_birthdays')
+          .select('id, contact_id, associate_id, full_name, first_name, level, birth_date_text, congratulate_by_date, status, congratulated_at, cycle_year')
+          .eq('user_id', ownerId)
+          .eq('cycle_year', cycleYear)
+          .limit(1)
+        bQuery = birthdayId ? bQuery.eq('id', birthdayId) : bQuery.eq('associate_id', associateId)
+        const { data: entry, error: bErr } = await bQuery.maybeSingle()
+        if (bErr) throw bErr
+        if (!entry) return json({ error: 'birthday_not_found' }, 404)
+
+        // Phone/opt-out come from the linked contact, not from
+        // contact_birthdays itself — same join useBirthdays.ts does
+        // client-side (contact.PhoneNumber -> phone_number,
+        // contact.phone_normalized, contact.auto_send_opt_out).
+        let phoneNumber = ''
+        let phoneNormalized: string | null = null
+        let optOut = false
+        if (entry.contact_id) {
+          const { data: contact } = await supabase
+            .from('contacts')
+            .select('phone_number, phone_normalized, auto_send_opt_out')
+            .eq('id', entry.contact_id)
+            .eq('user_id', ownerId)
+            .maybeSingle()
+          if (contact) {
+            phoneNumber = contact.phone_number || ''
+            phoneNormalized = contact.phone_normalized ?? null
+            optOut = Boolean(contact.auto_send_opt_out)
+          }
+        }
+
+        // Sender name/email default to the account's own profile — same
+        // lookup BirthdayComposerModal.tsx does on mount — unless the caller
+        // explicitly passed one or both.
+        let senderName = body.sender_name ? String(body.sender_name) : ''
+        let senderEmail = body.sender_email ? String(body.sender_email) : ''
+        if (!senderName && !senderEmail) {
+          const { data: profile } = await supabase
+            .from('profiles').select('display_name, email').eq('id', ownerId).maybeSingle()
+          senderName = profile?.display_name || ''
+          senderEmail = profile?.email || ''
+        }
+
+        const firstName = entry.first_name || (entry.full_name || '').split(' ')[0]
+        const fullName = entry.full_name
+        const levelLine = entry.level ? `\nYour level: ${entry.level}` : ''
+
+        const result: Record<string, unknown> = {
+          ok: true,
+          birthday_id: entry.id,
+          contact_id: entry.contact_id,
+          associate_id: entry.associate_id,
+          full_name: entry.full_name,
+          birth_date_text: entry.birth_date_text,
+          congratulate_by_date: entry.congratulate_by_date,
+          status: entry.status,
+          phone_number: phoneNumber,
+          phone_normalized: phoneNormalized,
+          opt_out: optOut,
+          sender_name: senderName,
+          sender_email: senderEmail,
+          // Not sent, not marked congratulated — composition only.
+          note: 'This composes text only. Sending and marking congratulated still happen in the app.',
+        }
+
+        if (allTones) {
+          const messages: Record<string, string> = {}
+          for (const t of validTones) {
+            messages[t] = buildBirthdayMessage(t, firstName, fullName, levelLine, senderName, senderEmail)
+          }
+          result.messages = messages
+        } else {
+          result.tone = requestedTone
+          result.message = buildBirthdayMessage(requestedTone, firstName, fullName, levelLine, senderName, senderEmail)
+        }
+
+        return json(result)
       }
 
       case 'list_whatsapp_conversations': {
