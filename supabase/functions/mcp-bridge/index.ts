@@ -56,11 +56,13 @@ function buildBirthdayMessageBody(
   fullName: string,
   levelLine: string,
 ): string {
+  // Every recipient is addressed with the "Leader" prefix, permanently
+  // (Vanto's standing instruction, 2026-09-02) — applies to all 4 tones.
   const bodies: Record<string, string> = {
-    warm: `Hi ${firstName} 🎉\n\nHappy Birthday to you! 🎂\n\nWishing you joy, strength, favor, and a beautiful year ahead.\n\nMay this new season bring growth, peace, and great grace into your life.${levelLine}\n\nEnjoy your special day! 🌟`,
-    royal: `${fullName} 👑🎂\n\nToday we celebrate YOU!\n\nHappy Birthday — you are royalty, and this day marks another year of greatness.\n\nMay your new year be filled with abundance, favor, and extraordinary blessings.${levelLine}\n\nCrown up. It's YOUR day! 🎉🏆`,
-    spiritual: `Dear ${firstName} 🕊️\n\nHappy Blessed Birthday! 🎂\n\nMay the Lord pour out His favor, protection, and wisdom upon you this new year.\n\nYou are a blessing to everyone around you. May this season bring divine connections, growth, and peace beyond understanding.${levelLine}\n\nCelebrate with gratitude — the best is yet to come. 🙏✨`,
-    professional: `Hi ${fullName},\n\nHappy Birthday! 🎂\n\nWishing you a wonderful celebration and a year filled with success, growth, and good health.${levelLine}\n\nKind regards`,
+    warm: `Hi Leader ${firstName} 🎉\n\nHappy Birthday to you! 🎂\n\nWishing you joy, strength, favor, and a beautiful year ahead.\n\nMay this new season bring growth, peace, and great grace into your life.${levelLine}\n\nEnjoy your special day! 🌟`,
+    royal: `Leader ${fullName} 👑🎂\n\nToday we celebrate YOU!\n\nHappy Birthday — you are royalty, and this day marks another year of greatness.\n\nMay your new year be filled with abundance, favor, and extraordinary blessings.${levelLine}\n\nCrown up. It's YOUR day! 🎉🏆`,
+    spiritual: `Dear Leader ${firstName} 🕊️\n\nHappy Blessed Birthday! 🎂\n\nMay the Lord pour out His favor, protection, and wisdom upon you this new year.\n\nYou are a blessing to everyone around you. May this season bring divine connections, growth, and peace beyond understanding.${levelLine}\n\nCelebrate with gratitude — the best is yet to come. 🙏✨`,
+    professional: `Hi Leader ${fullName},\n\nHappy Birthday! 🎂\n\nWishing you a wonderful celebration and a year filled with success, growth, and good health.${levelLine}\n\nKind regards`,
   }
   return bodies[tone]
 }
@@ -79,80 +81,6 @@ function buildBirthdayMessage(
 }
 
 const norm = (s: unknown) => String(s ?? '').trim()
-
-// ── Monthly Activity Smart Paste helpers ──
-// Server-side mirrors of src/utils/monthlyActivityParser.ts, monthlyActivityKey.ts
-// (normalizeActivityMonth), and aplgoId.ts (sanitizeAplgoId). Kept in sync manually,
-// same convention as buildBirthdayMessage above — these MUST match the client
-// exactly or the paste_monthly_activity action would silently diverge from what
-// the in-app "Monthly Activity Paste" modal does for the same input.
-
-function sanitizeAplgoId(raw: unknown): string {
-  if (raw === null || raw === undefined) return ''
-  return String(raw).replace(/[^0-9]/g, '')
-}
-
-const ACTIVITY_MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-]
-const ACTIVITY_MONTH_INDEX: Record<string, number> = (() => {
-  const m: Record<string, number> = {}
-  ACTIVITY_MONTH_NAMES.forEach((name, i) => { m[name.toLowerCase()] = i; m[name.slice(0, 3).toLowerCase()] = i })
-  return m
-})()
-
-function normalizeActivityMonth(input: string): string {
-  if (!input) return ''
-  const raw = String(input).trim()
-  if (!raw) return ''
-  const cleaned = raw.replace(/^Monthly Activity\s*-\s*/i, '').trim()
-  const ymd = cleaned.match(/^(\d{4})-(\d{1,2})(?:-\d{1,2})?$/)
-  if (ymd) return `${ymd[1]}-${String(parseInt(ymd[2], 10)).padStart(2, '0')}`
-  const named = cleaned.match(/^([A-Za-z]+)\s+(\d{4})$/)
-  if (named) {
-    const idx = ACTIVITY_MONTH_INDEX[named[1].toLowerCase()]
-    if (idx !== undefined) return `${named[2]}-${String(idx + 1).padStart(2, '0')}`
-  }
-  const d = new Date(cleaned)
-  if (!isNaN(d.getTime())) return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-  return ''
-}
-
-interface ParsedActivityRow {
-  userId: string
-  displayedLevel: string
-  actualLevel: string
-  amount: number
-}
-
-// Mirrors src/utils/monthlyActivityParser.ts parseMonthlyActivityReport exactly.
-function parseMonthlyActivityReport(text: string): ParsedActivityRow[] {
-  const rawLines = text.split('\n').map((l) => l.trim()).filter(Boolean)
-  const rows: ParsedActivityRow[] = []
-  let currentLevel = ''
-  const levelHeaderRe = /^level\s+(\d+)$/i
-  const entryRe = /(\d{4,})(?:\((\d+)\))?\s*:\s*(\d[\d.,]*\d)\s*R\b/gi
-
-  for (const rawLine of rawLines) {
-    const headerMatch = rawLine.match(levelHeaderRe)
-    if (headerMatch) { currentLevel = headerMatch[1]; continue }
-    let match: RegExpExecArray | null
-    entryRe.lastIndex = 0
-    while ((match = entryRe.exec(rawLine)) !== null) {
-      const userId = match[1]
-      const bracketLevel = match[2] || ''
-      const amount = parseFloat(match[3].replace(/,/g, ''))
-      rows.push({
-        userId,
-        displayedLevel: currentLevel || '?',
-        actualLevel: bracketLevel || currentLevel || '?',
-        amount: isNaN(amount) ? 0 : amount,
-      })
-    }
-  }
-  return rows
-}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -262,6 +190,14 @@ Deno.serve(async (req) => {
         const contactId = String(body.contact_id ?? '')
         if (!contactId) return json({ error: 'contact_id_required' }, 400)
 
+        // Only fields explicitly provided are changed. lead_type / lead_temperature /
+        // registration_status / communication_status are FREE TEXT at the DB level in
+        // this app (their CHECK constraints were dropped in migration
+        // 20260210103356_68eb302b...sql) — accepted as provided, not coerced into a
+        // hardcoded enum that could reject legitimate values the app itself uses
+        // (e.g. "Expired", "Registered_Nopurchase" appear elsewhere in this codebase).
+        // Phone number is intentionally NOT editable here — avoids colliding with
+        // duplicate-detection / phone_normalized matching; use the app UI for that.
         const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
         const allowed = [
           'full_name', 'email_address', 'lead_type', 'lead_temperature',
@@ -295,8 +231,16 @@ Deno.serve(async (req) => {
         const phone = norm(body.phone_number)
         const email = norm(body.email_address)
 
+        // Same duplicate guard the app's own AddContact flow runs, against
+        // phone_normalized / email_normalized. Returns the existing contact
+        // instead of creating a second one, unless force=true is passed.
         if (!body.force && (phone || email)) {
           const orParts: string[] = []
+          // phone_normalized / email_normalized are DB-derived columns; the
+          // app queries them directly rather than normalizing client-side
+          // for this bridge, so we match on the raw fields it was given
+          // plus a loose ilike as a fallback since normalization happens
+          // via a DB trigger on insert, not on this SELECT.
           if (phone) orParts.push(`phone_number.eq.${phone}`)
           if (email) orParts.push(`email_address.eq.${email}`)
           if (orParts.length) {
@@ -358,6 +302,8 @@ Deno.serve(async (req) => {
         if (cErr) throw cErr
         if (!contact) return json({ error: 'contact_not_found' }, 404)
 
+        // Strictly additive — inserts a new contact_activities row, never edits
+        // or overwrites any existing activity entry.
         const { data: inserted, error } = await supabase.from('contact_activities').insert({
           user_id: ownerId,
           contact_id: contactId,
@@ -380,6 +326,7 @@ Deno.serve(async (req) => {
         const limit = Number.isInteger(Number(body.limit)) && Number(body.limit) > 0
           ? Math.min(Number(body.limit), 100) : 25
 
+        // Read-only by design — order creation/editing is not exposed via MCP.
         let query = supabase.from('orders')
           .select('id, order_id, contact_id, contact_name, product, quantity, amount, status, order_date, badges')
           .eq('user_id', ownerId)
@@ -393,228 +340,11 @@ Deno.serve(async (req) => {
         return json({ ok: true, count: data?.length ?? 0, orders: data ?? [] })
       }
 
-      case 'paste_monthly_activity': {
-        const ownerId = await resolveOwnerUserId()
-        if (!ownerId) return json({ error: 'owner_not_configured' }, 500)
-
-        // Server-side mirror of src/components/MonthlyActivityPasteModal.tsx's
-        // handleParse + handleSave, end to end: parse -> match by aplgo_id ->
-        // MP0.1 stable signature + within-batch twin-occurrence dedupe ->
-        // Needs Review (contact_waiting_room) routing for ambiguous repeats.
-        // dry_run defaults to true — mandatory preview-first, same convention
-        // as send-activity-appreciation. Caller must pass dry_run:false to write.
-        const pastedText = String(body.pasted_text ?? '')
-        const activityMonthRaw = String(body.activity_month ?? '')
-        const periodStart = body.period_start ? String(body.period_start) : null
-        const periodEnd = body.period_end ? String(body.period_end) : null
-        const dryRun = body.dry_run !== false
-
-        if (!pastedText.trim()) return json({ error: 'pasted_text_required' }, 400)
-        if (!activityMonthRaw.trim()) return json({ error: 'activity_month_required' }, 400)
-        if (periodStart && periodEnd && periodStart > periodEnd) {
-          return json({ error: 'invalid_period_range', message: 'period_end must be on or after period_start' }, 400)
-        }
-
-        const parsed = parseMonthlyActivityReport(pastedText)
-        if (parsed.length === 0) {
-          return json({ error: 'no_entries_found', hint: 'Expected format: "Level 1\\n1129930(6): 2,520.00 R, 934517: 2,385.00 R"' }, 400)
-        }
-
-        // Match against contacts by aplgo_id — exact DB lookup (this server-side
-        // path has no browser-local cache, so every match is the modal's
-        // "exact-db" fallback path).
-        const idsToLookUp = Array.from(new Set(parsed.map((r) => sanitizeAplgoId(r.userId)).filter(Boolean)))
-        const contactByAplgo = new Map<string, { id: string; full_name: string; aplgo_id: string }>()
-        for (let i = 0; i < idsToLookUp.length; i += 100) {
-          const chunk = idsToLookUp.slice(i, i + 100)
-          const { data, error } = await supabase.from('contacts')
-            .select('id, full_name, aplgo_id')
-            .eq('user_id', ownerId)
-            .in('aplgo_id', chunk)
-          if (error) throw error
-          for (const c of (data ?? [])) contactByAplgo.set(sanitizeAplgoId(c.aplgo_id), c)
-        }
-
-        const matchedRows = parsed.map((row) => ({
-          ...row,
-          contact: contactByAplgo.get(sanitizeAplgoId(row.userId)) ?? null,
-        }))
-        const unmatchedRows = matchedRows.filter((r) => !r.contact)
-        const matchedForInsert = matchedRows.filter((r) => r.contact) as Array<ParsedActivityRow & { contact: { id: string; full_name: string; aplgo_id: string } }>
-
-        // Optional period-overlap heads-up — mirrors findOverlappingActivityPeriods
-        // in src/hooks/useOrders.ts. Informational only, never blocks.
-        const overlapByContact = new Map<string, { start: string; end: string }[]>()
-        if (periodStart && periodEnd) {
-          const contactIds = Array.from(new Set(matchedForInsert.map((r) => r.contact.id)))
-          if (contactIds.length > 0) {
-            const { data: existingPeriods, error: overlapErr } = await supabase.from('orders')
-              .select('contact_id, activity_period_start, activity_period_end')
-              .eq('user_id', ownerId)
-              .eq('source', 'monthly-activity-paste')
-              .not('activity_period_start', 'is', null)
-              .not('activity_period_end', 'is', null)
-              .in('contact_id', contactIds)
-            if (overlapErr) throw overlapErr
-            for (const row of (existingPeriods ?? [])) {
-              const s = row.activity_period_start as string
-              const e = row.activity_period_end as string
-              if (s <= periodEnd && e >= periodStart) {
-                const cid = String(row.contact_id)
-                const list = overlapByContact.get(cid) ?? []
-                list.push({ start: s, end: e })
-                overlapByContact.set(cid, list)
-              }
-            }
-          }
-        }
-
-        // MP0.1 stable signature + within-batch occurrence — identical rule set
-        // to the modal's handleSave. sig = user|monthKey|aplgoId|amount|dispLvl|actLvl.
-        const monthKey = normalizeActivityMonth(activityMonthRaw) || activityMonthRaw.replace(/\s/g, '')
-        const monthSlug = activityMonthRaw.replace(/\s/g, '')
-        const buildSig = (row: ParsedActivityRow) =>
-          [ownerId, monthKey, row.userId, row.amount, row.displayedLevel || 'x', row.actualLevel || 'x'].join('|').toLowerCase()
-
-        const sigPrefix = `ma|${[ownerId, monthKey].join('|').toLowerCase()}|`
-        const { data: existing, error: existingErr } = await supabase.from('orders')
-          .select('dedupe_key')
-          .eq('user_id', ownerId)
-          .eq('source', 'monthly-activity-paste')
-          .like('dedupe_key', `${sigPrefix}%`)
-        if (existingErr) throw existingErr
-        const existingKeys = new Set((existing ?? []).map((r) => String((r as { dedupe_key?: string }).dedupe_key ?? '').toLowerCase()))
-
-        const sigCountInBatch = new Map<string, number>()
-        for (const r of matchedForInsert) {
-          const s = buildSig(r)
-          sigCountInBatch.set(s, (sigCountInBatch.get(s) ?? 0) + 1)
-        }
-
-        const occurrenceCursor = new Map<string, number>()
-        const rowsOut: Array<Record<string, unknown>> = []
-        let created = 0, skippedExact = 0, flagged = 0, wouldCreate = 0
-
-        for (const row of matchedForInsert) {
-          const sig = buildSig(row)
-          const occ = (occurrenceCursor.get(sig) ?? 0) + 1
-          occurrenceCursor.set(sig, occ)
-
-          const dedupeKey = `ma|${sig}|#${occ}`
-          const firstKey = `ma|${sig}|#1`
-          const thisKeyAlreadyExists = existingKeys.has(dedupeKey)
-          const firstAlreadyExists = existingKeys.has(firstKey)
-          const sameReportTwin = (sigCountInBatch.get(sig) ?? 0) >= 2
-
-          const rowOut: Record<string, unknown> = {
-            userId: row.userId,
-            contact_id: row.contact.id,
-            contact_name: row.contact.full_name,
-            displayed_level: row.displayedLevel,
-            actual_level: row.actualLevel,
-            amount: row.amount,
-            dedupe_key: dedupeKey,
-            period_overlap: overlapByContact.get(row.contact.id) ?? null,
-          }
-
-          // A. Exact key already exists → silent skip (matches modal).
-          if (thisKeyAlreadyExists) {
-            skippedExact++
-            rowsOut.push({ ...rowOut, action: 'skip_duplicate', reason: 'exact_entry_already_exists' })
-            continue
-          }
-
-          // B. Same-report twin proof, or C. fresh first occurrence → insertable.
-          // D. Ambiguous repeat → Needs Review, never inserted, never Crown-able.
-          if (!sameReportTwin && !(occ === 1 && !firstAlreadyExists)) {
-            flagged++
-            rowsOut.push({
-              ...rowOut,
-              action: dryRun ? 'would_flag_needs_review' : 'flagged_needs_review',
-              reason: 'ambiguous_repeat_no_same_report_twin_proof',
-            })
-            if (!dryRun) {
-              await supabase.from('contact_waiting_room').insert({
-                user_id: ownerId,
-                contact_id: row.contact.id,
-                issue_type: 'follow_up_correction',
-                issue_note:
-                  `Possible duplicate Monthly Activity entry — owner approval required. ` +
-                  `Month: ${activityMonthRaw}. Amount: R${row.amount}. Level: ${row.displayedLevel}/${row.actualLevel}. ` +
-                  `A prior entry with the same signature exists and this paste did not provide same-report twin proof for a new occurrence. ` +
-                  `(Pasted via MCP paste_monthly_activity tool.)`,
-                priority: 'medium',
-              })
-            }
-            continue
-          }
-
-          if (dryRun) {
-            wouldCreate++
-            rowsOut.push({ ...rowOut, action: 'would_create' })
-            continue
-          }
-
-          const entrySig = `${row.amount}-${row.displayedLevel || 'x'}-${row.actualLevel || 'x'}-occ${occ}`
-          const { data: inserted, error: insertErr } = await supabase.from('orders').insert({
-            user_id: ownerId,
-            order_id: `MA-${row.userId}-${monthSlug}-${entrySig}`,
-            contact_id: row.contact.id,
-            contact_name: row.contact.full_name,
-            product: `Monthly Activity - ${activityMonthRaw}`,
-            quantity: 1,
-            amount: row.amount,
-            status: 'Paid',
-            order_date: new Date().toISOString().split('T')[0],
-            badges: ['Activity'],
-            purchase_type: 'Activity',
-            pv_amount: 0,
-            source: 'monthly-activity-paste',
-            sales_channel: 'Online',
-            dedupe_key: dedupeKey,
-            activity_period_start: periodStart || null,
-            activity_period_end: periodEnd || null,
-          }).select('id').single()
-
-          if (insertErr) {
-            if ((insertErr as { code?: string }).code === '23505') {
-              skippedExact++
-              rowsOut.push({ ...rowOut, action: 'skip_duplicate', reason: 'db_unique_constraint' })
-              continue
-            }
-            rowsOut.push({ ...rowOut, action: 'insert_failed', reason: insertErr.message })
-            continue
-          }
-
-          existingKeys.add(dedupeKey)
-          created++
-          rowsOut.push({ ...rowOut, action: 'created', order_id: (inserted as { id?: string })?.id })
-        }
-
-        return json({
-          ok: true,
-          dry_run: dryRun,
-          activity_month: activityMonthRaw,
-          month_key: monthKey,
-          parsed_total: parsed.length,
-          matched: matchedForInsert.length,
-          unmatched: unmatchedRows.length,
-          unmatched_aplgo_ids: unmatchedRows.map((r) => r.userId),
-          would_create: dryRun ? wouldCreate : undefined,
-          created: dryRun ? undefined : created,
-          skipped_duplicate: dryRun ? undefined : skippedExact,
-          flagged_needs_review: flagged,
-          rows: rowsOut,
-          note: dryRun
-            ? 'Nothing was written. Review "rows" (especially any would_flag_needs_review entries), then call again with dry_run:false to commit.'
-            : 'Committed. Any flagged_needs_review rows were written to the Waiting Room, not to orders — they need owner review in the app.',
-        })
-      }
-
       case 'get_prospector_status': {
         const ownerId = await resolveOwnerUserId()
         if (!ownerId) return json({ error: 'owner_not_configured' }, 500)
 
+        // Read-only — never touches zazi_actions, never sends anything.
         const { data: actions, error: aErr } = await supabase
           .from('zazi_actions').select('status').eq('user_id', ownerId)
         if (aErr) throw aErr
@@ -637,6 +367,9 @@ Deno.serve(async (req) => {
         const ownerId = await resolveOwnerUserId()
         if (!ownerId) return json({ error: 'owner_not_configured' }, 500)
 
+        // Read-only, full detail — mirrors the in-app Prospector Inbox review
+        // view. No approve/reject/snooze/send action is exposed here; those
+        // stay behind the app's own one-by-one, human-gated workflow.
         const status = body.status ? String(body.status) : null
         const limit = Number.isInteger(Number(body.limit)) && Number(body.limit) > 0
           ? Math.min(Number(body.limit), 100) : 25
@@ -691,6 +424,9 @@ Deno.serve(async (req) => {
         if (!Number.isInteger(quantity) || quantity < 0) return json({ error: 'quantity_must_be_a_non_negative_integer' }, 400)
         if (!id && !productName) return json({ error: 'id_or_product_name_required' }, 400)
 
+        // Sets an absolute stock quantity (same as the app's own inline edit).
+        // If an id is given, updates that row. Otherwise upserts by product
+        // name — creates a new inventory row if one doesn't exist yet.
         if (id) {
           const { data, error } = await supabase
             .from('inventory')
@@ -730,6 +466,9 @@ Deno.serve(async (req) => {
         const ownerId = await resolveOwnerUserId()
         if (!ownerId) return json({ error: 'owner_not_configured' }, 500)
 
+        // Mirrors src/pages/Deals.tsx's client-side derivation exactly:
+        // deals = contacts with lead_type = 'Purchase_Status', joined to
+        // orders by contact name. Read-only, no table of its own.
         const limit = Number.isInteger(Number(body.limit)) && Number(body.limit) > 0
           ? Math.min(Number(body.limit), 100) : 50
 
@@ -792,6 +531,9 @@ Deno.serve(async (req) => {
         const ownerId = await resolveOwnerUserId()
         if (!ownerId) return json({ error: 'owner_not_configured' }, 500)
 
+        // Detection only — mirrors src/pages/Duplicates.tsx's grouping logic.
+        // No merge/delete tool is exposed via MCP; that stays an in-app,
+        // human-confirmed action since it deletes contact rows.
         const { data, error } = await supabase
           .from('contacts')
           .select('id, full_name, phone_number, phone_normalized, email_address, email_normalized, lead_type, registration_status, created_at')
@@ -833,6 +575,9 @@ Deno.serve(async (req) => {
         const ownerId = await resolveOwnerUserId()
         if (!ownerId) return json({ error: 'owner_not_configured' }, 500)
 
+        // Read-only, mirrors src/pages/SponsorIdReview.tsx's audit derivation.
+        // No placeholder-contact creation is exposed here — that page is
+        // explicitly "no automatic fixes" even in-app.
         const { data: contacts, error } = await supabase
           .from('contacts')
           .select('id, full_name, aplgo_id, sponsor_name, parent_contact_id, tree_depth, leg')
@@ -864,6 +609,8 @@ Deno.serve(async (req) => {
         }
         const alreadyParented = (contacts ?? []).filter((c) => c.parent_contact_id).length
 
+        // Missing-upline rows (sponsor IDs referenced by contacts but with no
+        // matching aplgo_id contact yet), capped for payload size.
         const bySponsor = new Map<string, typeof contacts>()
         for (const c of contacts ?? []) {
           const s = norm(c.sponsor_name)
@@ -917,6 +664,8 @@ Deno.serve(async (req) => {
         const { data, error } = await query
         if (error) throw error
 
+        // Timing bucket, computed the same way classifyBirthdayEntry does
+        // client-side (based on congratulate_by_date vs. today).
         const today = new Date(); today.setHours(0, 0, 0, 0)
         const withTiming = (data ?? []).map((b) => {
           let timing: string | null = null
@@ -936,6 +685,8 @@ Deno.serve(async (req) => {
       }
 
       case 'list_birthday_message_tones': {
+        // Static reference, no DB call. Mirrors BirthdayComposerModal.tsx's
+        // TONE_CONFIG (label/description only — icon/color are UI-only).
         return json({ ok: true, tones: BIRTHDAY_TONES })
       }
 
@@ -956,6 +707,9 @@ Deno.serve(async (req) => {
 
         const cycleYear = Number.isInteger(Number(body.cycle_year)) ? Number(body.cycle_year) : new Date().getFullYear()
 
+        // Same source row list_birthdays reads from (contact_birthdays), plus
+        // 'level' which list_birthdays doesn't currently select but the
+        // composer template needs (mirrors BirthdayEntry.level in useBirthdays.ts).
         let bQuery = supabase.from('contact_birthdays')
           .select('id, contact_id, associate_id, full_name, first_name, level, birth_date_text, congratulate_by_date, status, congratulated_at, cycle_year')
           .eq('user_id', ownerId)
@@ -966,6 +720,10 @@ Deno.serve(async (req) => {
         if (bErr) throw bErr
         if (!entry) return json({ error: 'birthday_not_found' }, 404)
 
+        // Phone/opt-out come from the linked contact, not from
+        // contact_birthdays itself — same join useBirthdays.ts does
+        // client-side (contact.PhoneNumber -> phone_number,
+        // contact.phone_normalized, contact.auto_send_opt_out).
         let phoneNumber = ''
         let phoneNormalized: string | null = null
         let optOut = false
@@ -983,6 +741,9 @@ Deno.serve(async (req) => {
           }
         }
 
+        // Sender name/email default to the account's own profile — same
+        // lookup BirthdayComposerModal.tsx does on mount — unless the caller
+        // explicitly passed one or both.
         let senderName = body.sender_name ? String(body.sender_name) : ''
         let senderEmail = body.sender_email ? String(body.sender_email) : ''
         if (!senderName && !senderEmail) {
@@ -1010,6 +771,7 @@ Deno.serve(async (req) => {
           opt_out: optOut,
           sender_name: senderName,
           sender_email: senderEmail,
+          // Not sent, not marked congratulated — composition only.
           note: 'This composes text only. Sending and marking congratulated still happen in the app.',
         }
 
@@ -1031,6 +793,11 @@ Deno.serve(async (req) => {
         const ownerId = await resolveOwnerUserId()
         if (!ownerId) return json({ error: 'owner_not_configured' }, 500)
 
+        // Read-only, MATCHED CONTACTS ONLY. Mirrors the app's own privacy
+        // rule in MaytapiInbox.tsx: unmatched/unknown numbers are never
+        // exposed with body text outside the admin "Unmatched" gate, and
+        // this bridge holds to that same boundary — rows with a null
+        // contact_id are excluded entirely, not just masked.
         const limit = Number.isInteger(Number(body.limit)) && Number(body.limit) > 0
           ? Math.min(Number(body.limit), 300) : 200
 
@@ -1071,6 +838,10 @@ Deno.serve(async (req) => {
         const ownerId = await resolveOwnerUserId()
         if (!ownerId) return json({ error: 'owner_not_configured' }, 500)
 
+        // contact_id is required (not conversation_key) — this is a
+        // deliberate guardrail so an unmatched/masked-number thread can
+        // never be requested through this tool; only rows with a resolved
+        // contact_id are reachable.
         const contactId = String(body.contact_id ?? '')
         if (!contactId) return json({ error: 'contact_id_required' }, 400)
 
