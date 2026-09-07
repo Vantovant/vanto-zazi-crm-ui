@@ -36,14 +36,11 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return json({ ok: false, error: 'method_not_allowed' }, 405);
 
-  const apiKey = Deno.env.get('SHIPLOGIC_API_KEY') ?? '';
-  if (!apiKey) {
-    return json({ ok: false, error: 'shiplogic_api_key_not_configured' }, 500);
-  }
-
   const authHeader = req.headers.get('authorization') ?? '';
   const token = authHeader.toLowerCase().startsWith('bearer ') ? authHeader.slice(7).trim() : '';
   if (!token) return json({ ok: false, error: 'unauthorized', reason: 'missing_authorization_header' }, 401);
+
+  const apiKey = Deno.env.get('SHIPLOGIC_API_KEY') ?? '';
 
   const admin = createClient(
     Deno.env.get('SUPABASE_URL')!,
