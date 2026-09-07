@@ -865,6 +865,123 @@ Deno.serve(async (req) => {
         return json({ ok: true, contact_id: contactId, contact_name: contact.full_name, message_count: data?.length ?? 0, messages: data ?? [] })
       }
 
+      // ---------- Shipments / deliveries ----------
+      case 'list_shipments': {
+        const limit = Number.isInteger(Number(body.limit)) && Number(body.limit) > 0
+          ? Math.min(Number(body.limit), 200) : 50
+        let q = supabase
+          .from('shipments')
+          .select('id, waybill_number, contact_id, order_id, status, product_summary, delivery_address, service_level, courier_reference, earliest_delivery_date, last_status_update, created_at')
+          .eq('user_id', ownerId)
+          .order('last_status_update', { ascending: false })
+          .limit(limit)
+        if (body.status) q = q.eq('status', String(body.status))
+        if (body.contact_id) q = q.eq('contact_id', String(body.contact_id))
+        const { data, error } = await q
+        if (error) throw error
+        return json({ ok: true, count: data?.length ?? 0, shipments: data ?? [] })
+      }
+
+      case 'get_shipment': {
+        const waybill = String(body.waybill_number ?? '').trim()
+        if (!waybill) return json({ error: 'waybill_number_required' }, 400)
+        const { data, error } = await supabase
+          .from('shipments')
+          .select('*')
+          .eq('user_id', ownerId)
+          .eq('waybill_number', waybill)
+          .maybeSingle()
+        if (error) throw error
+        if (!data) return json({ error: 'shipment_not_found', waybill_number: waybill }, 404)
+        return json({ ok: true, shipment: data })
+      }
+
+      case 'create_shipment': {
+        const waybill = String(body.waybill_number ?? '').trim()
+        if (!waybill) return json({ error: 'waybill_number_required' }, 400)
+
+        const contactId = body.contact_id ? String(body.contact_id) : null
+        if (contactId) {
+          const { data: c, error: cErr } = await supabase
+            .from('contacts').select('id').eq('id', contactId).eq('user_id', ownerId).maybeSingle()
+          if (cErr) throw cErr
+          if (!c) return json({ error: 'contact_not_found' }, 404)
+        }
+        const orderId = body.order_id ? String(body.order_id) : null
+        if (orderId) {
+          const { data: o, error: oErr } = await supabase
+            .from('orders').select('id').eq('id', orderId).eq('user_id', ownerId).maybeSingle()
+          if (oErr) throw oErr
+          if (!o) return json({ error: 'order_not_found' }, 404)
+        }
+
+        const { data: existing } = await supabase
+          .from('shipments').select('id').eq('user_id', ownerId).eq('waybill_number', waybill).maybeSingle()
+        if (existing) return json({ error: 'shipment_already_exists', waybill_number: waybill }, 409)
+
+        const { data, error } = await supabase
+          .from('shipments')
+          .insert({
+            user_id: ownerId,
+            waybill_number: waybill,
+            contact_id: contactId,
+            order_id: orderId,
+            status: String(body.status ?? 'unknown'),
+            product_summary: String(body.product_summary ?? ''),
+            collection_address: String(body.collection_address ?? ''),
+            delivery_address: String(body.delivery_address ?? ''),
+            service_level: String(body.service_level ?? ''),
+            courier_reference: String(body.courier_reference ?? ''),
+            earliest_delivery_date: body.earliest_delivery_date ? String(body.earliest_delivery_date) : null,
+            last_status_update: new Date().toISOString(),
+          })
+          .select('*')
+          .single()
+        if (error) throw error
+        return json({ ok: true, shipment: data })
+      }
+
+      case 'update_shipment': {
+        const waybill = String(body.waybill_number ?? '').trim()
+        if (!waybill) return json({ error: 'waybill_number_required' }, 400)
+
+        const allowed = [
+          'status', 'product_summary', 'collection_address', 'delivery_address',
+          'service_level', 'courier_reference', 'earliest_delivery_date',
+          'contact_id', 'order_id',
+        ]
+        const patch: Record<string, unknown> = {}
+        for (const key of allowed) {
+          if (body[key] !== undefined) {
+            patch[key] = body[key] === null || body[key] === '' ? null : body[key]
+          }
+        }
+        if (Object.keys(patch).length === 0) return json({ error: 'no_fields_to_update' }, 400)
+
+        if (patch.contact_id) {
+          const { data: c } = await supabase
+            .from('contacts').select('id').eq('id', String(patch.contact_id)).eq('user_id', ownerId).maybeSingle()
+          if (!c) return json({ error: 'contact_not_found' }, 404)
+        }
+        if (patch.order_id) {
+          const { data: o } = await supabase
+            .from('orders').select('id').eq('id', String(patch.order_id)).eq('user_id', ownerId).maybeSingle()
+          if (!o) return json({ error: 'order_not_found' }, 404)
+        }
+        if (patch.status !== undefined) patch.last_status_update = new Date().toISOString()
+
+        const { data, error } = await supabase
+          .from('shipments')
+          .update(patch)
+          .eq('user_id', ownerId)
+          .eq('waybill_number', waybill)
+          .select('*')
+          .maybeSingle()
+        if (error) throw error
+        if (!data) return json({ error: 'shipment_not_found', waybill_number: waybill }, 404)
+        return json({ ok: true, shipment: data })
+      }
+
       default:
         return json({ error: 'unknown_action', action }, 400)
     }

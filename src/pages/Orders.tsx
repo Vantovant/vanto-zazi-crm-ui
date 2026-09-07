@@ -14,6 +14,7 @@ import { useCrm } from '@/contexts/CrmContext';
 import { AddOrderModal } from '@/components/AddOrderModal';
 import { SmartPasteOrdersModal } from '@/components/SmartPasteOrdersModal';
 import { MonthlyActivityPasteModal } from '@/components/MonthlyActivityPasteModal';
+import { useOrderShipments, shipmentStatusClasses } from '@/hooks/useShipments';
 
 const statusColors: Record<string, string> = {
   Pending: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
@@ -32,6 +33,7 @@ type FilterKey = 'status' | 'product' | 'contact';
 
 export function Orders() {
   const { orders, ordersLoading, ordersDbActive } = useCrm();
+  const { byOrderId: shipmentsByOrder } = useOrderShipments();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilters, setActiveFilters] = useState<Record<FilterKey, string>>({
     status: '',
@@ -339,6 +341,7 @@ export function Orders() {
                 <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-400 uppercase tracking-wider">PV</th>
                 <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-400 uppercase tracking-wider">Amount</th>
                 <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+                <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-400 uppercase tracking-wider">Shipped</th>
                 <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-400 uppercase tracking-wider">Date</th>
                 <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-400 uppercase tracking-wider">Source</th>
                 <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-400 uppercase tracking-wider">Badges</th>
@@ -396,6 +399,22 @@ export function Orders() {
                     <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${statusColors[order.status]}`}>
                       {order.status}
                     </span>
+                  </td>
+                  <td className="px-5 py-4">
+                    {(() => {
+                      const shipment = shipmentsByOrder[String(order.id)];
+                      if (!shipment) {
+                        return <span className="text-xs text-slate-500">Not yet shipped</span>;
+                      }
+                      return (
+                        <div className="space-y-1">
+                          <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${shipmentStatusClasses(shipment.status)}`}>
+                            {shipment.status}
+                          </span>
+                          <div className="font-mono text-[11px] text-slate-400">{shipment.waybill_number}</div>
+                        </div>
+                      );
+                    })()}
                   </td>
                   <td className="px-5 py-4">
                     <span className="text-sm text-slate-400">{order.orderDate}</span>

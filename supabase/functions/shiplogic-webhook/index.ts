@@ -12,6 +12,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
+import { applyInventoryForShipment } from '../_shared/shiplogic-shared.ts';
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -188,17 +189,27 @@ Deno.serve(async (req) => {
       }
 
       let shipmentId = existing?.id as string | undefined;
+      let stockNote = '';
       if (shipmentId) {
         if (contactId && !existing?.contact_id) patch.contact_id = contactId;
         const { error } = await admin.from('shipments').update(patch).eq('id', shipmentId);
         if (error) console.error('[shiplogic-webhook] update failed:', error.message);
       } else {
+        // First time we see this waybill: deduct the shipped products from
+        // offline inventory. Unrecognised products are skipped, never guessed.
+        const inv = productSummary
+          ? await applyInventoryForShipment(admin, { userId: shipmentUserId, productSummary })
+          : { applied: false, note: '', decremented: [], skipped: [] };
+        stockNote = inv.note;
+
         const { data: inserted, error } = await admin
           .from('shipments')
           .insert({
             user_id: shipmentUserId,
             waybill_number: waybill,
             contact_id: contactId,
+            inventory_applied: inv.applied,
+            inventory_note: inv.note,
             ...patch,
           })
           .select('id')
@@ -218,6 +229,7 @@ Deno.serve(async (req) => {
             serviceLevel ? `Service level: ${serviceLevel}` : '',
             courierRef ? `Courier reference: ${courierRef}` : '',
             delivery ? `Delivery address: ${delivery}` : '',
+            stockNote,
           ].filter(Boolean).join('\n'),
           next_action: '',
         });

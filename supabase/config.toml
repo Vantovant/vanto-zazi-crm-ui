@@ -33,3 +33,6 @@ verify_jwt = false
 [functions.shiplogic-webhook]
 verify_jwt = false
 
+
+[functions.shiplogic-backfill]
+verify_jwt = false

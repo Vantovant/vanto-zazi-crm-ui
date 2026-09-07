@@ -1688,7 +1688,10 @@ export type Database = {
           delivery_address: string
           earliest_delivery_date: string | null
           id: string
+          inventory_applied: boolean
+          inventory_note: string
           last_status_update: string
+          order_id: string | null
           product_summary: string
           raw: Json
           service_level: string
@@ -1705,7 +1708,10 @@ export type Database = {
           delivery_address?: string
           earliest_delivery_date?: string | null
           id?: string
+          inventory_applied?: boolean
+          inventory_note?: string
           last_status_update?: string
+          order_id?: string | null
           product_summary?: string
           raw?: Json
           service_level?: string
@@ -1722,7 +1728,10 @@ export type Database = {
           delivery_address?: string
           earliest_delivery_date?: string | null
           id?: string
+          inventory_applied?: boolean
+          inventory_note?: string
           last_status_update?: string
+          order_id?: string | null
           product_summary?: string
           raw?: Json
           service_level?: string
@@ -1737,6 +1746,13 @@ export type Database = {
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shipments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
             referencedColumns: ["id"]
           },
         ]

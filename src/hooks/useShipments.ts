@@ -7,6 +7,7 @@ export interface Shipment {
   user_id: string;
   waybill_number: string;
   contact_id: string | null;
+  order_id: string | null;
   status: string;
   product_summary: string;
   collection_address: string;
@@ -16,6 +17,8 @@ export interface Shipment {
   earliest_delivery_date: string | null;
   last_status_update: string;
   created_at: string;
+  inventory_applied?: boolean;
+  inventory_note?: string;
 }
 
 export const SHIPMENT_STATUSES = [
@@ -90,7 +93,71 @@ export function useShipments() {
     return true;
   }, [fetchShipments]);
 
-  return { shipments, loading, refetch: fetchShipments, linkShipmentToContact };
+  const linkShipmentToOrder = useCallback(async (shipmentId: string, orderId: string | null) => {
+    const { error } = await (supabase.from('shipments') as any)
+      .update({ order_id: orderId })
+      .eq('id', shipmentId);
+    if (error) {
+      console.error('Error linking shipment to order:', error);
+      return false;
+    }
+    await fetchShipments();
+    return true;
+  }, [fetchShipments]);
+
+  const syncHistory = useCallback(async (days = 30) => {
+    const { data, error } = await supabase.functions.invoke('shiplogic-backfill', {
+      body: { days },
+    });
+    if (error) {
+      console.error('Shiplogic history sync failed:', error);
+      return { ok: false, error: error.message } as any;
+    }
+    await fetchShipments();
+    return data as any;
+  }, [fetchShipments]);
+
+  return {
+    shipments,
+    loading,
+    refetch: fetchShipments,
+    linkShipmentToContact,
+    linkShipmentToOrder,
+    syncHistory,
+  };
+}
+
+/**
+ * Shipments keyed by the order they were created for, for the "Shipped /
+ * Not yet shipped" indicator on the Orders page. Read-only.
+ */
+export function useOrderShipments() {
+  const { user } = useAuth();
+  const [byOrderId, setByOrderId] = useState<Record<string, Shipment>>({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!user) { setByOrderId({}); setLoading(false); return; }
+    setLoading(true);
+    (async () => {
+      const { data } = await (supabase.from('shipments') as any)
+        .select('*')
+        .eq('user_id', user.id)
+        .not('order_id', 'is', null)
+        .order('last_status_update', { ascending: false });
+      if (cancelled) return;
+      const map: Record<string, Shipment> = {};
+      for (const row of (data || []) as Shipment[]) {
+        if (row.order_id && !map[row.order_id]) map[row.order_id] = row;
+      }
+      setByOrderId(map);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
+
+  return { byOrderId, loading };
 }
 
 export function useContactShipments(contactId?: string | null) {
