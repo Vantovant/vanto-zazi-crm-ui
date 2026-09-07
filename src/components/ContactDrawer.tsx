@@ -29,6 +29,7 @@ import { SyncContactToHubButton } from './SyncContactToHubButton';
 import { useCrm } from '@/contexts/CrmContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useContactActivities, type ContactActivity } from '@/hooks/useContactActivities';
+import { ContactShipmentsCard } from '@/components/ContactShipmentsCard';
 import { useWaitingRoom, ISSUE_TYPE_LABELS } from '@/hooks/useWaitingRoom';
 import { buildWhatsAppUrl } from '@/utils/whatsappPhone';
 
@@ -505,6 +506,9 @@ export function ContactDrawer({ prospect: initialProspect, onClose, onOpenTempla
             </div>
 
             <div className="flex-1 sm:overflow-y-auto p-6 space-y-4">
+              {/* Deliveries for this contact */}
+              <ContactShipmentsCard contactId={prospect.id as unknown as string} />
+
               {/* AI Message Suggestion */}
               <div className="bg-violet-500/10 border border-violet-500/20 rounded-xl p-4">
                 <div className="flex items-center justify-between mb-3">
