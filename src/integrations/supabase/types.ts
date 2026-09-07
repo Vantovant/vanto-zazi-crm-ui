@@ -1679,6 +1679,68 @@ export type Database = {
           },
         ]
       }
+      shipments: {
+        Row: {
+          collection_address: string
+          contact_id: string | null
+          courier_reference: string
+          created_at: string
+          delivery_address: string
+          earliest_delivery_date: string | null
+          id: string
+          last_status_update: string
+          product_summary: string
+          raw: Json
+          service_level: string
+          status: string
+          updated_at: string
+          user_id: string
+          waybill_number: string
+        }
+        Insert: {
+          collection_address?: string
+          contact_id?: string | null
+          courier_reference?: string
+          created_at?: string
+          delivery_address?: string
+          earliest_delivery_date?: string | null
+          id?: string
+          last_status_update?: string
+          product_summary?: string
+          raw?: Json
+          service_level?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+          waybill_number: string
+        }
+        Update: {
+          collection_address?: string
+          contact_id?: string | null
+          courier_reference?: string
+          created_at?: string
+          delivery_address?: string
+          earliest_delivery_date?: string | null
+          id?: string
+          last_status_update?: string
+          product_summary?: string
+          raw?: Json
+          service_level?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+          waybill_number?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shipments_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_activity: {
         Row: {
           action: string

@@ -19,6 +19,7 @@ import { TeamDashboard } from './pages/TeamDashboard';
 import { Duplicates } from './pages/Duplicates';
 import { Inventory } from './pages/Inventory';
 import { MomentumRun } from './pages/MomentumRun';
+import { Deliveries } from './pages/Deliveries';
 import { SponsorIdReview } from './pages/SponsorIdReview';
 import { MonthlyActivityPush } from './pages/MonthlyActivityPush';
 import { BirthdayCampaign } from './pages/campaigns/BirthdayCampaign';
@@ -67,6 +68,7 @@ function App() {
               <Route path="contacts" element={<Contacts />} />
               <Route path="activities" element={<Activities />} />
               <Route path="orders" element={<Orders />} />
+              <Route path="deliveries" element={<Deliveries />} />
               <Route path="inventory" element={<Inventory />} />
               <Route path="deals" element={<Deals />} />
               <Route path="whatsapp" element={<WhatsApp />} />

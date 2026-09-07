@@ -22,6 +22,7 @@ import {
   Video,
   Contact,
   Brain,
+  Truck,
 } from 'lucide-react';
 
 const OWNER_ID = 'b8028d7d-6a08-45ef-a369-b438c440bea3';
@@ -31,6 +32,7 @@ const baseNavItems = [
   { path: '/contacts', label: 'Contacts', icon: Users },
   { path: '/activities', label: 'Activities', icon: Activity },
   { path: '/orders', label: 'Orders', icon: ShoppingCart },
+  { path: '/deliveries', label: 'Deliveries', icon: Truck },
   { path: '/inventory', label: 'Inventory', icon: Package },
   { path: '/deals', label: 'Deals', icon: Briefcase },
   { path: '/whatsapp', label: 'WhatsApp', icon: MessageCircle },
