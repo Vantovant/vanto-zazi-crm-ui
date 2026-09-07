@@ -334,6 +334,94 @@ function buildServer() {
   );
 
   server.registerTool(
+    "list_shipments",
+    {
+      title: "List shipments / deliveries",
+      description:
+        "Read courier shipments tracked on the Deliveries page. Optional filters: " +
+        "status (Shiplogic vocabulary, e.g. in-transit, out-for-delivery, delivered) " +
+        "and contact_id. Read-only.",
+      inputSchema: {
+        status: z.string().optional().describe("Shipment status filter"),
+        contact_id: z.string().optional().describe("Contact UUID filter"),
+        limit: z.number().int().positive().max(200).optional().describe("Max rows (default 50)"),
+      },
+    },
+    async (args) => {
+      const data = await callBridge("list_shipments", args);
+      return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+    }
+  );
+
+  server.registerTool(
+    "get_shipment",
+    {
+      title: "Get shipment by waybill",
+      description: "Full detail for one shipment, looked up by waybill number. Read-only.",
+      inputSchema: {
+        waybill_number: z.string().describe("Courier waybill / tracking reference"),
+      },
+    },
+    async (args) => {
+      const data = await callBridge("get_shipment", args);
+      return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+    }
+  );
+
+  server.registerTool(
+    "create_shipment",
+    {
+      title: "Create a shipment record",
+      description:
+        "Record a courier shipment against a waybill number. Fails if that waybill " +
+        "already exists (use update_shipment instead). Does not book anything with the " +
+        "courier — this only records tracking data in the CRM.",
+      inputSchema: {
+        waybill_number: z.string().describe("Courier waybill / tracking reference (unique)"),
+        contact_id: z.string().optional().describe("Recipient contact UUID"),
+        order_id: z.string().optional().describe("Order UUID this shipment fulfils"),
+        status: z.string().optional().describe("Shipment status (default: unknown)"),
+        product_summary: z.string().optional().describe('e.g. "GRW + SLD + STP"'),
+        collection_address: z.string().optional(),
+        delivery_address: z.string().optional(),
+        service_level: z.string().optional(),
+        courier_reference: z.string().optional(),
+        earliest_delivery_date: z.string().optional().describe("YYYY-MM-DD"),
+      },
+    },
+    async (args) => {
+      const data = await callBridge("create_shipment", args);
+      return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+    }
+  );
+
+  server.registerTool(
+    "update_shipment",
+    {
+      title: "Update a shipment record",
+      description:
+        "Update fields on an existing shipment, found by waybill number. Only the " +
+        "listed fields can be changed; the waybill itself cannot be renamed.",
+      inputSchema: {
+        waybill_number: z.string().describe("Courier waybill / tracking reference"),
+        status: z.string().optional(),
+        product_summary: z.string().optional(),
+        collection_address: z.string().optional(),
+        delivery_address: z.string().optional(),
+        service_level: z.string().optional(),
+        courier_reference: z.string().optional(),
+        earliest_delivery_date: z.string().optional().describe("YYYY-MM-DD"),
+        contact_id: z.string().optional().describe("Link/relink to a contact UUID"),
+        order_id: z.string().optional().describe("Link/relink to an order UUID"),
+      },
+    },
+    async (args) => {
+      const data = await callBridge("update_shipment", args);
+      return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+    }
+  );
+
+  server.registerTool(
     "get_deals_summary",
     {
       title: "Get Deals summary",
