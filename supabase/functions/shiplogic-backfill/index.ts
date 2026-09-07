@@ -52,6 +52,8 @@ Deno.serve(async (req) => {
   const callerId = userData?.user?.id;
   if (userErr || !callerId) return json({ ok: false, error: 'unauthorized', reason: 'invalid_token' }, 401);
 
+  if (!apiKey) return json({ ok: false, error: 'shiplogic_api_key_not_configured' }, 500);
+
   let body: Record<string, any> = {};
   try {
     body = req.headers.get('content-length') === '0' ? {} : await req.json();
