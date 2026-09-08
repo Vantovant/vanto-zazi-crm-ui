@@ -867,6 +867,8 @@ Deno.serve(async (req) => {
 
       // ---------- Shipments / deliveries ----------
       case 'list_shipments': {
+        const ownerId = await resolveOwnerUserId()
+        if (!ownerId) return json({ error: 'owner_not_configured' }, 500)
         const limit = Number.isInteger(Number(body.limit)) && Number(body.limit) > 0
           ? Math.min(Number(body.limit), 200) : 50
         let q = supabase
@@ -883,6 +885,8 @@ Deno.serve(async (req) => {
       }
 
       case 'get_shipment': {
+        const ownerId = await resolveOwnerUserId()
+        if (!ownerId) return json({ error: 'owner_not_configured' }, 500)
         const waybill = String(body.waybill_number ?? '').trim()
         if (!waybill) return json({ error: 'waybill_number_required' }, 400)
         const { data, error } = await supabase
@@ -897,6 +901,8 @@ Deno.serve(async (req) => {
       }
 
       case 'create_shipment': {
+        const ownerId = await resolveOwnerUserId()
+        if (!ownerId) return json({ error: 'owner_not_configured' }, 500)
         const waybill = String(body.waybill_number ?? '').trim()
         if (!waybill) return json({ error: 'waybill_number_required' }, 400)
 
@@ -942,6 +948,8 @@ Deno.serve(async (req) => {
       }
 
       case 'update_shipment': {
+        const ownerId = await resolveOwnerUserId()
+        if (!ownerId) return json({ error: 'owner_not_configured' }, 500)
         const waybill = String(body.waybill_number ?? '').trim()
         if (!waybill) return json({ error: 'waybill_number_required' }, 400)
 
