@@ -82,6 +82,105 @@ function buildBirthdayMessage(
 
 const norm = (s: unknown) => String(s ?? '').trim()
 
+// ---------------------------------------------------------------------------
+// Monthly Activity Paste — parsing/matching/dedupe helpers.
+// These MUST mirror the app's own client-side logic exactly (per the
+// server-side-mirror contract in this tool's description), so this bridge
+// action can never silently diverge from what a human pasting in the app
+// would get. Sources, kept in sync manually:
+//   - src/utils/monthlyActivityParser.ts  (parseMonthlyActivityReport)
+//   - src/utils/aplgoId.ts                (sanitizeAplgoId)
+//   - src/utils/monthlyActivityKey.ts     (normalizeActivityMonth)
+//   - src/components/MonthlyActivityPasteModal.tsx (MP0.1 sig/dedupe/Needs-Review branch order)
+//   - src/hooks/useOrders.ts              (order insert shape, findOverlappingActivityPeriods)
+//   - src/hooks/useWaitingRoom.ts         (contact_waiting_room insert shape)
+// ---------------------------------------------------------------------------
+
+interface MonthlyActivityParsedRow {
+  userId: string
+  displayedLevel: string
+  actualLevel: string
+  amount: number
+}
+
+function parseMonthlyActivityReport(text: string): MonthlyActivityParsedRow[] {
+  const rawLines = text.split('\n').map((l) => l.trim()).filter(Boolean)
+  const rows: MonthlyActivityParsedRow[] = []
+  let currentLevel = ''
+
+  const levelHeaderRe = /^level\s+(\d+)$/i
+  // Matches: 1129930(6): 2,520.00 R  or  934517: 2385.00 R
+  const entryRe = /(\d{4,})(?:\((\d+)\))?\s*:\s*(\d[\d.,]*\d)\s*R\b/gi
+
+  for (const rawLine of rawLines) {
+    const headerMatch = rawLine.match(levelHeaderRe)
+    if (headerMatch) {
+      currentLevel = headerMatch[1]
+      continue
+    }
+    let match: RegExpExecArray | null
+    entryRe.lastIndex = 0
+    while ((match = entryRe.exec(rawLine)) !== null) {
+      const userId = match[1]
+      const bracketLevel = match[2] || ''
+      const amount = parseFloat(match[3].replace(/,/g, ''))
+      rows.push({
+        userId,
+        displayedLevel: currentLevel || '?',
+        actualLevel: bracketLevel || currentLevel || '?',
+        amount: isNaN(amount) ? 0 : amount,
+      })
+    }
+  }
+  return rows
+}
+
+// APLGO ID is digits-only. Mirrors the DB trigger sanitize_contact_aplgo_id()
+// so client, DB, and this bridge always agree on the canonical stored value.
+function sanitizeAplgoId(raw: unknown): string {
+  if (raw === null || raw === undefined) return ''
+  return String(raw).replace(/[^0-9]/g, '')
+}
+
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+]
+const MONTH_INDEX: Record<string, number> = (() => {
+  const m: Record<string, number> = {}
+  MONTH_NAMES.forEach((name, i) => {
+    m[name.toLowerCase()] = i
+    m[name.slice(0, 3).toLowerCase()] = i
+  })
+  return m
+})()
+
+// Returns canonical "YYYY-MM" or empty string. Accepts "April 2026", "Apr 2026",
+// "2026-04", "Monthly Activity - April 2026", or any Date-parseable string.
+function normalizeActivityMonth(input: string | null | undefined): string {
+  if (!input) return ''
+  const raw = String(input).trim()
+  if (!raw) return ''
+  const cleaned = raw.replace(/^Monthly Activity\s*-\s*/i, '').trim()
+
+  const ymd = cleaned.match(/^(\d{4})-(\d{1,2})(?:-\d{1,2})?$/)
+  if (ymd) {
+    const y = ymd[1]
+    const m = String(parseInt(ymd[2], 10)).padStart(2, '0')
+    return `${y}-${m}`
+  }
+
+  const named = cleaned.match(/^([A-Za-z]+)\s+(\d{4})$/)
+  if (named) {
+    const idx = MONTH_INDEX[named[1].toLowerCase()]
+    if (idx !== undefined) return `${named[2]}-${String(idx + 1).padStart(2, '0')}`
+  }
+
+  const d = new Date(cleaned)
+  if (!isNaN(d.getTime())) return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  return ''
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405)
@@ -993,6 +1092,208 @@ Deno.serve(async (req) => {
         if (error) throw error
         if (!data) return json({ error: 'shipment_not_found', waybill_number: waybill }, 404)
         return json({ ok: true, shipment: data })
+      }
+
+      case 'paste_monthly_activity': {
+        const ownerId = await resolveOwnerUserId()
+        if (!ownerId) return json({ error: 'owner_not_configured' }, 500)
+
+        const pastedText = String(body.pasted_text ?? '')
+        const activityMonthRaw = String(body.activity_month ?? '').trim()
+        if (!pastedText.trim()) return json({ error: 'pasted_text_required' }, 400)
+        if (!activityMonthRaw) return json({ error: 'activity_month_required' }, 400)
+
+        const periodStart = body.period_start ? String(body.period_start) : null
+        const periodEnd = body.period_end ? String(body.period_end) : null
+        // Defaults to true (preview-only); must be explicitly false to write anything.
+        const dryRun = body.dry_run !== false
+
+        // ---- Parse (mirrors monthlyActivityParser.ts exactly) ----
+        const parsedRows = parseMonthlyActivityReport(pastedText)
+        if (parsedRows.length === 0) {
+          return json({
+            error: 'no_entries_found',
+            message: 'No entries found. Expected format: "Level 1\\n1129930(6): 2,520.00 R, 934517: 2,385.00 R"',
+          }, 400)
+        }
+
+        // ---- Match by aplgo_id (collapses the app's local-cache + exact-db tiers into one direct query) ----
+        const sanitizedIds = Array.from(new Set(parsedRows.map((r) => sanitizeAplgoId(r.userId)).filter(Boolean)))
+        const { data: matchedContacts, error: matchErr } = await supabase
+          .from('contacts')
+          .select('id, full_name, aplgo_id')
+          .eq('user_id', ownerId)
+          .in('aplgo_id', sanitizedIds)
+        if (matchErr) throw matchErr
+        const contactByAplgo = new Map<string, { id: string; full_name: string }>()
+        for (const c of matchedContacts ?? []) {
+          const k = sanitizeAplgoId(c.aplgo_id)
+          if (k) contactByAplgo.set(k, { id: c.id, full_name: c.full_name })
+        }
+
+        const rows = parsedRows.map((r) => {
+          const contact = contactByAplgo.get(sanitizeAplgoId(r.userId)) || null
+          return { ...r, contact }
+        })
+        const matchedRows = rows.filter((r) => r.contact)
+        const unmatchedRows = rows.filter((r) => !r.contact)
+
+        // ---- Period overlap check — purely informational, never blocks (mirrors useOrders.findOverlappingActivityPeriods) ----
+        const overlapByContact = new Map<string, { start: string; end: string }[]>()
+        if (periodStart && periodEnd && matchedRows.length > 0) {
+          const contactIds = Array.from(new Set(matchedRows.map((r) => r.contact!.id)))
+          const { data: overlapRows } = await supabase
+            .from('orders')
+            .select('contact_id, activity_period_start, activity_period_end')
+            .eq('user_id', ownerId)
+            .eq('source', 'monthly-activity-paste')
+            .not('activity_period_start', 'is', null)
+            .not('activity_period_end', 'is', null)
+            .in('contact_id', contactIds)
+          for (const row of overlapRows ?? []) {
+            const start = row.activity_period_start as string
+            const end = row.activity_period_end as string
+            if (start <= periodEnd && end >= periodStart) {
+              const cid = String(row.contact_id)
+              const list = overlapByContact.get(cid) || []
+              list.push({ start, end })
+              overlapByContact.set(cid, list)
+            }
+          }
+        }
+
+        // ---- MP0.1 stable signature + within-batch occurrence (mirrors MonthlyActivityPasteModal.handleSave exactly) ----
+        const monthKey = normalizeActivityMonth(activityMonthRaw) || activityMonthRaw.replace(/\s/g, '')
+        const monthSlug = activityMonthRaw.replace(/\s/g, '')
+        const buildSig = (row: { userId: string; amount: number; displayedLevel: string; actualLevel: string }) =>
+          [ownerId, monthKey, row.userId, row.amount, row.displayedLevel || 'x', row.actualLevel || 'x'].join('|').toLowerCase()
+
+        const sigPrefix = `ma|${[ownerId, monthKey].join('|').toLowerCase()}|`
+        const { data: existingKeyRows } = await supabase
+          .from('orders')
+          .select('dedupe_key')
+          .eq('user_id', ownerId)
+          .eq('source', 'monthly-activity-paste')
+          .like('dedupe_key', `${sigPrefix}%`)
+        const existingKeys = new Set((existingKeyRows ?? []).map((r: any) => String(r.dedupe_key || '').toLowerCase()))
+
+        const sigCountInBatch = new Map<string, number>()
+        for (const r of matchedRows) {
+          const s = buildSig(r)
+          sigCountInBatch.set(s, (sigCountInBatch.get(s) || 0) + 1)
+        }
+
+        const occurrenceCursor = new Map<string, number>()
+        const previewRows: Record<string, unknown>[] = []
+        let created = 0, skipped = 0, flagged = 0
+
+        for (const row of matchedRows) {
+          const sig = buildSig(row)
+          const occ = (occurrenceCursor.get(sig) || 0) + 1
+          occurrenceCursor.set(sig, occ)
+
+          const dedupeKey = `ma|${sig}|#${occ}`
+          const firstKey = `ma|${sig}|#1`
+          const thisKeyAlreadyExists = existingKeys.has(dedupeKey)
+          const firstAlreadyExists = existingKeys.has(firstKey)
+          const sameReportTwin = (sigCountInBatch.get(sig) || 0) >= 2
+
+          // Same branch order as the in-app modal: A) exact key exists -> skip;
+          // B) same-report twin proof in this paste -> insert; C) fresh first
+          // occurrence -> insert; D) ambiguous repeat -> Needs Review, never inserted.
+          let action: 'insert' | 'skip_duplicate' | 'needs_review'
+          if (thisKeyAlreadyExists) action = 'skip_duplicate'
+          else if (sameReportTwin) action = 'insert'
+          else if (occ === 1 && !firstAlreadyExists) action = 'insert'
+          else action = 'needs_review'
+
+          const overlap = overlapByContact.get(row.contact!.id) || []
+
+          if (dryRun) {
+            previewRows.push({
+              user_id: row.userId,
+              contact_id: row.contact!.id,
+              contact_name: row.contact!.full_name,
+              displayed_level: row.displayedLevel,
+              actual_level: row.actualLevel,
+              amount: row.amount,
+              dedupe_key: dedupeKey,
+              would_action: action,
+              ...(overlap.length ? { period_overlap: overlap } : {}),
+            })
+            if (action === 'insert') created++
+            else if (action === 'skip_duplicate') skipped++
+            else flagged++
+            continue
+          }
+
+          if (action === 'skip_duplicate') { skipped++; continue }
+
+          if (action === 'needs_review') {
+            const { error: wrErr } = await supabase.from('contact_waiting_room').insert({
+              user_id: ownerId,
+              contact_id: row.contact!.id,
+              issue_type: 'follow_up_correction',
+              issue_note:
+                `Possible duplicate Monthly Activity entry — owner approval required. ` +
+                `Month: ${activityMonthRaw}. Amount: R${row.amount}. ` +
+                `Level: ${row.displayedLevel}/${row.actualLevel}. ` +
+                `A prior entry with the same signature exists and this paste did not provide same-report twin proof for a new occurrence.`,
+              priority: 'medium',
+              status: 'open',
+            })
+            if (wrErr) console.error('paste_monthly_activity: waiting-room insert failed', wrErr)
+            flagged++
+            continue
+          }
+
+          // action === 'insert'
+          const entrySig = `${row.amount}-${row.displayedLevel || 'x'}-${row.actualLevel || 'x'}-occ${occ}`
+          const orderId = `MA-${row.userId}-${monthSlug}-${entrySig}`
+          const { error: insErr } = await supabase.from('orders').insert({
+            user_id: ownerId,
+            order_id: orderId,
+            contact_id: row.contact!.id,
+            contact_name: row.contact!.full_name,
+            product: `Monthly Activity - ${activityMonthRaw}`,
+            quantity: 1,
+            amount: row.amount,
+            status: 'Paid',
+            order_date: new Date().toISOString().split('T')[0],
+            badges: ['Activity'],
+            purchase_type: 'Activity',
+            pv_amount: 0,
+            source: 'monthly-activity-paste',
+            dedupe_key: dedupeKey,
+            ...(periodStart ? { activity_period_start: periodStart } : {}),
+            ...(periodEnd ? { activity_period_end: periodEnd } : {}),
+          })
+          if (insErr) {
+            if ((insErr as { code?: string }).code === '23505') skipped++
+            else { console.error('paste_monthly_activity: order insert failed', insErr); flagged++ }
+            continue
+          }
+          created++
+        }
+
+        return json({
+          ok: true,
+          dry_run: dryRun,
+          activity_month: activityMonthRaw,
+          parsed_count: rows.length,
+          matched_count: matchedRows.length,
+          unmatched_count: unmatchedRows.length,
+          created,
+          skipped,
+          flagged,
+          unmatched: unmatchedRows.map((r) => ({
+            user_id: r.userId, displayed_level: r.displayedLevel, actual_level: r.actualLevel, amount: r.amount,
+          })),
+          ...(dryRun ? { rows: previewRows } : {}),
+          note: dryRun
+            ? 'Preview only — nothing written. Review would_action per row, then call again with dry_run:false.'
+            : 'Unmatched APLGO IDs were never inserted — those contacts need to exist in the CRM first (see create_contact). Needs-review rows were sent to the in-app Waiting Room, not inserted as orders.',
+        })
       }
 
       default:
