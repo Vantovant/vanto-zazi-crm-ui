@@ -198,9 +198,13 @@ Deno.serve(async (req) => {
         // (e.g. "Expired", "Registered_Nopurchase" appear elsewhere in this codebase).
         // Phone number is intentionally NOT editable here — avoids colliding with
         // duplicate-detection / phone_normalized matching; use the app UI for that.
+        // aplgo_id IS editable here (added 2026-09-19, per Vanto's explicit request) —
+        // this is the field the app's own Monthly Activity Paste modal matches
+        // pasted-report rows against, so being able to set it via MCP directly
+        // closes the loop on newly-created contacts that come in unmatched.
         const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
         const allowed = [
-          'full_name', 'email_address', 'lead_type', 'lead_temperature',
+          'full_name', 'email_address', 'aplgo_id', 'lead_type', 'lead_temperature',
           'registration_status', 'communication_status', 'assigned_to',
           'next_action', 'sponsor_name', 'city', 'province', 'country',
         ]
@@ -216,7 +220,7 @@ Deno.serve(async (req) => {
           .update(updates)
           .eq('id', contactId)
           .eq('user_id', ownerId)
-          .select('id, full_name, email_address, lead_type, lead_temperature, registration_status, communication_status, assigned_to, next_action, updated_at')
+          .select('id, full_name, email_address, aplgo_id, lead_type, lead_temperature, registration_status, communication_status, assigned_to, next_action, updated_at')
           .single()
         if (error) throw error
         return json({ ok: true, contact: data })
@@ -263,6 +267,7 @@ Deno.serve(async (req) => {
           full_name: fullName,
           phone_number: phone,
           email_address: email,
+          aplgo_id: norm(body.aplgo_id),
           city: norm(body.city),
           province: norm(body.province),
           country: norm(body.country) || 'South Africa',
@@ -277,7 +282,7 @@ Deno.serve(async (req) => {
         const { data, error } = await supabase
           .from('contacts')
           .insert(insertRow)
-          .select('id, full_name, phone_number, email_address, lead_type, lead_temperature, registration_status, created_at')
+          .select('id, full_name, phone_number, email_address, aplgo_id, lead_type, lead_temperature, registration_status, created_at')
           .single()
         if (error) {
           if ((error as { code?: string }).code === '23505') {
