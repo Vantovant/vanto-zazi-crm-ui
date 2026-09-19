@@ -2,17 +2,19 @@ import { runCampaignTick, corsHeaders } from "../_shared/campaign-send.ts";
 
 const APLGO_URL = "https://crm.onlinecourseformlm.com/aplgo.html";
 
-const TONES: Record<string, (first: string) => string> = {
-  warm: (n) => `Hi Leader ${n} 🎉\n\nHappy Birthday to you! 🎂 Wishing you joy, favor, and a beautiful year ahead.`,
-  royal: (n) => `Leader ${n} 👑🎂\n\nToday we celebrate YOU! Crown up — it's YOUR day.`,
-  spiritual: (n) => `Dear Leader ${n} 🕊️\n\nHappy Blessed Birthday! May the Lord pour His favor upon you this new year. 🙏✨`,
-  professional: (n) => `Hi Leader ${n},\n\nHappy Birthday! 🎂 Wishing you a wonderful celebration and a year of success.`,
+// Full library, matching src/components/BirthdayComposerModal.tsx
+const TONES: Record<string, (first: string, full: string) => string> = {
+  warm: (n) => `Hi ${n} 🎉\n\nHappy Birthday to you! 🎂\n\nWishing you joy, strength, favor, and a beautiful year ahead.\n\nMay this new season bring growth, peace, and great grace into your life.\n\nEnjoy your special day! 🌟`,
+  royal: (_n, full) => `${full} 👑🎂\n\nToday we celebrate YOU!\n\nHappy Birthday — you are royalty, and this day marks another year of greatness.\n\nMay your new year be filled with abundance, favor, and extraordinary blessings.\n\nCrown up. It's YOUR day! 🎉🏆`,
+  spiritual: (n) => `Dear ${n} 🕊️\n\nHappy Blessed Birthday! 🎂\n\nMay the Lord pour out His favor, protection, and wisdom upon you this new year.\n\nYou are a blessing to everyone around you. May this season bring divine connections, growth, and peace beyond understanding.\n\nCelebrate with gratitude — the best is yet to come. 🙏✨`,
+  professional: (_n, full) => `Hi ${full},\n\nHappy Birthday! 🎂\n\nWishing you a wonderful celebration and a year filled with success, growth, and good health.\n\nKind regards`,
 };
 
 function buildBody(row: any): string {
   const first = row.first_name || (row.name ?? "").split(" ")[0] || "Friend";
+  const full = row.name || first;
   const tone = TONES[row.tone] ? row.tone : "warm";
-  return `${APLGO_URL}\n\n${TONES[tone](first)}\n\n— Your Team`;
+  return `${APLGO_URL}\n\n${TONES[tone](first, full)}\n\n— Your Team`;
 }
 
 Deno.serve(async (req) => {
