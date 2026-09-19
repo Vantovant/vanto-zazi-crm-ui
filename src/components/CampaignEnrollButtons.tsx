@@ -11,6 +11,15 @@ interface Props {
   prospect: Prospect;
 }
 
+// Deterministic, even, zero-maintenance tone assignment.
+// Same contact always gets the same tone; no manual picking, no clustering.
+const BIRTHDAY_TONES = ['warm', 'royal', 'spiritual', 'professional'] as const;
+function pickBirthdayTone(id: string): typeof BIRTHDAY_TONES[number] {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  return BIRTHDAY_TONES[hash % BIRTHDAY_TONES.length];
+}
+
 export function CampaignEnrollButtons({ prospect }: Props) {
   const [state, setState] = useState<Record<CampaignKind, State>>({
     birthday: 'idle', activation: 'idle', zoom: 'idle',
@@ -55,7 +64,7 @@ export function CampaignEnrollButtons({ prospect }: Props) {
         email: prospect.EmailAddress || null,
         birth_date,
         cycle_year: new Date().getFullYear(),
-        tone: 'warm',
+        tone: pickBirthdayTone(String(prospect.id)),
         status: 'queued',
       } as any);
       if (error) throw error;
