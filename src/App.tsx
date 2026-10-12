@@ -4,6 +4,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { Layout } from './components/Layout';
 import { Auth } from './pages/Auth';
 import { ResetPassword } from './pages/ResetPassword';
+import OAuthConsent from './pages/OAuthConsent';
 import { EnvStatusBanner } from './components/EnvStatusBanner';
 import { OfflineBanner } from './components/OfflineBanner';
 import { PwaInstallBanner } from './components/PwaInstallBanner';
@@ -56,6 +57,7 @@ function App() {
 
             <Route path="/signin" element={<Auth />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route
               element={
