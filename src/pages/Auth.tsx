@@ -4,6 +4,7 @@ import { Navigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { env } from '@/lib/env';
+import { oauthReturnPath } from '@/lib/oauth-return-path';
 import {
   Mail, Lock, User, Loader2, Ticket, Eye, EyeOff,
   Bot, MessageCircle, Users as UsersIcon, Cake, BarChart3,
@@ -31,7 +32,10 @@ export function Auth() {
     );
   }
 
-  if (user) return <Navigate to="/dashboard" replace />;
+  if (user) {
+    const next = oauthReturnPath(searchParams.get('next'));
+    return <Navigate to={next !== '/' ? next : '/dashboard'} replace />;
+  }
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 relative overflow-hidden">
