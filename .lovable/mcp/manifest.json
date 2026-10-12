@@ -1,0 +1,738 @@
+{
+  "version": 1,
+  "sdk_version": "3.0.5",
+  "path": "/functions/v1/mcp",
+  "auth": {
+    "type": "oauth",
+    "issuer": "https://urfyfuakgabieellbuce.supabase.co/auth/v1",
+    "accepted_audiences": [
+      "authenticated"
+    ]
+  },
+  "mcp": {
+    "server": {
+      "name": "get-well-grow",
+      "version": "2.0.0",
+      "title": "Get Well Grow"
+    },
+    "tools": [
+      {
+        "name": "list_contacts",
+        "title": "List contacts",
+        "description": "List contacts with optional lead_type/lead_temperature/registration_status/search filters (max 100).",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "lead_type": {
+              "type": "string"
+            },
+            "lead_temperature": {
+              "type": "string"
+            },
+            "registration_status": {
+              "type": "string"
+            },
+            "search": {
+              "type": "string"
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_contact",
+        "title": "Get contact",
+        "description": "Get one contact by contact_id or phone_normalized, with the last 10 activities.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "contact_id": {
+              "type": "string"
+            },
+            "phone_normalized": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "create_contact",
+        "title": "Create contact",
+        "description": "Create a contact; runs the duplicate check on phone/email unless force is true.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "full_name": {
+              "type": "string"
+            },
+            "phone_number": {
+              "type": "string"
+            },
+            "email_address": {
+              "type": "string"
+            },
+            "aplgo_id": {
+              "type": "string"
+            },
+            "city": {
+              "type": "string"
+            },
+            "province": {
+              "type": "string"
+            },
+            "country": {
+              "type": "string"
+            },
+            "lead_temperature": {
+              "type": "string"
+            },
+            "communication_status": {
+              "type": "string"
+            },
+            "registration_status": {
+              "type": "string"
+            },
+            "lead_type": {
+              "type": "string"
+            },
+            "sponsor_name": {
+              "type": "string"
+            },
+            "additional_notes": {
+              "type": "string"
+            },
+            "force": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "full_name"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "update_contact",
+        "title": "Update contact",
+        "description": "Update only the provided fields of a contact. Phone numbers can never be changed.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "contact_id": {
+              "type": "string"
+            },
+            "full_name": {
+              "type": "string"
+            },
+            "email_address": {
+              "type": "string"
+            },
+            "aplgo_id": {
+              "type": "string"
+            },
+            "lead_type": {
+              "type": "string"
+            },
+            "lead_temperature": {
+              "type": "string"
+            },
+            "registration_status": {
+              "type": "string"
+            },
+            "communication_status": {
+              "type": "string"
+            },
+            "assigned_to": {
+              "type": "string"
+            },
+            "next_action": {
+              "type": "string"
+            },
+            "sponsor_name": {
+              "type": "string"
+            },
+            "city": {
+              "type": "string"
+            },
+            "province": {
+              "type": "string"
+            },
+            "country": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "contact_id"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "add_contact_note",
+        "title": "Add contact note",
+        "description": "Append a note to a contact activity log (append-only, never edits existing entries).",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "contact_id": {
+              "type": "string"
+            },
+            "note": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "contact_id",
+            "note"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "find_duplicate_contacts",
+        "title": "Find duplicate contacts",
+        "description": "Detect duplicate contact groups by phone/email. Detection only, no merges.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_sponsor_id_audit",
+        "title": "Sponsor ID audit",
+        "description": "Read-only sponsor-ID audit summary and missing uplines.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_orders",
+        "title": "List orders",
+        "description": "List orders with optional status/contact_id filters (read-only, max 100).",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string"
+            },
+            "contact_id": {
+              "type": "string"
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "paste_monthly_activity",
+        "title": "Paste monthly activity",
+        "description": "Parse a pasted APLGO monthly activity report and match to contacts. dry_run defaults to true; pass dry_run:false to write.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "pasted_text": {
+              "type": "string"
+            },
+            "activity_month": {
+              "type": "string"
+            },
+            "period_start": {
+              "type": "string"
+            },
+            "period_end": {
+              "type": "string"
+            },
+            "dry_run": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "pasted_text",
+            "activity_month"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_inventory",
+        "title": "List inventory",
+        "description": "List inventory products and stock quantities.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "update_inventory_stock",
+        "title": "Update inventory stock",
+        "description": "Set an absolute stock quantity by id or product_name (creates the product row if missing).",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "product_name": {
+              "type": "string"
+            },
+            "quantity": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "quantity"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_shipments",
+        "title": "List shipments",
+        "description": "List shipments with optional status/contact_id filters (max 200).",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string"
+            },
+            "contact_id": {
+              "type": "string"
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_shipment",
+        "title": "Get shipment",
+        "description": "Get a shipment by waybill number.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "waybill_number": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "waybill_number"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "create_shipment",
+        "title": "Create shipment",
+        "description": "Create a shipment record (no sending).",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "waybill_number": {
+              "type": "string"
+            },
+            "contact_id": {
+              "type": "string"
+            },
+            "order_id": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "product_summary": {
+              "type": "string"
+            },
+            "collection_address": {
+              "type": "string"
+            },
+            "delivery_address": {
+              "type": "string"
+            },
+            "service_level": {
+              "type": "string"
+            },
+            "courier_reference": {
+              "type": "string"
+            },
+            "earliest_delivery_date": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "waybill_number"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "update_shipment",
+        "title": "Update shipment",
+        "description": "Update provided fields of a shipment by waybill number.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "waybill_number": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "product_summary": {
+              "type": "string"
+            },
+            "collection_address": {
+              "type": "string"
+            },
+            "delivery_address": {
+              "type": "string"
+            },
+            "service_level": {
+              "type": "string"
+            },
+            "courier_reference": {
+              "type": "string"
+            },
+            "earliest_delivery_date": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "contact_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "order_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "waybill_number"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_birthdays",
+        "title": "List birthdays",
+        "description": "List birthdays for a cycle year with timing buckets (max 200).",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string"
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "cycle_year": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "compose_birthday_message",
+        "title": "Compose birthday message",
+        "description": "Draft a birthday message greeting \"Leader {first_name}\". Draft only: never sends or marks congratulated.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "birthday_id": {
+              "type": "string"
+            },
+            "associate_id": {
+              "type": "string"
+            },
+            "tone": {
+              "type": "string"
+            },
+            "all_tones": {
+              "type": "boolean"
+            },
+            "cycle_year": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "sender_name": {
+              "type": "string"
+            },
+            "sender_email": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_birthday_message_tones",
+        "title": "List birthday tones",
+        "description": "List available birthday message tones.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_whatsapp_conversations",
+        "title": "List WhatsApp conversations",
+        "description": "List WhatsApp conversations for matched contacts only (read-only).",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_whatsapp_thread",
+        "title": "Get WhatsApp thread",
+        "description": "Read a WhatsApp thread for a matched contact (read-only, no sending).",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "contact_id": {
+              "type": "string"
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "contact_id"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_prospector_status",
+        "title": "Prospector status",
+        "description": "Prospector counts by status and pending review items (read-only).",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_prospector_drafts",
+        "title": "Prospector drafts",
+        "description": "Read Prospector drafts in full detail. No approve/reject/send.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string"
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_deals_summary",
+        "title": "Deals summary",
+        "description": "Read-only deals summary derived from contacts and orders.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}
