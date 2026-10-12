@@ -160,30 +160,6 @@ function normalizeActivityMonth(input: string | null | undefined): string {
   return ''
 }
 
-Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
-  if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405)
-
-  // ---- Fail-closed auth: missing/wrong token -> 401. No fallback "system" path. ----
-  const expected = Deno.env.get('MCP_BRIDGE_TOKEN')
-  const provided = req.headers.get('x-mcp-token')
-  if (!expected || !provided || !timingSafeEqual(provided, expected)) {
-    return json({ error: 'unauthorized' }, 401)
-  }
-
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-    { auth: { persistSession: false } },
-  )
-
-  let body: Record<string, unknown>
-  try {
-    body = await req.json()
-  } catch {
-    return json({ error: 'invalid_json' }, 400)
-  }
-
 export interface ActionResult { status: number; body: Record<string, unknown> }
 const r = (body: any, status = 200): ActionResult => ({ status, body })
 
