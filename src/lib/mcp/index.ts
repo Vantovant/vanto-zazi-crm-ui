@@ -22,6 +22,16 @@ import GetWhatsappThread from "./tools/get-whatsapp-thread";
 import GetProspectorStatus from "./tools/get-prospector-status";
 import GetProspectorDrafts from "./tools/get-prospector-drafts";
 import GetDealsSummary from "./tools/get-deals-summary";
+import ListCallSheet from "./tools/list-call-sheet";
+import GetCallSheetCard from "./tools/get-call-sheet-card";
+import LogCall from "./tools/log-call";
+import ListCalls from "./tools/list-calls";
+import ListFollowupsDue from "./tools/list-followups-due";
+import ListNeedsLevel from "./tools/list-needs-level";
+import SetContactLevel from "./tools/set-contact-level";
+import BulkSetLevels from "./tools/bulk-set-levels";
+import GetCallSheetSettings from "./tools/get-call-sheet-settings";
+import SetCallSheetSettings from "./tools/set-call-sheet-settings";
 
 // Vite inlines the stable ref; issuer must be the direct supabase.co host.
 const projectRef = import.meta.env["VITE_SUPABASE_PROJECT_ID"] ?? "project-ref-unset";
@@ -29,11 +39,11 @@ const projectRef = import.meta.env["VITE_SUPABASE_PROJECT_ID"] ?? "project-ref-u
 export default defineMcp({
   name: "get-well-grow",
   title: "Get Well Grow",
-  version: "2.0.0",
-  instructions: "Get Well Grow downline CRM tools: contacts, notes, orders, monthly activity, inventory, shipments, birthdays (draft only), WhatsApp read-only, Prospector read-only, deals. No sending, deleting or merging.",
+  version: "2.1.0",
+  instructions: "Get Well Grow downline CRM tools: contacts, notes, orders, monthly activity, inventory, shipments, birthdays (draft only), WhatsApp read-only, Prospector read-only, deals, call sheets (read, log calls, set levels, settings). No sending, deleting or merging.",
   auth: auth.oauth.issuer({
     issuer: `https://${projectRef}.supabase.co/auth/v1`,
     acceptedAudiences: "authenticated",
   }),
-  tools: [ListContacts, GetContact, CreateContact, UpdateContact, AddContactNote, FindDuplicateContacts, GetSponsorIdAudit, ListOrders, PasteMonthlyActivity, ListInventory, UpdateInventoryStock, ListShipments, GetShipment, CreateShipment, UpdateShipment, ListBirthdays, ComposeBirthdayMessage, ListBirthdayMessageTones, ListWhatsappConversations, GetWhatsappThread, GetProspectorStatus, GetProspectorDrafts, GetDealsSummary],
+  tools: [ListContacts, GetContact, CreateContact, UpdateContact, AddContactNote, FindDuplicateContacts, GetSponsorIdAudit, ListOrders, PasteMonthlyActivity, ListInventory, UpdateInventoryStock, ListShipments, GetShipment, CreateShipment, UpdateShipment, ListBirthdays, ComposeBirthdayMessage, ListBirthdayMessageTones, ListWhatsappConversations, GetWhatsappThread, GetProspectorStatus, GetProspectorDrafts, GetDealsSummary, ListCallSheet, GetCallSheetCard, LogCall, ListCalls, ListFollowupsDue, ListNeedsLevel, SetContactLevel, BulkSetLevels, GetCallSheetSettings, SetCallSheetSettings],
 });
