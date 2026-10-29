@@ -5,7 +5,7 @@ import { runTool } from "../run";
 export default defineTool({
   name: "log_call",
   title: "Log a phone call",
-  description: "WRITES: saves one call exactly like "Save call" on the page (a "call" note on the contact; updates the contact"s next action if given). Returns the new activity id.",
+  description: "WRITES: saves one call exactly like 'Save call' on the page (a 'call' note on the contact; updates the contact's next action if given). Returns the new activity id.",
   inputSchema: {
     contact_id: z.string(),
     outcome: z.enum(["Answered", "No answer", "Call back", "Wrong number", "Not interested"]),

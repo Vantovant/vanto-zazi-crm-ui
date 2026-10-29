@@ -5,7 +5,7 @@ import { runTool } from "../run";
 export default defineTool({
   name: "get_call_sheet_card",
   title: "Get one call sheet card",
-  description: "Read-only. Returns one person"s call sheet card, last 10 history lines and last 10 WhatsApp messages, found by contact_id, aplgo_id or phone.",
+  description: "Read-only. Returns one person's call sheet card, last 10 history lines and last 10 WhatsApp messages, found by contact_id, aplgo_id or phone.",
   inputSchema: {
     contact_id: z.string().optional(),
     aplgo_id: z.string().optional(),
