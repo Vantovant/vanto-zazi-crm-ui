@@ -14,6 +14,7 @@ import { Contacts } from './pages/Contacts';
 import { Orders } from './pages/Orders';
 import { WhatsApp } from './pages/WhatsApp';
 import { Activities } from './pages/Activities';
+import { CallSheets } from './pages/CallSheets';
 import { ImportExport } from './pages/ImportExport';
 import { Deals } from './pages/Deals';
 import { TeamDashboard } from './pages/TeamDashboard';
@@ -69,6 +70,7 @@ function App() {
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="contacts" element={<Contacts />} />
               <Route path="activities" element={<Activities />} />
+              <Route path="call-sheets" element={<CallSheets />} />
               <Route path="orders" element={<Orders />} />
               <Route path="deliveries" element={<Deliveries />} />
               <Route path="inventory" element={<Inventory />} />

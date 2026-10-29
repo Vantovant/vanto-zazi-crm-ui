@@ -113,6 +113,13 @@ export type Database = {
             foreignKeyName: "activation_campaign_recipients_contact_id_fkey"
             columns: ["contact_id"]
             isOneToOne: false
+            referencedRelation: "call_sheet_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activation_campaign_recipients_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
             referencedRelation: "contacts"
             referencedColumns: ["id"]
           },
@@ -199,6 +206,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "ai_action_log_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "call_sheet_cards"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ai_action_log_contact_id_fkey"
             columns: ["contact_id"]
@@ -379,10 +393,47 @@ export type Database = {
             foreignKeyName: "birthday_campaign_recipients_contact_id_fkey"
             columns: ["contact_id"]
             isOneToOne: false
+            referencedRelation: "call_sheet_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "birthday_campaign_recipients_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
             referencedRelation: "contacts"
             referencedColumns: ["id"]
           },
         ]
+      }
+      call_sheet_settings: {
+        Row: {
+          created_at: string
+          max_level: number
+          min_level: number
+          new_days: number
+          steady_days: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          max_level?: number
+          min_level?: number
+          new_days?: number
+          steady_days?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          max_level?: number
+          min_level?: number
+          new_days?: number
+          steady_days?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       campaign_send_ledger: {
         Row: {
@@ -458,9 +509,11 @@ export type Database = {
           activity_type: string
           contact_id: string | null
           created_at: string
+          follow_up_on: string | null
           id: string
           next_action: string | null
           notes: string | null
+          outcome: string | null
           summary: string
           user_id: string
         }
@@ -468,9 +521,11 @@ export type Database = {
           activity_type?: string
           contact_id?: string | null
           created_at?: string
+          follow_up_on?: string | null
           id?: string
           next_action?: string | null
           notes?: string | null
+          outcome?: string | null
           summary?: string
           user_id: string
         }
@@ -478,13 +533,22 @@ export type Database = {
           activity_type?: string
           contact_id?: string | null
           created_at?: string
+          follow_up_on?: string | null
           id?: string
           next_action?: string | null
           notes?: string | null
+          outcome?: string | null
           summary?: string
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "contact_activities_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "call_sheet_cards"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "contact_activities_contact_id_fkey"
             columns: ["contact_id"]
@@ -572,6 +636,13 @@ export type Database = {
             foreignKeyName: "contact_birthdays_contact_id_fkey"
             columns: ["contact_id"]
             isOneToOne: false
+            referencedRelation: "call_sheet_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contact_birthdays_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
             referencedRelation: "contacts"
             referencedColumns: ["id"]
           },
@@ -616,6 +687,13 @@ export type Database = {
             foreignKeyName: "contact_waiting_room_contact_id_fkey"
             columns: ["contact_id"]
             isOneToOne: false
+            referencedRelation: "call_sheet_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contact_waiting_room_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
             referencedRelation: "contacts"
             referencedColumns: ["id"]
           },
@@ -624,6 +702,7 @@ export type Database = {
       contacts: {
         Row: {
           action_taken: string
+          activated_on: string | null
           additional_notes: string
           aplgo_id: string
           assigned_to: string
@@ -636,6 +715,7 @@ export type Database = {
           date_captured: string
           email_address: string
           email_normalized: string | null
+          enrolled_on: string | null
           focus_area: string
           full_name: string
           go_status: string
@@ -662,6 +742,7 @@ export type Database = {
         }
         Insert: {
           action_taken?: string
+          activated_on?: string | null
           additional_notes?: string
           aplgo_id?: string
           assigned_to?: string
@@ -674,6 +755,7 @@ export type Database = {
           date_captured?: string
           email_address?: string
           email_normalized?: string | null
+          enrolled_on?: string | null
           focus_area?: string
           full_name: string
           go_status?: string
@@ -700,6 +782,7 @@ export type Database = {
         }
         Update: {
           action_taken?: string
+          activated_on?: string | null
           additional_notes?: string
           aplgo_id?: string
           assigned_to?: string
@@ -712,6 +795,7 @@ export type Database = {
           date_captured?: string
           email_address?: string
           email_normalized?: string | null
+          enrolled_on?: string | null
           focus_area?: string
           full_name?: string
           go_status?: string
@@ -828,6 +912,13 @@ export type Database = {
             foreignKeyName: "expired_campaign_recipients_contact_id_fkey"
             columns: ["contact_id"]
             isOneToOne: false
+            referencedRelation: "call_sheet_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expired_campaign_recipients_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
             referencedRelation: "contacts"
             referencedColumns: ["id"]
           },
@@ -877,6 +968,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "follow_up_states_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "call_sheet_cards"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "follow_up_states_contact_id_fkey"
             columns: ["contact_id"]
@@ -1513,6 +1611,13 @@ export type Database = {
             foreignKeyName: "orders_contact_id_fkey"
             columns: ["contact_id"]
             isOneToOne: false
+            referencedRelation: "call_sheet_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
             referencedRelation: "contacts"
             referencedColumns: ["id"]
           },
@@ -1741,6 +1846,13 @@ export type Database = {
           waybill_number?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "shipments_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "call_sheet_cards"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "shipments_contact_id_fkey"
             columns: ["contact_id"]
@@ -2129,6 +2241,13 @@ export type Database = {
             foreignKeyName: "zoom_campaign_recipients_contact_id_fkey"
             columns: ["contact_id"]
             isOneToOne: false
+            referencedRelation: "call_sheet_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "zoom_campaign_recipients_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
             referencedRelation: "contacts"
             referencedColumns: ["id"]
           },
@@ -2136,7 +2255,41 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      call_sheet_cards: {
+        Row: {
+          activated_on: string | null
+          additional_notes: string | null
+          aplgo_id: string | null
+          auto_send_opt_out: boolean | null
+          bucket: string | null
+          called_today: boolean | null
+          city: string | null
+          communication_status: string | null
+          created_at: string | null
+          enrolled_on: string | null
+          full_name: string | null
+          go_status: string | null
+          id: string | null
+          last_call_at: string | null
+          last_call_outcome: string | null
+          last_inbound_at: string | null
+          last_inbound_preview: string | null
+          last_order_at: string | null
+          last_outbound_at: string | null
+          lead_type: string | null
+          leg: string | null
+          level: string | null
+          next_action: string | null
+          orders_last_60d: number | null
+          phone_normalized: string | null
+          phone_number: string | null
+          province: string | null
+          sponsor_name: string | null
+          unanswered_inbound: boolean | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       cleanup_webhook_safety_tables: { Args: never; Returns: undefined }
@@ -2177,6 +2330,16 @@ export type Database = {
       }
       normalize_email: { Args: { raw: string }; Returns: string }
       normalize_phone: { Args: { raw: string }; Returns: string }
+      save_call: {
+        Args: {
+          p_contact_id: string
+          p_follow_up_on: string
+          p_next_action: string
+          p_notes: string
+          p_outcome: string
+        }
+        Returns: string
+      }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
     }

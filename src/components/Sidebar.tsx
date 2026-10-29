@@ -23,6 +23,7 @@ import {
   Contact,
   Brain,
   Truck,
+  Phone,
 } from 'lucide-react';
 
 const OWNER_ID = 'b8028d7d-6a08-45ef-a369-b438c440bea3';
@@ -31,6 +32,7 @@ const baseNavItems = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/contacts', label: 'Contacts', icon: Users },
   { path: '/activities', label: 'Activities', icon: Activity },
+  { path: '/call-sheets', label: 'Call Sheets', icon: Phone },
   { path: '/orders', label: 'Orders', icon: ShoppingCart },
   { path: '/deliveries', label: 'Deliveries', icon: Truck },
   { path: '/inventory', label: 'Inventory', icon: Package },
