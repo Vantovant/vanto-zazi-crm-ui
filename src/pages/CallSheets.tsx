@@ -1,16 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { toast } from 'sonner';
 import { Phone, MessageCircle, ExternalLink, Search, Loader2, PhoneOff, Link2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCrm } from '@/contexts/CrmContext';
 import { ContactDrawer } from '@/components/ContactDrawer';
 import type { Prospect } from '@/data/mockData';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Button, Input, Textarea, Badge, Sheet, Toaster, toast } from '@/components/callsheets/ui';
 import {
   CALL_OUTCOMES, CallCard, dedupeCards, formatLocalPhone, intlDigits, isNoiseNote, isPhoneOnly, sortCards, talkAbout,
 } from '@/lib/callSheets';
@@ -229,6 +224,7 @@ export function CallSheets() {
 
       {waFor && <WhatsAppDrawer card={waFor} onClose={() => { setWaFor(null); loadCards(); }} />}
       {linkFor && <LinkUnmatched row={linkFor} userId={user?.id} onClose={() => { setLinkFor(null); loadUnmatched(); loadCards(); }} />}
+      <Toaster />
       {openContact && <ContactDrawer prospect={openContact} onClose={() => setOpenContact(null)} />}
     </div>
   );
@@ -341,9 +337,7 @@ function WhatsAppDrawer({ card, onClose }: { card: CallCard; onClose: () => void
 
   let lastDay = '';
   return (
-    <Sheet open onOpenChange={(o) => !o && onClose()}>
-      <SheetContent className="flex w-full flex-col sm:max-w-md">
-        <SheetHeader><SheetTitle>{card.full_name}</SheetTitle></SheetHeader>
+    <Sheet title={card.full_name} onClose={onClose}>
         <div className="flex-1 space-y-2 overflow-y-auto py-2">
           {msgs.length === 0 && <p className="text-sm text-muted-foreground">No WhatsApp messages stored for this person.</p>}
           {msgs.map((m) => {
@@ -362,8 +356,7 @@ function WhatsAppDrawer({ card, onClose }: { card: CallCard; onClose: () => void
             );
           })}
         </div>
-        <Button asChild><a href={`https://wa.me/${intlDigits(card.phone_number)}`} target="_blank" rel="noreferrer"><ExternalLink className="mr-1 h-4 w-4" />Open in WhatsApp</a></Button>
-      </SheetContent>
+        <a className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground" href={`https://wa.me/${intlDigits(card.phone_number)}`} target="_blank" rel="noreferrer"><ExternalLink className="mr-1 h-4 w-4" />Open in WhatsApp</a>
     </Sheet>
   );
 }
@@ -389,9 +382,7 @@ function LinkUnmatched({ row, userId, onClose }: { row: any; userId?: string; on
     onClose();
   };
   return (
-    <Sheet open onOpenChange={(o) => !o && onClose()}>
-      <SheetContent className="w-full sm:max-w-md">
-        <SheetHeader><SheetTitle>Link …{row.phone_last4} to a contact</SheetTitle></SheetHeader>
+    <Sheet title={`Link …${row.phone_last4} to a contact`} onClose={onClose}>
         <Input className="my-3" placeholder="Search name or number" value={q} onChange={(e) => setQ(e.target.value)} />
         <div className="space-y-1">
           {results.map((r) => (
@@ -400,7 +391,6 @@ function LinkUnmatched({ row, userId, onClose }: { row: any; userId?: string; on
             </Button>
           ))}
         </div>
-      </SheetContent>
     </Sheet>
   );
 }
