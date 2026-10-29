@@ -1,6 +1,6 @@
 {
   "name": "vanto-zazi-mcp",
-  "version": "1.0.0",
+  "version": "2.1.0",
   "description": "Standalone MCP server connecting Claude directly to the Vanto Zazi CRM (GetWell Grow) Supabase database via a locked-down edge function bridge (no Lovable tokens used).",
   "type": "module",
   "main": "src/index.js",

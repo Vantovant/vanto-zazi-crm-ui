@@ -585,6 +585,76 @@ function buildServer() {
     }
   );
 
+  // ---------------- Call Sheets (v2.1.0) ----------------
+  // Mirrors the in-app Call Sheets page. No sending, no order writes, no
+  // deletes, never touches consent / opt-out / communication_status.
+  const OUTCOMES = ["Answered", "No answer", "Call back", "Wrong number", "Not interested"];
+  const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
+  const passthrough = (action, title, description, inputSchema) =>
+    server.registerTool(action, { title, description, inputSchema }, async (args) => {
+      const data = await callBridge(action, args);
+      return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+    });
+
+  passthrough("list_call_sheet", "List a call sheet",
+    "Read-only. Lists the call sheet cards for one level (only people in the latest APLGO export), same fields as the in-app page, plus the last 3 history lines each.",
+    {
+      level: z.number().int().describe("Level number, 1 to 12"),
+      bucket: z.enum(["open", "new", "steady", "little"]).optional().describe("Only this group"),
+      not_called_today: z.boolean().optional().describe("Only people not yet called today"),
+      limit: z.number().int().positive().max(500).optional().describe("Default 100"),
+    });
+  passthrough("get_call_sheet_card", "Get one call sheet card",
+    "Read-only. Returns one person's call sheet card, last 10 history lines and last 10 WhatsApp messages, found by contact_id, aplgo_id or phone.",
+    {
+      contact_id: z.string().optional(), aplgo_id: z.string().optional(), phone: z.string().optional(),
+    });
+  passthrough("log_call", "Log a phone call",
+    "WRITES: saves one call exactly like 'Save call' on the page (a 'call' note on the contact; updates the contact's next action if given). Returns the new activity id.",
+    {
+      contact_id: z.string().describe("Contact UUID"),
+      outcome: z.enum(OUTCOMES),
+      notes: z.string().optional(), next_action: z.string().optional(),
+      follow_up_on: date.optional().describe("Follow-up date YYYY-MM-DD"),
+    });
+  passthrough("list_calls", "List logged calls",
+    "Read-only. Lists calls logged between two dates (default today, SA time) with name, level, outcome, notes, next action and follow-up date.",
+    {
+      from: date.optional(), to: date.optional(),
+      level: z.number().int().optional(), outcome: z.enum(OUTCOMES).optional(),
+    });
+  passthrough("list_followups_due", "List follow-ups due",
+    "Read-only. People whose latest call has a follow-up date on or before the given date (default today).",
+    { on_or_before: date.optional(), level: z.number().int().optional() });
+  passthrough("list_needs_level", "List people needing a level",
+    "Read-only. Same list as the page's 'Needs a level' panel, plus 'Outside the range' (level above 12).",
+    {});
+  passthrough("set_contact_level", "Set a contact's level",
+    "WRITES: sets level (1 to 12) and optionally leg (L/R) and GO status on one contact, and adds a note 'Level set to N via Claude'.",
+    {
+      contact_id: z.string(), level: z.number().int().describe("1 to 12"),
+      leg: z.enum(["L", "R"]).optional(), go_status: z.string().optional(),
+    });
+  passthrough("bulk_set_levels", "Bulk refresh from an APLGO export",
+    "WRITES: for up to 100 people (matched by aplgo_id, then phone) updates only changed level/leg/GO status/dates, marks each matched person as in the latest export, and adds a note per changed person. Never creates contacts.",
+    {
+      items: z.array(z.object({
+        aplgo_id: z.string().optional(), phone: z.string().optional(),
+        level: z.number().int().optional(), leg: z.enum(["L", "R"]).optional(), go_status: z.string().optional(),
+        enrolled_on: date.optional(), activated_on: date.optional(),
+      })).min(1).max(100),
+    });
+  passthrough("get_call_sheet_settings", "Get call sheet settings",
+    "Read-only. Returns the level range, new-joiner days, steady-buyer days and export freshness days.",
+    {});
+  passthrough("set_call_sheet_settings", "Change call sheet settings",
+    "WRITES: changes only the call sheet settings given (levels 1 to 12; day values 1 or more).",
+    {
+      min_level: z.number().int().optional(), max_level: z.number().int().optional(),
+      new_days: z.number().int().optional(), steady_days: z.number().int().optional(),
+      export_fresh_days: z.number().int().optional(),
+    });
+
   return server;
 }
 
