@@ -82,7 +82,7 @@ Once connected, you can ask Claude things like:
 - `list_orders` — filter by status / contact (read-only — no order creation/editing)
 - `get_prospector_status` — counts + pending review items (read-only — never sends)
 
-**Deliberately not included in this first version:** anything that sends a
+**Deliberately not included (still true in 2.1.0):** anything that sends a
 WhatsApp message, creates/edits an order, or deletes anything. Sending stays
 behind the app's existing approval workflow (`zazi_actions` →
 `maytapi-send-1to1`), not this bridge — see the architecture notes in the
@@ -110,3 +110,34 @@ Then it runs at `http://localhost:3000/mcp`.
   eventually operate across multiple team members' data rather than one
   configured account, that needs deliberate design (per-caller identity,
   not just the shared bridge token), not a default.
+
+## Version 2.1.0 — Call Sheets tools
+
+Same design as before: read-mostly, **no WhatsApp sending, no order writes, no
+deletes**, and none of these tools change consent, unsubscribe,
+`auto_send_opt_out` or `communication_status`. Fields match the
+`call_sheet_cards` view used by the in-app Call Sheets page. Writes are marked **WRITES**.
+
+| Tool | What it does | Example call |
+|---|---|---|
+| `list_call_sheet` | Read. Cards for one level (latest export only) + last 3 history lines | `{"level": 1, "bucket": "open", "not_called_today": true}` |
+| `get_call_sheet_card` | Read. One card + last 10 history lines + last 10 WhatsApp messages | `{"aplgo_id": "1318879"}` |
+| `get_whatsapp_thread` | Read. Last N messages (default 30), direction/date/text/media label | `{"contact_id": "<uuid>", "limit": 30}` |
+| `log_call` | **WRITES** one call, same as "Save call" | `{"contact_id": "<uuid>", "outcome": "Call back", "notes": "Busy", "follow_up_on": "2026-11-02"}` |
+| `list_calls` | Read. Calls in a date range (default today) | `{"from": "2026-10-01", "to": "2026-10-31", "level": 2}` |
+| `list_followups_due` | Read. Follow-ups due on/before a date (default today) | `{"on_or_before": "2026-11-05"}` |
+| `list_needs_level` | Read. "Needs a level" + "Outside the range" lists | `{}` |
+| `set_contact_level` | **WRITES** level 1–12 (+ leg, GO status) and a note | `{"contact_id": "<uuid>", "level": 3, "leg": "L"}` |
+| `bulk_set_levels` | **WRITES** up to 100 export rows; marks matched people as in the latest export; never creates contacts | `{"items": [{"aplgo_id": "1318879", "level": 1, "leg": "R"}, {"phone": "0821234567", "level": 2}]}` |
+| `get_call_sheet_settings` | Read. Level range and day windows | `{}` |
+| `set_call_sheet_settings` | **WRITES** only the settings given | `{"max_level": 12, "export_fresh_days": 45}` |
+
+Errors are returned as JSON, e.g. `contact_not_found`, `invalid_outcome`,
+`level_must_be_1_to_12`.
+
+### Redeploying after this update
+
+The `mcp-bridge` function updates with the app. The Railway server must be
+redeployed so Claude sees the new tools: in Railway open this service and click
+**Deploy** (or **Redeploy** on the latest deployment) after the GitHub change
+reaches your repo. No new environment variables are needed.
