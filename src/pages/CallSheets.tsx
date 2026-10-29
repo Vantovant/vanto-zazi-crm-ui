@@ -199,7 +199,7 @@ export function CallSheets() {
       <header className="space-y-1">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-foreground">Call Sheets</h1>
-          <Button size="sm" variant="ghost" aria-label="Call sheet settings" onClick={() => { setDraft(settings); setShowSettings((v) => !v); }}><Settings2 className="h-5 w-5" /></Button>
+          <Button size="sm" variant="outline" aria-label="Call sheet settings" onClick={() => { setDraft(settings); setShowSettings((v) => !v); }}><Settings2 className="h-5 w-5" /></Button>
         </div>
         <p className="text-sm text-muted-foreground">Phone your team level by level, record each call, and see what to talk about.</p>
       </header>
