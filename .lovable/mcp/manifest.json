@@ -12,7 +12,7 @@
   "mcp": {
     "server": {
       "name": "get-well-grow",
-      "version": "2.0.0",
+      "version": "2.1.0",
       "title": "Get Well Grow"
     },
     "tools": [
@@ -645,7 +645,7 @@
       {
         "name": "get_whatsapp_thread",
         "title": "Get WhatsApp thread",
-        "description": "Read a WhatsApp thread for a matched contact (read-only, no sending).",
+        "description": "Read-only. The last `limit` WhatsApp messages (default 30) for one contact, oldest to newest, each with direction, date, text, or a media label when there is no text.",
         "annotations": {
           "readOnlyHint": true,
           "openWorldHint": false
@@ -724,6 +724,362 @@
           "type": "object",
           "properties": {
             "limit": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_call_sheet",
+        "title": "List a call sheet",
+        "description": "Read-only. Lists the call sheet cards for one level (only people in the latest APLGO export), same fields as the in-app page, plus the last 3 history lines each.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "level": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991,
+              "description": "Level number, 1 to 12"
+            },
+            "bucket": {
+              "type": "string",
+              "enum": [
+                "open",
+                "new",
+                "steady",
+                "little"
+              ]
+            },
+            "not_called_today": {
+              "type": "boolean"
+            },
+            "limit": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 500
+            }
+          },
+          "required": [
+            "level"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_call_sheet_card",
+        "title": "Get one call sheet card",
+        "description": "Read-only. Returns one person's call sheet card, last 10 history lines and last 10 WhatsApp messages, found by contact_id, aplgo_id or phone.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "contact_id": {
+              "type": "string"
+            },
+            "aplgo_id": {
+              "type": "string"
+            },
+            "phone": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "log_call",
+        "title": "Log a phone call",
+        "description": "WRITES: saves one call exactly like 'Save call' on the page (a 'call' note on the contact; updates the contact's next action if given). Returns the new activity id.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "contact_id": {
+              "type": "string"
+            },
+            "outcome": {
+              "type": "string",
+              "enum": [
+                "Answered",
+                "No answer",
+                "Call back",
+                "Wrong number",
+                "Not interested"
+              ]
+            },
+            "notes": {
+              "type": "string"
+            },
+            "next_action": {
+              "type": "string"
+            },
+            "follow_up_on": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            }
+          },
+          "required": [
+            "contact_id",
+            "outcome"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_calls",
+        "title": "List logged calls",
+        "description": "Read-only. Lists calls logged between two dates (default today, SA time) with name, level, outcome, notes, next action and follow-up date.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "from": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            },
+            "to": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            },
+            "level": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "outcome": {
+              "type": "string",
+              "enum": [
+                "Answered",
+                "No answer",
+                "Call back",
+                "Wrong number",
+                "Not interested"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_followups_due",
+        "title": "List follow-ups due",
+        "description": "Read-only. People whose latest call has a follow-up date on or before the given date (default today).",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "on_or_before": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            },
+            "level": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_needs_level",
+        "title": "List people needing a level",
+        "description": "Read-only. Same list as the page's 'Needs a level' panel, plus 'Outside the range' (level above 12).",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "set_contact_level",
+        "title": "Set a contact's level",
+        "description": "WRITES: sets level (1 to 12) and optionally leg (L/R) and GO status on one contact, and adds a note 'Level set to N via Claude'.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "contact_id": {
+              "type": "string"
+            },
+            "level": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991,
+              "description": "1 to 12"
+            },
+            "leg": {
+              "type": "string",
+              "enum": [
+                "L",
+                "R"
+              ]
+            },
+            "go_status": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "contact_id",
+            "level"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "bulk_set_levels",
+        "title": "Bulk refresh from an APLGO export",
+        "description": "WRITES: for up to 100 people (matched by aplgo_id, then phone) updates only changed level/leg/GO status/dates, marks each matched person as in the latest export, and adds a note per changed person. Never creates contacts.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "items": {
+              "minItems": 1,
+              "maxItems": 100,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "aplgo_id": {
+                    "type": "string"
+                  },
+                  "phone": {
+                    "type": "string"
+                  },
+                  "level": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "leg": {
+                    "type": "string",
+                    "enum": [
+                      "L",
+                      "R"
+                    ]
+                  },
+                  "go_status": {
+                    "type": "string"
+                  },
+                  "enrolled_on": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                  },
+                  "activated_on": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                  }
+                }
+              }
+            }
+          },
+          "required": [
+            "items"
+          ],
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_call_sheet_settings",
+        "title": "Get call sheet settings",
+        "description": "Read-only. Returns the level range, new-joiner days, steady-buyer days and export freshness days.",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "set_call_sheet_settings",
+        "title": "Change call sheet settings",
+        "description": "WRITES: changes only the call sheet settings given (levels 1 to 12; day values 1 or more).",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "min_level": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "max_level": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "new_days": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "steady_days": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "export_fresh_days": {
               "type": "integer",
               "minimum": -9007199254740991,
               "maximum": 9007199254740991
