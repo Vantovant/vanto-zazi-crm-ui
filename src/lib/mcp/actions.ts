@@ -160,6 +160,84 @@ function normalizeActivityMonth(input: string | null | undefined): string {
   return ''
 }
 
+// ---------------------------------------------------------------------------
+// Call Sheets helpers (v2.1.0) — mirror src/lib/callSheets.ts.
+// ---------------------------------------------------------------------------
+const CS_OUTCOMES = ['Answered', 'No answer', 'Call back', 'Wrong number', 'Not interested']
+const CS_BUCKETS = ['open', 'new', 'steady', 'little']
+const CS_DEFAULTS = { min_level: 1, max_level: 5, new_days: 30, steady_days: 60, export_fresh_days: 45 }
+const csIsNoise = (t: string) =>
+  /october vip/i.test(t) || /appreciation|thank you for your (monthly )?activity|auto[- ]?sent/i.test(t)
+const csToday = () => new Date(Date.now() + 2 * 3600e3).toISOString().slice(0, 10) // SAST date
+const csLimit = (v: unknown, def: number, max: number) =>
+  Number.isInteger(Number(v)) && Number(v) > 0 ? Math.min(Number(v), max) : def
+const MEDIA_LABELS: Record<string, string> = { ptt: 'Voice note', audio: 'Voice note', image: 'Image', video: 'Video', document: 'Document', sticker: 'Sticker' }
+function cs_msg(m: any) {
+  const text = norm(m.body || m.body_preview)
+  return {
+    direction: m.direction, date: m.received_at, received_at: m.received_at,
+    text: text || null,
+    media_label: text ? null : (MEDIA_LABELS[String(m.media_type ?? '').toLowerCase()] ?? (m.media_type ? `Media (${m.media_type})` : 'No text')),
+    media_type: m.media_type ?? null, status: m.status, read_at: m.read_at, body: m.body,
+  }
+}
+// One card per person: same aplgo_id or phone_normalized → keep the first.
+function csDedupe(rows: any[]) {
+  const seen = new Set<string>()
+  return rows.filter((r) => {
+    const keys = [r.aplgo_id ? `a:${r.aplgo_id}` : '', r.phone_normalized ? `p:${r.phone_normalized}` : ''].filter(Boolean)
+    if (keys.some((k) => seen.has(k))) return false
+    keys.forEach((k) => seen.add(k)); return true
+  })
+}
+async function csHistory(sb: any, ownerId: string, ids: string[], perPerson: number) {
+  const map: Record<string, { at: string; text: string }[]> = {}
+  if (!ids.length) return map
+  const push = (id: string, l: { at: string; text: string }) => { (map[id] ||= []).push(l) }
+  for (let i = 0; i < ids.length; i += 150) {
+    const chunk = ids.slice(i, i + 150)
+    const [acts, ords, msgs] = await Promise.all([
+      sb.from('contact_activities').select('contact_id,created_at,summary,notes,activity_type').eq('user_id', ownerId).in('contact_id', chunk).order('created_at', { ascending: false }).limit(2000),
+      sb.from('orders').select('contact_id,order_date,product,amount').eq('user_id', ownerId).in('contact_id', chunk).order('order_date', { ascending: false }).limit(1000),
+      sb.from('maytapi_messages').select('contact_id,received_at,direction,body,body_preview').eq('user_id', ownerId).in('contact_id', chunk).order('received_at', { ascending: false }).limit(1000),
+    ])
+    for (const a of acts.data ?? []) {
+      const t = [a.summary, a.notes].filter(Boolean).join(' — ')
+      if (!t || csIsNoise(t)) continue
+      push(a.contact_id, { at: a.created_at, text: a.activity_type === 'call' ? `Call: ${t}` : t })
+    }
+    for (const o of ords.data ?? []) push(o.contact_id, { at: o.order_date, text: `Order: ${o.product} (R${Number(o.amount).toFixed(0)})` })
+    for (const m of msgs.data ?? []) {
+      const b = norm(m.body || m.body_preview)
+      if (!b || csIsNoise(b)) continue
+      push(m.contact_id, { at: m.received_at, text: `${m.direction === 'inbound' ? 'WhatsApp from them' : 'WhatsApp sent'}: ${b.slice(0, 90)}` })
+    }
+  }
+  for (const k of Object.keys(map)) map[k] = map[k].sort((x, y) => String(y.at).localeCompare(String(x.at))).slice(0, perPerson)
+  return map
+}
+async function csFindContact(sb: any, ownerId: string, body: Record<string, unknown>):
+  Promise<{ id: string } | { error: string; status: number }> {
+  const sel = () => sb.from('contacts').select('id').eq('user_id', ownerId).order('updated_at', { ascending: false }).limit(1)
+  if (body.contact_id) {
+    const { data } = await sel().eq('id', String(body.contact_id))
+    return data?.[0] ? { id: data[0].id } : { error: 'contact_not_found', status: 404 }
+  }
+  const aplgo = sanitizeAplgoId(body.aplgo_id)
+  if (aplgo) {
+    const { data } = await sel().eq('aplgo_id', aplgo)
+    return data?.[0] ? { id: data[0].id } : { error: 'contact_not_found', status: 404 }
+  }
+  if (norm(body.phone)) {
+    const { data: pn } = await sb.rpc('normalize_phone', { raw: norm(body.phone) })
+    if (!pn) return { error: 'contact_not_found', status: 404 }
+    const { data } = await sel().eq('phone_normalized', pn)
+    return data?.[0] ? { id: data[0].id } : { error: 'contact_not_found', status: 404 }
+  }
+  return { error: 'contact_id_or_aplgo_id_or_phone_required', status: 400 }
+}
+
+
 export interface ActionResult { status: number; body: Record<string, unknown> }
 const r = (body: any, status = 200): ActionResult => ({ status, body })
 
@@ -853,19 +931,7 @@ export async function runAction(action: string, body: Record<string, any>, supab
         if (cErr) throw cErr
         if (!contact) return r({ error: 'contact_not_found' }, 404)
 
-        const limit = Number.isInteger(Number(body.limit)) && Number(body.limit) > 0
-          ? Math.min(Number(body.limit), 200) : 100
 
-        const { data, error } = await supabase
-          .from('maytapi_messages')
-          .select('direction, body, media_type, received_at, status, read_at')
-          .eq('user_id', ownerId)
-          .eq('contact_id', contactId)
-          .order('received_at', { ascending: true })
-          .limit(limit)
-        if (error) throw error
-
-        return r({ ok: true, contact_id: contactId, contact_name: contact.full_name, message_count: data?.length ?? 0, messages: data ?? [] })
       }
 
       // ---------- Shipments / deliveries ----------
@@ -1183,6 +1249,226 @@ export async function runAction(action: string, body: Record<string, any>, supab
             ? 'Preview only — nothing written. Review would_action per row, then call again with dry_run:false.'
             : 'Unmatched APLGO IDs were never inserted — those contacts need to exist in the CRM first (see create_contact). Needs-review rows were sent to the in-app Waiting Room, not inserted as orders.',
         })
+      }
+
+      // ---------- Call Sheets (v2.1.0) ----------
+      // Mirrors src/pages/CallSheets.tsx + the save_call RPC. Never sends,
+      // never touches orders, never deletes, never changes consent/opt-out/
+      // communication_status. Every query is scoped to the configured owner.
+      case 'list_call_sheet': {
+        const level = Number(body.level)
+        if (!Number.isInteger(level) || level < 1 || level > 12) return r({ error: 'level_must_be_1_to_12' }, 400)
+        const bucket = body.bucket == null ? '' : String(body.bucket)
+        if (bucket && !CS_BUCKETS.includes(bucket)) return r({ error: 'invalid_bucket', allowed: CS_BUCKETS }, 400)
+        const limit = csLimit(body.limit, 100, 500)
+        let q = supabase.from('call_sheet_cards').select('*').eq('user_id', ownerId).eq('level', String(level))
+        if (bucket) q = q.eq('bucket', bucket)
+        if (body.not_called_today === true) q = q.eq('called_today', false)
+        const { data, error } = await q.order('full_name').limit(2000)
+        if (error) throw error
+        const cards = csDedupe(data ?? []).slice(0, limit)
+        const hist = await csHistory(supabase, ownerId, cards.map((c) => c.id), 3)
+        return r({ ok: true, level, count: cards.length, cards: cards.map((c) => ({ ...c, history: hist[c.id] ?? [] })) })
+      }
+
+      case 'get_call_sheet_card': {
+        const contact = await csFindContact(supabase, ownerId, body)
+        if ('error' in contact) return r({ error: contact.error }, contact.status)
+        const { data: card, error } = await supabase.from('call_sheet_cards').select('*')
+          .eq('user_id', ownerId).eq('id', contact.id).maybeSingle()
+        if (error) throw error
+        const hist = await csHistory(supabase, ownerId, [contact.id], 10)
+        const { data: msgs } = await supabase.from('maytapi_messages')
+          .select('direction, body, body_preview, media_type, received_at')
+          .eq('user_id', ownerId).eq('contact_id', contact.id).order('received_at', { ascending: false }).limit(10)
+        return r({
+          ok: true, contact_id: contact.id, on_call_sheet: !!card,
+          note: card ? undefined : 'This contact is not on a call sheet (level outside range or not in the latest export).',
+          card: card ?? null, history: hist[contact.id] ?? [],
+          whatsapp: (msgs ?? []).reverse().map(cs_msg),
+        })
+      }
+
+      case 'log_call': {
+        const contactId = String(body.contact_id ?? '')
+        if (!contactId) return r({ error: 'contact_id_required' }, 400)
+        const outcome = String(body.outcome ?? '')
+        if (!CS_OUTCOMES.includes(outcome)) return r({ error: 'invalid_outcome', allowed: CS_OUTCOMES }, 400)
+        const followUp = body.follow_up_on == null || body.follow_up_on === '' ? null : String(body.follow_up_on)
+        if (followUp && !/^\d{4}-\d{2}-\d{2}$/.test(followUp)) return r({ error: 'follow_up_on_must_be_yyyy_mm_dd' }, 400)
+        const { data: c } = await supabase.from('contacts').select('id').eq('id', contactId).eq('user_id', ownerId).maybeSingle()
+        if (!c) return r({ error: 'contact_not_found' }, 404)
+        const notes = norm(body.notes); const nextAction = norm(body.next_action)
+        const { data: ins, error } = await supabase.from('contact_activities').insert({
+          user_id: ownerId, contact_id: contactId, activity_type: 'call', summary: outcome, outcome,
+          notes: notes || null, next_action: nextAction || null, follow_up_on: followUp,
+        }).select('id, created_at').single()
+        if (error) throw error
+        if (nextAction) {
+          const { error: uErr } = await supabase.from('contacts')
+            .update({ next_action: nextAction, updated_at: new Date().toISOString() })
+            .eq('id', contactId).eq('user_id', ownerId)
+          if (uErr) throw uErr
+        }
+        return r({ ok: true, activity_id: ins.id, created_at: ins.created_at, contact_id: contactId, outcome })
+      }
+
+      case 'list_calls': {
+        const today = csToday()
+        const from = String(body.from ?? today); const to = String(body.to ?? today)
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) return r({ error: 'dates_must_be_yyyy_mm_dd' }, 400)
+        if (body.outcome != null && !CS_OUTCOMES.includes(String(body.outcome))) return r({ error: 'invalid_outcome', allowed: CS_OUTCOMES }, 400)
+        let q = supabase.from('contact_activities')
+          .select('id, contact_id, created_at, outcome, summary, notes, next_action, follow_up_on, contacts(full_name, level)')
+          .eq('user_id', ownerId).eq('activity_type', 'call')
+          .gte('created_at', `${from}T00:00:00+02:00`).lte('created_at', `${to}T23:59:59.999+02:00`)
+        if (body.outcome != null) q = q.eq('outcome', String(body.outcome))
+        const { data, error } = await q.order('created_at', { ascending: false }).limit(1000)
+        if (error) throw error
+        let calls = (data ?? []).map((r: any) => ({
+          activity_id: r.id, contact_id: r.contact_id, full_name: r.contacts?.full_name ?? '', level: norm(r.contacts?.level),
+          called_at: r.created_at, outcome: r.outcome ?? r.summary, notes: r.notes, next_action: r.next_action, follow_up_on: r.follow_up_on,
+        }))
+        if (body.level != null) calls = calls.filter((c) => c.level === String(body.level))
+        return r({ ok: true, from, to, count: calls.length, calls })
+      }
+
+      case 'list_followups_due': {
+        const onOrBefore = String(body.on_or_before ?? csToday())
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(onOrBefore)) return r({ error: 'on_or_before_must_be_yyyy_mm_dd' }, 400)
+        const { data, error } = await supabase.from('contact_activities')
+          .select('id, contact_id, created_at, outcome, summary, notes, next_action, follow_up_on, contacts(full_name, level, phone_number)')
+          .eq('user_id', ownerId).eq('activity_type', 'call').not('contact_id', 'is', null)
+          .order('created_at', { ascending: false }).limit(5000)
+        if (error) throw error
+        const latest = new Map<string, any>()
+        for (const r of data ?? []) if (!latest.has(r.contact_id)) latest.set(r.contact_id, r)
+        let due = [...latest.values()]
+          .filter((r) => r.follow_up_on && r.follow_up_on <= onOrBefore)
+          .map((r) => ({
+            contact_id: r.contact_id, full_name: r.contacts?.full_name ?? '', level: norm(r.contacts?.level),
+            phone_number: r.contacts?.phone_number ?? '', follow_up_on: r.follow_up_on, last_call_at: r.created_at,
+            last_call_outcome: r.outcome ?? r.summary, notes: r.notes, next_action: r.next_action,
+          }))
+        if (body.level != null) due = due.filter((d) => d.level === String(body.level))
+        due.sort((a, b) => String(a.follow_up_on).localeCompare(String(b.follow_up_on)))
+        return r({ ok: true, on_or_before: onOrBefore, count: due.length, followups: due })
+      }
+
+      case 'list_needs_level': {
+        const since = new Date(Date.now() - 14 * 864e5).toISOString()
+        const { data, error } = await supabase.from('contacts')
+          .select('id, full_name, phone_number, city, aplgo_id, level, leg, lead_type, created_at')
+          .eq('user_id', ownerId).or(`aplgo_id.neq.,created_at.gte.${since}`).neq('lead_type', 'Expired').limit(5000)
+        if (error) throw error
+        const needs = (data ?? []).filter((c: any) => !/^\s*\d{1,2}\s*$/.test(c.level || ''))
+        const { data: hi } = await supabase.from('contacts').select('id, full_name, phone_number, level, aplgo_id')
+          .eq('user_id', ownerId).not('level', 'is', null).neq('level', '').limit(10000)
+        const outside = (hi ?? []).filter((c: any) => /^\s*\d+\s*$/.test(c.level) && Number(c.level) > 12)
+        return r({ ok: true, needs_level_count: needs.length, needs_level: needs, outside_range_count: outside.length, outside_range: outside })
+      }
+
+      case 'set_contact_level': {
+        const contactId = String(body.contact_id ?? '')
+        if (!contactId) return r({ error: 'contact_id_required' }, 400)
+        const level = Number(body.level)
+        if (!Number.isInteger(level) || level < 1 || level > 12) return r({ error: 'level_must_be_1_to_12', received: body.level ?? null }, 400)
+        if (body.leg != null && !['L', 'R'].includes(String(body.leg))) return r({ error: 'leg_must_be_L_or_R' }, 400)
+        const { data: c } = await supabase.from('contacts').select('id').eq('id', contactId).eq('user_id', ownerId).maybeSingle()
+        if (!c) return r({ error: 'contact_not_found' }, 404)
+        const patch: Record<string, unknown> = { level: String(level), updated_at: new Date().toISOString() }
+        if (body.leg != null) patch.leg = String(body.leg)
+        if (body.go_status != null) patch.go_status = norm(body.go_status)
+        const { error } = await supabase.from('contacts').update(patch).eq('id', contactId).eq('user_id', ownerId)
+        if (error) throw error
+        await supabase.from('contact_activities').insert({
+          user_id: ownerId, contact_id: contactId, activity_type: 'note', summary: `Level set to ${level} via Claude`, next_action: '',
+        })
+        return r({ ok: true, contact_id: contactId, updated: patch })
+      }
+
+      case 'bulk_set_levels': {
+        const items = Array.isArray(body.items) ? body.items as Record<string, unknown>[] : null
+        if (!items || !items.length) return r({ error: 'items_required' }, 400)
+        if (items.length > 100) return r({ error: 'max_100_items' }, 400)
+        // Validate everything first so a bad row never leaves a half-applied batch.
+        for (const [i, it] of items.entries()) {
+          if (!sanitizeAplgoId(it.aplgo_id) && !norm(it.phone)) return r({ error: 'aplgo_id_or_phone_required', index: i }, 400)
+          if (it.level != null) {
+            const l = Number(it.level)
+            if (!Number.isInteger(l) || l < 1 || l > 12) return r({ error: 'level_must_be_1_to_12', index: i, received: it.level }, 400)
+          }
+          if (it.leg != null && !['L', 'R'].includes(String(it.leg))) return r({ error: 'leg_must_be_L_or_R', index: i }, 400)
+          for (const k of ['enrolled_on', 'activated_on']) {
+            if (it[k] != null && !/^\d{4}-\d{2}-\d{2}$/.test(String(it[k]))) return r({ error: `${k}_must_be_yyyy_mm_dd`, index: i }, 400)
+          }
+        }
+        const today = csToday()
+        let matched = 0, updated = 0
+        const notFound: unknown[] = []
+        const results: unknown[] = []
+        for (const it of items) {
+          const aplgo = sanitizeAplgoId(it.aplgo_id)
+          let contact: any = null
+          if (aplgo) {
+            const { data } = await supabase.from('contacts').select('id, full_name, level, leg, go_status, enrolled_on, activated_on')
+              .eq('user_id', ownerId).eq('aplgo_id', aplgo).order('updated_at', { ascending: false }).limit(1)
+            contact = data?.[0] ?? null
+          }
+          if (!contact && norm(it.phone)) {
+            const { data: pn } = await supabase.rpc('normalize_phone', { raw: norm(it.phone) })
+            if (pn) {
+              const { data } = await supabase.from('contacts').select('id, full_name, level, leg, go_status, enrolled_on, activated_on')
+                .eq('user_id', ownerId).eq('phone_normalized', pn).order('updated_at', { ascending: false }).limit(1)
+              contact = data?.[0] ?? null
+            }
+          }
+          if (!contact) { notFound.push(it); continue }
+          matched++
+          const changes: Record<string, unknown> = {}
+          if (it.level != null && norm(contact.level) !== String(Number(it.level))) changes.level = String(Number(it.level))
+          if (it.leg != null && contact.leg !== String(it.leg)) changes.leg = String(it.leg)
+          if (it.go_status != null && contact.go_status !== norm(it.go_status)) changes.go_status = norm(it.go_status)
+          if (it.enrolled_on != null && contact.enrolled_on !== String(it.enrolled_on)) changes.enrolled_on = String(it.enrolled_on)
+          if (it.activated_on != null && contact.activated_on !== String(it.activated_on)) changes.activated_on = String(it.activated_on)
+          const { error } = await supabase.from('contacts')
+            .update({ ...changes, export_seen_on: today, updated_at: new Date().toISOString() })
+            .eq('id', contact.id).eq('user_id', ownerId)
+          if (error) throw error
+          if (Object.keys(changes).length) {
+            updated++
+            await supabase.from('contact_activities').insert({
+              user_id: ownerId, contact_id: contact.id, activity_type: 'note', next_action: '',
+              summary: `Export refresh via Claude: ${Object.entries(changes).map(([k, v]) => `${k} → ${v}`).join(', ')}`,
+            })
+          }
+          results.push({ contact_id: contact.id, full_name: contact.full_name, changed: changes })
+        }
+        return r({ ok: true, export_seen_on: today, matched, updated, not_found: notFound.length, not_found_rows: notFound, results })
+      }
+
+      case 'get_call_sheet_settings': {
+        const { data } = await supabase.from('call_sheet_settings').select('min_level, max_level, new_days, steady_days, export_fresh_days')
+          .eq('user_id', ownerId).maybeSingle()
+        return r({ ok: true, settings: data ?? CS_DEFAULTS, is_default: !data })
+      }
+
+      case 'set_call_sheet_settings': {
+        const { data: cur } = await supabase.from('call_sheet_settings').select('min_level, max_level, new_days, steady_days, export_fresh_days')
+          .eq('user_id', ownerId).maybeSingle()
+        const next: Record<string, number> = { ...CS_DEFAULTS, ...(cur ?? {}) }
+        for (const k of Object.keys(CS_DEFAULTS)) {
+          if (body[k] == null) continue
+          const n = Number(body[k])
+          if (!Number.isInteger(n) || n < 1) return r({ error: `${k}_must_be_positive_integer` }, 400)
+          next[k] = n
+        }
+        if (next.min_level > 12 || next.max_level > 12) return r({ error: 'level_must_be_1_to_12' }, 400)
+        if (next.min_level > next.max_level) return r({ error: 'min_level_cannot_exceed_max_level' }, 400)
+        const { error } = await supabase.from('call_sheet_settings')
+          .upsert({ user_id: ownerId, ...next, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
+        if (error) throw error
+        return r({ ok: true, settings: next })
       }
 
       default:
