@@ -931,7 +931,22 @@ export async function runAction(action: string, body: Record<string, any>, supab
         if (cErr) throw cErr
         if (!contact) return r({ error: 'contact_not_found' }, 404)
 
+        const limit = Number.isInteger(Number(body.limit)) && Number(body.limit) > 0
+          ? Math.min(Number(body.limit), 200) : 30
 
+        // v2.1: return the LAST `limit` messages (oldest -> newest), each with
+        // date + text, or a media label when there is no text.
+        const { data, error } = await supabase
+          .from('maytapi_messages')
+          .select('direction, body, body_preview, media_type, received_at, status, read_at')
+          .eq('user_id', ownerId)
+          .eq('contact_id', contactId)
+          .order('received_at', { ascending: false })
+          .limit(limit)
+        if (error) throw error
+        const messages = (data ?? []).reverse().map(cs_msg)
+
+        return r({ ok: true, contact_id: contactId, contact_name: contact.full_name, message_count: messages.length, messages })
       }
 
       // ---------- Shipments / deliveries ----------
