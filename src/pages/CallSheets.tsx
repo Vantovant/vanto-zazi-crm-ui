@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Phone, MessageCircle, ExternalLink, Search, Loader2, PhoneOff, Link2 } from 'lucide-react';
+import { Phone, MessageCircle, ExternalLink, Search, Loader2, PhoneOff, Link2, Settings2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCrm } from '@/contexts/CrmContext';
@@ -10,7 +10,8 @@ import {
   CALL_OUTCOMES, CallCard, dedupeCards, formatLocalPhone, intlDigits, isNoiseNote, isPhoneOnly, sortCards, talkAbout,
 } from '@/lib/callSheets';
 
-type Settings = { min_level: number; max_level: number };
+type Settings = { min_level: number; max_level: number; new_days: number; steady_days: number; export_fresh_days: number };
+const DEFAULT_SETTINGS: Settings = { min_level: 1, max_level: 5, new_days: 30, steady_days: 60, export_fresh_days: 45 };
 type HistoryLine = { at: string; text: string };
 type Filter = 'all' | 'open' | 'new' | 'steady' | 'little' | 'notcalled';
 
@@ -20,7 +21,7 @@ const fmtDate = (s: string) => new Date(s).toLocaleDateString('en-ZA', { day: 'n
 export function CallSheets() {
   const { user } = useAuth();
   const { contacts } = useCrm();
-  const [settings, setSettings] = useState<Settings>({ min_level: 1, max_level: 5 });
+  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [cards, setCards] = useState<CallCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [level, setLevel] = useState(1);
@@ -33,12 +34,20 @@ export function CallSheets() {
   const [openContact, setOpenContact] = useState<Prospect | null>(null);
   const [linkFor, setLinkFor] = useState<any | null>(null);
 
+  const [showSettings, setShowSettings] = useState(false);
+  const [draft, setDraft] = useState<Settings>(DEFAULT_SETTINGS);
+  const [stale, setStale] = useState<any[]>([]);
+  const [outside, setOutside] = useState<any[]>([]);
+
   // Settings row: created on first load
   useEffect(() => {
     if (!user) return;
     (async () => {
       const { data } = await db.from('call_sheet_settings').select('*').eq('user_id', user.id).maybeSingle();
-      if (data) setSettings({ min_level: data.min_level, max_level: data.max_level });
+      if (data) setSettings({
+        min_level: data.min_level, max_level: data.max_level, new_days: data.new_days,
+        steady_days: data.steady_days, export_fresh_days: data.export_fresh_days ?? 45,
+      });
       else await db.from('call_sheet_settings').insert({ user_id: user.id });
     })();
   }, [user]);
@@ -57,7 +66,34 @@ export function CallSheets() {
       .or(`aplgo_id.neq.,created_at.gte.${since}`)
       .neq('lead_type', 'Expired').limit(1000);
     setNeedsLevel((data ?? []).filter((c: any) => !/^\s*\d{1,2}\s*$/.test(c.level || '')));
+    const { data: hi } = await db.from('contacts').select('id,full_name,level').not('level', 'is', null).neq('level', '').limit(5000);
+    setOutside((hi ?? []).filter((c: any) => /^\s*\d+\s*$/.test(c.level) && Number(c.level) > 12));
   }, []);
+
+  // Contacts at the current level who are not in the latest export (review only)
+  const cardIdsKey = cards.map((c) => c.id).join(',');
+  const loadStale = useCallback(async () => {
+    const shown = new Set(cardIdsKey ? cardIdsKey.split(',') : []);
+    const { data } = await db.from('contacts')
+      .select('id,full_name,phone_number,go_status,lead_type,level,aplgo_id,phone_normalized,updated_at')
+      .in('level', [String(level), ` ${level}`, `${level} `]).limit(2000);
+    const seen = new Set<string>();
+    const shownKeys = new Set(cards.map((c) => c.aplgo_id || c.phone_normalized || c.id));
+    const rows = (data ?? []).filter((c: any) => {
+      if (shown.has(c.id)) return false;
+      const k = c.aplgo_id || c.phone_normalized || c.id;
+      if (shownKeys.has(k) || seen.has(k)) return false;
+      seen.add(k); return true;
+    });
+    const ids = rows.map((r: any) => r.id);
+    const last: Record<string, string> = {};
+    for (let i = 0; i < ids.length; i += 200) {
+      const { data: o } = await db.from('orders').select('contact_id,order_date').in('contact_id', ids.slice(i, i + 200));
+      for (const r of o ?? []) if (!last[r.contact_id] || r.order_date > last[r.contact_id]) last[r.contact_id] = r.order_date;
+    }
+    setStale(rows.map((r: any) => ({ ...r, last_order: last[r.id] })).sort((a: any, b: any) => (a.full_name || '').localeCompare(b.full_name || '')));
+  }, [level, cardIdsKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { loadStale(); }, [loadStale]);
 
   const loadUnmatched = useCallback(async () => {
     const { data } = await db.from('maytapi_inbound_unmatched')
@@ -147,12 +183,54 @@ export function CallSheets() {
     if (p) setOpenContact(p); else toast.error('Contact not loaded yet');
   };
 
+  const saveSettings = async () => {
+    if (!user) return;
+    const s = draft;
+    if (s.min_level < 1 || s.max_level > 12 || s.min_level > s.max_level) return toast.error('Levels must be 1 to 12, min not above max');
+    if ([s.new_days, s.steady_days, s.export_fresh_days].some((n) => !(n >= 1))) return toast.error('Day values must be 1 or more');
+    const { error } = await db.from('call_sheet_settings').upsert({ user_id: user.id, ...s, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+    if (error) return toast.error(`Settings not saved: ${error.message}`);
+    setSettings(s); setShowSettings(false); toast.success('Settings saved');
+    loadCards();
+  };
+
   return (
     <div className="mx-auto w-full max-w-[760px] space-y-4 p-3 sm:p-4">
       <header className="space-y-1">
-        <h1 className="text-2xl font-bold text-foreground">Call Sheets</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-foreground">Call Sheets</h1>
+          <Button size="sm" variant="outline" aria-label="Call sheet settings" onClick={() => { setDraft(settings); setShowSettings((v) => !v); }}><Settings2 className="h-5 w-5" /></Button>
+        </div>
         <p className="text-sm text-muted-foreground">Phone your team level by level, record each call, and see what to talk about.</p>
       </header>
+
+      {showSettings && (
+        <section className="grid grid-cols-2 gap-2 rounded-lg border border-border bg-card p-3 text-sm sm:grid-cols-3">
+          {([['min_level', 'Min level', 1, 12], ['max_level', 'Max level', 1, 12], ['new_days', 'New-joiner days', 1, 365], ['steady_days', 'Steady-buyer days', 1, 365], ['export_fresh_days', 'Export freshness (days)', 1, 365]] as [keyof Settings, string, number, number][]).map(([k, label, mn, mx]) => (
+            <label key={k} className="space-y-1">
+              <span className="text-muted-foreground">{label}</span>
+              <Input type="number" min={mn} max={mx} value={draft[k]} onChange={(e) => setDraft({ ...draft, [k]: Number(e.target.value) })} />
+            </label>
+          ))}
+          <div className="col-span-full flex gap-2">
+            <Button size="sm" onClick={saveSettings}>Save settings</Button>
+            <Button size="sm" variant="outline" onClick={() => setShowSettings(false)}>Cancel</Button>
+          </div>
+        </section>
+      )}
+
+      {outside.length > 0 && (
+        <section className="rounded-lg border border-border bg-card p-3">
+          <h2 className="mb-2 font-semibold text-foreground">Outside the range ({outside.length})</h2>
+          <p className="mb-1 text-xs text-muted-foreground">Level above 12. Left as is.</p>
+          {outside.map((c) => (
+            <div key={c.id} className="flex justify-between gap-2 text-sm">
+              <span className="text-foreground">{c.full_name || 'No name'} · Level {String(c.level).trim()}</span>
+              <button className="text-xs text-primary underline" onClick={() => openProspect(c.id)}>Open contact</button>
+            </div>
+          ))}
+        </section>
+      )}
 
       {needsLevel.length > 0 && (
         <section className="rounded-lg border border-border bg-card p-3">
@@ -207,6 +285,19 @@ export function CallSheets() {
           ))}
         </div>
       )}
+
+      <details className="rounded-lg border border-border bg-card p-3" data-testid="not-in-export">
+        <summary className="cursor-pointer font-semibold text-foreground">Not in the latest export ({stale.length})</summary>
+        <p className="mt-1 text-xs text-muted-foreground">For review only. These people are not changed.</p>
+        <div className="mt-2 max-h-96 space-y-1 overflow-y-auto text-sm">
+          {stale.map((c) => (
+            <div key={c.id} className="flex flex-wrap justify-between gap-2 border-b border-border py-1">
+              <span className="text-foreground">{c.full_name || 'No name'} <span className="text-muted-foreground">{formatLocalPhone(c.phone_number)}</span></span>
+              <span className="text-xs text-muted-foreground">{[c.go_status, c.lead_type, c.last_order ? `Last order ${fmtDate(c.last_order)}` : 'No orders'].filter(Boolean).join(' · ')}</span>
+            </div>
+          ))}
+        </div>
+      </details>
 
       {unmatched.length > 0 && (
         <section className="rounded-lg border border-border bg-card p-3">
@@ -264,6 +355,9 @@ function CallCardView({ c, lines, onWhatsApp, onSaved }: { c: CallCard; lines: H
 
   return (
     <article className="space-y-3 rounded-lg border border-border bg-card p-3 shadow-sm" data-testid="call-card" data-bucket={c.bucket}>
+      {c.lead_type === 'Expired' && (
+        <div className="rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">Tagged Expired in CRM</div>
+      )}
       {phoneOnly && (
         <div className="flex items-center gap-2 rounded-md bg-destructive/10 px-2 py-1 text-sm font-medium text-destructive">
           <PhoneOff className="h-4 w-4" /> No WhatsApp. Phone only.
