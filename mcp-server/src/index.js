@@ -570,13 +570,13 @@ function buildServer() {
     {
       title: "Get a WhatsApp conversation thread",
       description:
-        "Full message history for one contact's WhatsApp conversation, oldest first. " +
+        "Read-only. The last `limit` WhatsApp messages (default 30) for one contact, oldest to newest, each with direction, date, text, or a media label when there is no text. " +
         "Requires contact_id (not a raw conversation key) — this is a deliberate " +
         "guardrail so an unmatched/masked-number thread can never be requested " +
         "through this tool. Read-only.",
       inputSchema: {
         contact_id: z.string().describe("UUID of the contact whose thread to read"),
-        limit: z.number().int().positive().max(200).optional().describe("Max messages, default 100, max 200"),
+        limit: z.number().int().positive().max(200).optional().describe("Max messages, default 30, max 200"),
       },
     },
     async (args) => {
