@@ -408,6 +408,7 @@ export type Database = {
       call_sheet_settings: {
         Row: {
           created_at: string
+          export_fresh_days: number
           max_level: number
           min_level: number
           new_days: number
@@ -417,6 +418,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          export_fresh_days?: number
           max_level?: number
           min_level?: number
           new_days?: number
@@ -426,6 +428,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          export_fresh_days?: number
           max_level?: number
           min_level?: number
           new_days?: number
@@ -716,6 +719,7 @@ export type Database = {
           email_address: string
           email_normalized: string | null
           enrolled_on: string | null
+          export_seen_on: string | null
           focus_area: string
           full_name: string
           go_status: string
@@ -756,6 +760,7 @@ export type Database = {
           email_address?: string
           email_normalized?: string | null
           enrolled_on?: string | null
+          export_seen_on?: string | null
           focus_area?: string
           full_name: string
           go_status?: string
@@ -796,6 +801,7 @@ export type Database = {
           email_address?: string
           email_normalized?: string | null
           enrolled_on?: string | null
+          export_seen_on?: string | null
           focus_area?: string
           full_name?: string
           go_status?: string
@@ -2267,6 +2273,7 @@ export type Database = {
           communication_status: string | null
           created_at: string | null
           enrolled_on: string | null
+          export_seen_on: string | null
           full_name: string | null
           go_status: string | null
           id: string | null
@@ -2285,6 +2292,7 @@ export type Database = {
           phone_number: string | null
           province: string | null
           sponsor_name: string | null
+          tagged_expired: boolean | null
           unanswered_inbound: boolean | null
           user_id: string | null
         }
