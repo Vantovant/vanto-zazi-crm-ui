@@ -288,7 +288,7 @@ Deno.serve(async (req) => {
   const action = String(body.action ?? '')
 
   // Kairos key is read-only and limited to an explicit allowlist.
-  const KAIROS_ALLOWED = ['list_followups_due', 'list_call_sheet', 'list_birthdays', 'list_contacts']
+  const KAIROS_ALLOWED = ['list_followups_due', 'list_call_sheet', 'list_birthdays', 'list_contacts', 'add_contact_note']
   if (isKairos && !KAIROS_ALLOWED.includes(action)) {
     return json({
       error: 'forbidden_for_kairos_token',
@@ -495,19 +495,45 @@ Deno.serve(async (req) => {
         if (cErr) throw cErr
         if (!contact) return json({ error: 'contact_not_found' }, 404)
 
+        // Kairos-only idempotency ref; ignored for the main key.
+        let kairosRef: string | null = null
+        if (isKairos && body.kairos_ref != null && String(body.kairos_ref).trim() !== '') {
+          kairosRef = String(body.kairos_ref).trim()
+          if (kairosRef.length > 80) return json({ error: 'kairos_ref_too_long', max: 80 }, 400)
+        }
+        const findExisting = async () => {
+          const { data, error: fErr } = await supabase.from('contact_activities')
+            .select('id, created_at').eq('user_id', ownerId).eq('contact_id', contactId)
+            .eq('kairos_ref', kairosRef!).maybeSingle()
+          if (fErr) throw fErr
+          return data
+        }
+        if (kairosRef) {
+          const existing = await findExisting()
+          if (existing) return json({ ok: true, duplicate: true, contact_id: contactId, activity_id: existing.id, created_at: existing.created_at, kairos_ref: kairosRef })
+        }
+
         // Strictly additive — inserts a new contact_activities row, never edits
         // or overwrites any existing activity entry.
-        const { data: inserted, error } = await supabase.from('contact_activities').insert({
+        const row: Record<string, unknown> = {
           user_id: ownerId,
           contact_id: contactId,
           activity_type: 'note',
           summary: 'Note added via Claude/MCP',
           notes: note,
           next_action: '',
-        }).select('id, created_at').single()
-        if (error) throw error
+        }
+        if (kairosRef) row.kairos_ref = kairosRef
+        const { data: inserted, error } = await supabase.from('contact_activities').insert(row).select('id, created_at').single()
+        if (error) {
+          if (kairosRef && (error as { code?: string }).code === '23505') {
+            const existing = await findExisting()
+            if (existing) return json({ ok: true, duplicate: true, contact_id: contactId, activity_id: existing.id, created_at: existing.created_at, kairos_ref: kairosRef })
+          }
+          throw error
+        }
 
-        return json({ ok: true, contact_id: contactId, activity_id: inserted.id, created_at: inserted.created_at })
+        return json({ ok: true, ...(kairosRef ? { duplicate: false, kairos_ref: kairosRef } : {}), contact_id: contactId, activity_id: inserted.id, created_at: inserted.created_at })
       }
 
       case 'list_orders': {
