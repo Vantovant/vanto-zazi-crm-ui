@@ -514,6 +514,7 @@ export type Database = {
           created_at: string
           follow_up_on: string | null
           id: string
+          kairos_ref: string | null
           next_action: string | null
           notes: string | null
           outcome: string | null
@@ -526,6 +527,7 @@ export type Database = {
           created_at?: string
           follow_up_on?: string | null
           id?: string
+          kairos_ref?: string | null
           next_action?: string | null
           notes?: string | null
           outcome?: string | null
@@ -538,6 +540,7 @@ export type Database = {
           created_at?: string
           follow_up_on?: string | null
           id?: string
+          kairos_ref?: string | null
           next_action?: string | null
           notes?: string | null
           outcome?: string | null
