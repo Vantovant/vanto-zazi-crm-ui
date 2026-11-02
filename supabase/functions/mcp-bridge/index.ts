@@ -264,8 +264,11 @@ Deno.serve(async (req) => {
 
   // ---- Fail-closed auth: missing/wrong token -> 401. No fallback "system" path. ----
   const expected = Deno.env.get('MCP_BRIDGE_TOKEN')
+  const kairosExpected = Deno.env.get('KAIROS_BRIDGE_TOKEN')
   const provided = req.headers.get('x-mcp-token')
-  if (!expected || !provided || !timingSafeEqual(provided, expected)) {
+  const isMain = !!expected && !!provided && timingSafeEqual(provided, expected)
+  const isKairos = !isMain && !!kairosExpected && !!provided && timingSafeEqual(provided, kairosExpected)
+  if (!isMain && !isKairos) {
     return json({ error: 'unauthorized' }, 401)
   }
 
@@ -283,6 +286,15 @@ Deno.serve(async (req) => {
   }
 
   const action = String(body.action ?? '')
+
+  // Kairos key is read-only and limited to an explicit allowlist.
+  const KAIROS_ALLOWED = ['list_followups_due', 'list_call_sheet', 'list_birthdays', 'list_contacts']
+  if (isKairos && !KAIROS_ALLOWED.includes(action)) {
+    return json({
+      error: 'forbidden_for_kairos_token',
+      message: `The Kairos key may only call: ${KAIROS_ALLOWED.join(', ')}. "${action}" is not allowed.`,
+    }, 403)
+  }
 
   // MCP tools operate on behalf of a single configured account (same
   // DEFAULT_OWNER_EMAIL / ZAZI_DEFAULT_OWNER_EMAIL convention already used
