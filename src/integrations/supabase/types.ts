@@ -833,12 +833,15 @@ export type Database = {
       }
       duplication_scorecards: {
         Row: {
+          commitment_action: string
+          commitment_person: string
           created_at: string
           fix_note: string
           four_by_four: number
           gap_type: string | null
           helped_started: number
           id: string
+          last_week_done: string | null
           new_introduced: number
           rating: string | null
           taught_to_introduce: number
@@ -849,12 +852,15 @@ export type Database = {
           week_start: string
         }
         Insert: {
+          commitment_action?: string
+          commitment_person?: string
           created_at?: string
           fix_note?: string
           four_by_four?: number
           gap_type?: string | null
           helped_started?: number
           id?: string
+          last_week_done?: string | null
           new_introduced?: number
           rating?: string | null
           taught_to_introduce?: number
@@ -865,12 +871,15 @@ export type Database = {
           week_start: string
         }
         Update: {
+          commitment_action?: string
+          commitment_person?: string
           created_at?: string
           fix_note?: string
           four_by_four?: number
           gap_type?: string | null
           helped_started?: number
           id?: string
+          last_week_done?: string | null
           new_introduced?: number
           rating?: string | null
           taught_to_introduce?: number
