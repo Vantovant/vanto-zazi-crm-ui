@@ -35,6 +35,8 @@
   --muted-foreground: 215 16% 65%;
   --accent: 22 81% 54%;              /* brand orange */
   --accent-foreground: 0 0% 100%;
+  --gold: 43 74% 52%;
+  --gold-foreground: 210 38% 8%;
   --destructive: 0 75% 55%;
   --destructive-foreground: 0 0% 100%;
   --border: 215 25% 22%;

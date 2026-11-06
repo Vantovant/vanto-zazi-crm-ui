@@ -831,6 +831,57 @@ export type Database = {
         }
         Relationships: []
       }
+      duplication_scorecards: {
+        Row: {
+          created_at: string
+          fix_note: string
+          four_by_four: number
+          gap_type: string | null
+          helped_started: number
+          id: string
+          new_introduced: number
+          rating: string | null
+          taught_to_introduce: number
+          team_introduced: number
+          team_pv: number
+          updated_at: string
+          user_id: string
+          week_start: string
+        }
+        Insert: {
+          created_at?: string
+          fix_note?: string
+          four_by_four?: number
+          gap_type?: string | null
+          helped_started?: number
+          id?: string
+          new_introduced?: number
+          rating?: string | null
+          taught_to_introduce?: number
+          team_introduced?: number
+          team_pv?: number
+          updated_at?: string
+          user_id?: string
+          week_start: string
+        }
+        Update: {
+          created_at?: string
+          fix_note?: string
+          four_by_four?: number
+          gap_type?: string | null
+          helped_started?: number
+          id?: string
+          new_introduced?: number
+          rating?: string | null
+          taught_to_introduce?: number
+          team_introduced?: number
+          team_pv?: number
+          updated_at?: string
+          user_id?: string
+          week_start?: string
+        }
+        Relationships: []
+      }
       expired_campaign_recipients: {
         Row: {
           attempts: number
