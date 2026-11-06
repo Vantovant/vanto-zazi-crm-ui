@@ -8,7 +8,9 @@ import {
   type GapType, type Numbers, type Rating,
 } from '@/lib/duplicationScorecard';
 
-type Row = Numbers & { week_start: string; rating: Rating | null; gap_type: GapType | null; fix_note: string };
+type Done = 'done' | 'partly' | 'not_yet';
+const DONE_LABEL: Record<Done, string> = { done: 'DONE', partly: 'PARTLY', not_yet: 'NOT YET' };
+type Row = Numbers & { week_start: string; rating: Rating | null; gap_type: GapType | null; fix_note: string; commitment_action: string; commitment_person: string; last_week_done: Done | null };
 
 const BOXES: { key: keyof Numbers; label: string; max?: number; decimal?: boolean }[] = [
   { key: 'new_introduced', label: 'New people I introduced this week' },
@@ -37,6 +39,9 @@ export function DuplicationScorecard() {
   const [rating, setRating] = useState<Rating | null>(null);
   const [gap, setGap] = useState<GapType | null>(null);
   const [fix, setFix] = useState('');
+  const [action, setAction] = useState('');
+  const [person, setPerson] = useState('');
+  const [done, setDone] = useState<Done | null>(null);
   const [gapOpen, setGapOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -44,7 +49,7 @@ export function DuplicationScorecard() {
     if (!user) return;
     const { data, error } = await supabase
       .from('duplication_scorecards')
-      .select('week_start,new_introduced,helped_started,taught_to_introduce,team_introduced,four_by_four,team_pv,rating,gap_type,fix_note')
+      .select('week_start,new_introduced,helped_started,taught_to_introduce,team_introduced,four_by_four,team_pv,rating,gap_type,fix_note,commitment_action,commitment_person,last_week_done')
       .order('week_start', { ascending: false });
     if (error) { toast.error(error.message); return; }
     setRows((data ?? []).map((r) => ({ ...r, team_pv: Number(r.team_pv) })) as Row[]);
@@ -58,8 +63,9 @@ export function DuplicationScorecard() {
       const n = empty();
       NUMBER_FIELDS.forEach((k) => (n[k] = Number(r[k]) || 0));
       setNums(n); setRating(r.rating); setGap(r.gap_type); setFix(r.fix_note ?? '');
+      setAction(r.commitment_action ?? ''); setPerson(r.commitment_person ?? ''); setDone(r.last_week_done);
     } else {
-      setNums(empty()); setRating(null); setGap(null); setFix('');
+      setNums(empty()); setRating(null); setGap(null); setFix(''); setAction(''); setPerson(''); setDone(null);
     }
   }, [week, rows]);
 
@@ -80,7 +86,7 @@ export function DuplicationScorecard() {
     if (!rating) { toast.error('Pick Progressing, Standing still or Declining first.'); return; }
     setSaving(true);
     const { error } = await supabase.from('duplication_scorecards').upsert(
-      { user_id: user.id, week_start: week, ...nums, rating, gap_type: gap, fix_note: fix.trim() },
+      { user_id: user.id, week_start: week, ...nums, rating, gap_type: gap, fix_note: fix.trim(), commitment_action: action.trim(), commitment_person: person.trim(), last_week_done: done },
       { onConflict: 'user_id,week_start' },
     );
     setSaving(false);
@@ -168,6 +174,42 @@ export function DuplicationScorecard() {
         )}
       </section>
 
+      <section className="space-y-3">
+        <h2 className="text-lg font-bold text-gold">My Commitment</h2>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-xl border border-border bg-card p-4">
+            <h3 className="font-semibold">Last week I said I would…</h3>
+            {last?.commitment_action ? (
+              <p className="mt-2 rounded-lg bg-background p-2 text-sm">{last.commitment_action}
+                {last.commitment_person && <span className="mt-1 block text-xs text-muted-foreground">Person: {last.commitment_person}</span>}
+              </p>
+            ) : (
+              <p className="mt-2 text-xs text-muted-foreground">Nothing saved last week</p>
+            )}
+            <div className="mt-3 text-sm font-medium">Did I do it?</div>
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              {(Object.keys(DONE_LABEL) as Done[]).map((d) => (
+                <button key={d} onClick={() => setDone(done === d ? null : d)}
+                  className={`rounded-lg border px-1 py-2 text-xs font-bold tracking-wide transition ${done === d ? 'border-gold bg-gold text-gold-foreground' : 'border-border bg-background hover:border-gold/50'}`}>
+                  {DONE_LABEL[d]}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="rounded-xl border-2 border-gold bg-card p-4">
+            <h3 className="font-semibold text-gold">This week I commit to one action…</h3>
+            <textarea value={action} onChange={(e) => setAction(e.target.value)} rows={2}
+              className="mt-2 w-full rounded-lg border border-gold/40 bg-background p-2 text-sm focus:outline-none focus:ring-2 focus:ring-gold" />
+            <label className="mt-2 block">
+              <span className="text-sm">The person I will duplicate into:</span>
+              <input value={person} onChange={(e) => setPerson(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-gold/40 bg-background px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gold" />
+            </label>
+          </div>
+        </div>
+        <p className="text-center text-sm italic text-gold">Say it out loud. Next Friday we start here.</p>
+      </section>
+
       <button onClick={save} disabled={saving}
         className="w-full rounded-xl bg-gold py-3 text-base font-bold text-gold-foreground hover:opacity-90 disabled:opacity-50">
         {saving ? 'Saving…' : rows.some((r) => r.week_start === week) ? 'Update this week' : 'Save this week'}
@@ -194,6 +236,13 @@ export function DuplicationScorecard() {
                 </div>
               ))}
             </div>
+            {(r.commitment_action || r.commitment_person || r.last_week_done) && (
+              <div className="mt-2 space-y-0.5 text-xs">
+                {r.commitment_action && <div><span className="text-muted-foreground">Commitment:</span> {r.commitment_action}</div>}
+                {r.commitment_person && <div><span className="text-muted-foreground">Person:</span> {r.commitment_person}</div>}
+                {r.last_week_done && <div><span className="text-muted-foreground">Last week's commitment:</span> <span className="font-semibold text-gold">{DONE_LABEL[r.last_week_done]}</span></div>}
+              </div>
+            )}
           </button>
         ))}
       </section>
