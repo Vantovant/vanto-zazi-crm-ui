@@ -1,4 +1,5 @@
 import { defineConfig } from "vite";
+import path from "path";
 import react from "@vitejs/plugin-react";
 import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
@@ -57,7 +58,7 @@ export default defineConfig(({ mode }) => ({
   ].filter(Boolean),
   resolve: {
     alias: {
-      "@": "/src",
+      "@": path.resolve(__dirname, "./src"),
     },
   },
   envPrefix: "VITE_",
