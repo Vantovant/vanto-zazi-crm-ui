@@ -1249,6 +1249,7 @@
               ]
             },
             "dry_run": {
+              "default": false,
               "description": "Preview only: validates and returns what would be saved without writing.",
               "type": "boolean"
             }

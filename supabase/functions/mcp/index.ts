@@ -115,7 +115,7 @@ var scorecardSaveFields = {
   commitment_action: z.string().optional().describe("This week I commit to one action\u2026"),
   commitment_person: z.string().optional().describe("The person I will duplicate into:"),
   last_week_done: z.enum(["done", "partly", "not_yet"]).nullable().optional().describe("Did I do it? \u2014 DONE / PARTLY / NOT YET"),
-  dry_run: z.boolean().optional().describe("Preview only: validates and returns what would be saved without writing.")
+  dry_run: z.boolean().default(false).describe("Preview only: validates and returns what would be saved without writing.")
 };
 var scorecardSaveSchema = z.object(scorecardSaveFields).strict();
 var scorecardGetFields = { week_start: scorecardSaveFields.week_start };
