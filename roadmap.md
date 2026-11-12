@@ -1,0 +1,3 @@
+- [x] Add three OAuth scorecard tools and version 2.2.0 without changing existing tools or database structure.
+- [x] Run week/validation tests and authenticated dry-run checks without writing scorecard rows.
+- [x] Extract 36-tool manifest and report schemas, evidence, and publishing instructions.

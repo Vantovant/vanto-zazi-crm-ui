@@ -32,6 +32,9 @@ import SetContactLevel from "./tools/set-contact-level";
 import BulkSetLevels from "./tools/bulk-set-levels";
 import GetCallSheetSettings from "./tools/get-call-sheet-settings";
 import SetCallSheetSettings from "./tools/set-call-sheet-settings";
+import GetDuplicationScorecard from "./tools/get-duplication-scorecard";
+import ListDuplicationScorecards from "./tools/list-duplication-scorecards";
+import SaveDuplicationScorecard from "./tools/save-duplication-scorecard";
 
 // Vite inlines the stable ref; issuer must be the direct supabase.co host.
 const projectRef = import.meta.env["VITE_SUPABASE_PROJECT_ID"] ?? "project-ref-unset";
@@ -39,11 +42,11 @@ const projectRef = import.meta.env["VITE_SUPABASE_PROJECT_ID"] ?? "project-ref-u
 export default defineMcp({
   name: "get-well-grow",
   title: "Get Well Grow",
-  version: "2.1.0",
-  instructions: "Get Well Grow downline CRM tools: contacts, notes, orders, monthly activity, inventory, shipments, birthdays (draft only), WhatsApp read-only, Prospector read-only, deals, call sheets (read, log calls, set levels, settings). No sending, deleting or merging.",
+  version: "2.2.0",
+  instructions: "Get Well Grow downline CRM tools: contacts, notes, orders, monthly activity, inventory, shipments, birthdays (draft only), WhatsApp read-only, Prospector read-only, deals, call sheets (read, log calls, set levels, settings), duplication scorecard (read and save your own weekly scorecard; dry-run preview; rating is a hint only, you still choose; no delete). No sending, deleting or merging.",
   auth: auth.oauth.issuer({
     issuer: `https://${projectRef}.supabase.co/auth/v1`,
     acceptedAudiences: "authenticated",
   }),
-  tools: [ListContacts, GetContact, CreateContact, UpdateContact, AddContactNote, FindDuplicateContacts, GetSponsorIdAudit, ListOrders, PasteMonthlyActivity, ListInventory, UpdateInventoryStock, ListShipments, GetShipment, CreateShipment, UpdateShipment, ListBirthdays, ComposeBirthdayMessage, ListBirthdayMessageTones, ListWhatsappConversations, GetWhatsappThread, GetProspectorStatus, GetProspectorDrafts, GetDealsSummary, ListCallSheet, GetCallSheetCard, LogCall, ListCalls, ListFollowupsDue, ListNeedsLevel, SetContactLevel, BulkSetLevels, GetCallSheetSettings, SetCallSheetSettings],
+  tools: [ListContacts, GetContact, CreateContact, UpdateContact, AddContactNote, FindDuplicateContacts, GetSponsorIdAudit, ListOrders, PasteMonthlyActivity, ListInventory, UpdateInventoryStock, ListShipments, GetShipment, CreateShipment, UpdateShipment, ListBirthdays, ComposeBirthdayMessage, ListBirthdayMessageTones, ListWhatsappConversations, GetWhatsappThread, GetProspectorStatus, GetProspectorDrafts, GetDealsSummary, ListCallSheet, GetCallSheetCard, LogCall, ListCalls, ListFollowupsDue, ListNeedsLevel, SetContactLevel, BulkSetLevels, GetCallSheetSettings, SetCallSheetSettings, GetDuplicationScorecard, ListDuplicationScorecards, SaveDuplicationScorecard],
 });

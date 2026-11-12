@@ -2,6 +2,8 @@
 // Runs with the caller's own token under RLS; ownerId = verified token subject.
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // @ts-nocheck
+import { addWeeks, saWeekStart, suggestRating } from '../duplicationScorecard';
+import { emptyScorecard, scorecardGetSchema, scorecardListSchema, scorecardSaveSchema, scorecardPatch } from '../duplicationScorecardMcp';
 // Sponsor-ID / Deals estimated-value helper — mirrors the client-side logic
 // in src/pages/Deals.tsx exactly (kept in sync manually; read-only derivation).
 function estimatedMinValue(goStatus: string): number {
@@ -243,6 +245,46 @@ const r = (body: any, status = 200): ActionResult => ({ status, body })
 
 export async function runAction(action: string, body: Record<string, any>, supabase: any, ownerId: string): Promise<ActionResult> {
     switch (action) {
+      case 'get_duplication_scorecard':
+      case 'list_duplication_scorecards':
+      case 'save_duplication_scorecard': {
+        // Shared validation and week/rating helpers reuse the scorecard page's logic.
+        const { action: _action, ...input } = body;
+        const schema = action === 'save_duplication_scorecard' ? scorecardSaveSchema
+          : action === 'list_duplication_scorecards' ? scorecardListSchema : scorecardGetSchema;
+        const parsed = schema.safeParse(input);
+        if (!parsed.success) return r({ error: 'invalid_scorecard_input', message: parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ') }, 400);
+        const readError = () => r({ error: 'scorecard_read_failed', message: 'Could not read your scorecard. Check your sign-in and try again.' }, 400);
+        if (action === 'list_duplication_scorecards') {
+          const { data, error } = await supabase.from('duplication_scorecards').select('*')
+            .eq('user_id', ownerId).order('week_start', { ascending: false }).limit(parsed.data.limit);
+          if (error) return readError();
+          return r({ scorecards: data ?? [] });
+        }
+        const week = parsed.data.week_start ?? saWeekStart();
+        const { data: before, error } = await supabase.from('duplication_scorecards').select('*')
+          .eq('user_id', ownerId).eq('week_start', week).maybeSingle();
+        if (error) return readError();
+        const { data: previous, error: previousError } = await supabase.from('duplication_scorecards').select('*')
+          .eq('user_id', ownerId).eq('week_start', addWeeks(week, -1)).maybeSingle();
+        if (previousError) return readError();
+        const current = before ?? { ...emptyScorecard, user_id: ownerId, week_start: week };
+        if (action === 'get_duplication_scorecard') return r({
+          week_start: week, saved: !!before, scorecard: current, previous_week: previous,
+          suggested_rating: previous ? suggestRating(current, previous) : null,
+        });
+        const patch = scorecardPatch(parsed.data);
+        const candidate = { ...current, ...patch, user_id: ownerId, week_start: week };
+        if (parsed.data.dry_run) return r({ dry_run: true, week_start: week, before, after: candidate,
+          suggested_rating: previous ? suggestRating(candidate, previous) : null });
+        // Existing rows receive only provided fields, not a stale full-row copy.
+        const payload = { ...(before ? {} : emptyScorecard), ...patch, user_id: ownerId, week_start: week };
+        const { data: after, error: saveError } = await supabase.from('duplication_scorecards')
+          .upsert(payload, { onConflict: 'user_id,week_start' }).select('*').single();
+        if (saveError) return r({ error: 'scorecard_save_failed', message: 'Could not save your scorecard. Check your sign-in and try again; no other records were changed.' }, 400);
+        return r({ dry_run: false, week_start: week, before, after,
+          suggested_rating: previous ? suggestRating(after, previous) : null });
+      }
       case 'list_contacts': {
 
         const leadType = body.lead_type ? String(body.lead_type) : null
