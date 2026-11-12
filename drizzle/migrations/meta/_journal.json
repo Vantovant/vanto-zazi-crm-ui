@@ -43,6 +43,13 @@
       "when": 1793986740615,
       "tag": "0005_scorecard_commitment",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794484803770,
+      "tag": "0006_tighten_shared_table_read_policies",
+      "breakpoints": true
     }
   ]
 }
