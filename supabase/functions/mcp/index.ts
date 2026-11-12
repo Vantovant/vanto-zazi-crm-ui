@@ -7,7 +7,7 @@ import { auth, defineMcp } from "npm:@lovable.dev/mcp-js@3.0.5";
 
 // src/lib/mcp/tools/list-contacts.ts
 import { defineTool } from "npm:@lovable.dev/mcp-js@3.0.5";
-import { z } from "npm:zod@^4.6.7";
+import { z as z2 } from "npm:zod@^4.6.7";
 
 // src/lib/mcp/supabase.ts
 import { createClient } from "npm:@supabase/supabase-js@^2.98.0";
@@ -53,6 +53,97 @@ function supabaseForUser(ctx) {
     global: { headers: { Authorization: `Bearer ${token}` } },
     auth: { persistSession: false, autoRefreshToken: false }
   });
+}
+
+// src/lib/duplicationScorecard.ts
+var NUMBER_FIELDS = [
+  "new_introduced",
+  "helped_started",
+  "taught_to_introduce",
+  "team_introduced",
+  "four_by_four",
+  "team_pv"
+];
+var SA_OFFSET_MS = 2 * 60 * 60 * 1e3;
+function saWeekStart(now = /* @__PURE__ */ new Date()) {
+  const sa = new Date(now.getTime() + SA_OFFSET_MS);
+  const dow = sa.getUTCDay();
+  const back = (dow + 6) % 7;
+  const mon = new Date(Date.UTC(sa.getUTCFullYear(), sa.getUTCMonth(), sa.getUTCDate() - back));
+  return mon.toISOString().slice(0, 10);
+}
+function addWeeks(weekStart, n) {
+  const [y, m, d] = weekStart.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + n * 7)).toISOString().slice(0, 10);
+}
+function suggestRating(current, last) {
+  let up = 0;
+  let down = 0;
+  for (const k of NUMBER_FIELDS) {
+    const a = Number(current[k]) || 0;
+    const b = Number(last[k]) || 0;
+    if (a > b) up++;
+    else if (a < b) down++;
+  }
+  if (up > down) return "progressing";
+  if (down > up) return "declining";
+  return "standing_still";
+}
+
+// src/lib/duplicationScorecardMcp.ts
+import { z } from "npm:zod@^4.6.7";
+var scorecardWeek = z.string().superRefine((value, ctx) => {
+  const date = /* @__PURE__ */ new Date(`${value}T00:00:00Z`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || !Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== value) {
+    ctx.addIssue({ code: "custom", message: "week_start must be a real date in YYYY-MM-DD format." });
+  } else if (date.getUTCDay() !== 1) {
+    ctx.addIssue({ code: "custom", message: `week_start must be a Monday. The correct Monday for ${value} is ${saWeekStart(date)}; no date was changed.` });
+  }
+});
+var count = () => z.number().int("Must be an integer.").min(0, "Cannot be negative.").max(2147483647, "Exceeds the supported integer maximum.").optional();
+var scorecardSaveFields = {
+  week_start: scorecardWeek.optional().describe("This week / Past week \u2014 Monday in YYYY-MM-DD; defaults to the current South African week."),
+  new_introduced: count().describe("New people I introduced this week"),
+  helped_started: count().describe("People I helped to get started"),
+  taught_to_introduce: count().describe("People I taught to introduce others"),
+  team_introduced: count().describe("Team members who introduced someone new"),
+  four_by_four: z.number().int("Must be an integer.").min(0, "My 4x4 must be between 0 and 4.").max(4, "My 4x4 must be between 0 and 4.").optional().describe("My 4x4: people in place (out of 4)"),
+  team_pv: z.number().min(0, "Cannot be negative.").optional().describe("My team's total PV this week"),
+  rating: z.enum(["progressing", "standing_still", "declining"]).nullable().optional().describe("This week vs last week \u2014 Progressing / Standing still / Declining; you still choose."),
+  gap_type: z.enum(["skill", "activity", "belief"]).nullable().optional().describe("Didn't duplicate this week? \u2014 SKILL / ACTIVITY / BELIEF"),
+  fix_note: z.string().optional().describe("My one fix before next Friday"),
+  commitment_action: z.string().optional().describe("This week I commit to one action\u2026"),
+  commitment_person: z.string().optional().describe("The person I will duplicate into:"),
+  last_week_done: z.enum(["done", "partly", "not_yet"]).nullable().optional().describe("Did I do it? \u2014 DONE / PARTLY / NOT YET"),
+  dry_run: z.boolean().optional().describe("Preview only: validates and returns what would be saved without writing.")
+};
+var scorecardSaveSchema = z.object(scorecardSaveFields).strict();
+var scorecardGetFields = { week_start: scorecardSaveFields.week_start };
+var scorecardGetSchema = z.object(scorecardGetFields).strict();
+var scorecardListFields = {
+  limit: z.number().int().min(1).max(52).default(12).describe("Past weeks \u2014 number of weeks to return, newest first (default 12, maximum 52).")
+};
+var scorecardListSchema = z.object(scorecardListFields).strict();
+var emptyScorecardNumbers = {
+  new_introduced: 0,
+  helped_started: 0,
+  taught_to_introduce: 0,
+  team_introduced: 0,
+  four_by_four: 0,
+  team_pv: 0
+};
+var emptyScorecard = {
+  ...emptyScorecardNumbers,
+  rating: null,
+  gap_type: null,
+  fix_note: "",
+  commitment_action: "",
+  commitment_person: "",
+  last_week_done: null
+};
+function scorecardPatch(input) {
+  const { dry_run: _dryRun, week_start: _week, ...fields } = input;
+  return Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== void 0).map(([key, value]) => [key, typeof value === "string" ? value.trim() : value]));
 }
 
 // src/lib/mcp/actions.ts
@@ -277,6 +368,52 @@ async function csFindContact(sb, ownerId, body) {
 var r = (body, status = 200) => ({ status, body });
 async function runAction(action, body, supabase, ownerId) {
   switch (action) {
+    case "get_duplication_scorecard":
+    case "list_duplication_scorecards":
+    case "save_duplication_scorecard": {
+      const { action: _action, ...input } = body;
+      const schema = action === "save_duplication_scorecard" ? scorecardSaveSchema : action === "list_duplication_scorecards" ? scorecardListSchema : scorecardGetSchema;
+      const parsed = schema.safeParse(input);
+      if (!parsed.success) return r({ error: "invalid_scorecard_input", message: parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ") }, 400);
+      const readError = () => r({ error: "scorecard_read_failed", message: "Could not read your scorecard. Check your sign-in and try again." }, 400);
+      if (action === "list_duplication_scorecards") {
+        const { data, error: error2 } = await supabase.from("duplication_scorecards").select("*").eq("user_id", ownerId).order("week_start", { ascending: false }).limit(parsed.data.limit);
+        if (error2) return readError();
+        return r({ scorecards: data ?? [] });
+      }
+      const week = parsed.data.week_start ?? saWeekStart();
+      const { data: before, error } = await supabase.from("duplication_scorecards").select("*").eq("user_id", ownerId).eq("week_start", week).maybeSingle();
+      if (error) return readError();
+      const { data: previous, error: previousError } = await supabase.from("duplication_scorecards").select("*").eq("user_id", ownerId).eq("week_start", addWeeks(week, -1)).maybeSingle();
+      if (previousError) return readError();
+      const current = before ?? { ...emptyScorecard, user_id: ownerId, week_start: week };
+      if (action === "get_duplication_scorecard") return r({
+        week_start: week,
+        saved: !!before,
+        scorecard: current,
+        previous_week: previous,
+        suggested_rating: previous ? suggestRating(current, previous) : null
+      });
+      const patch = scorecardPatch(parsed.data);
+      const candidate = { ...current, ...patch, user_id: ownerId, week_start: week };
+      if (parsed.data.dry_run) return r({
+        dry_run: true,
+        week_start: week,
+        before,
+        after: candidate,
+        suggested_rating: previous ? suggestRating(candidate, previous) : null
+      });
+      const payload = { ...before ? {} : emptyScorecard, ...patch, user_id: ownerId, week_start: week };
+      const { data: after, error: saveError } = await supabase.from("duplication_scorecards").upsert(payload, { onConflict: "user_id,week_start" }).select("*").single();
+      if (saveError) return r({ error: "scorecard_save_failed", message: "Could not save your scorecard. Check your sign-in and try again; no other records were changed." }, 400);
+      return r({
+        dry_run: false,
+        week_start: week,
+        before,
+        after,
+        suggested_rating: previous ? suggestRating(after, previous) : null
+      });
+    }
     case "list_contacts": {
       const leadType = body.lead_type ? String(body.lead_type) : null;
       const temperature = body.lead_temperature ? String(body.lead_temperature) : null;
@@ -1211,11 +1348,11 @@ var list_contacts_default = defineTool({
   title: "List contacts",
   description: "List contacts with optional lead_type/lead_temperature/registration_status/search filters (max 100).",
   inputSchema: {
-    lead_type: z.string().optional(),
-    lead_temperature: z.string().optional(),
-    registration_status: z.string().optional(),
-    search: z.string().optional(),
-    limit: z.number().int().optional()
+    lead_type: z2.string().optional(),
+    lead_temperature: z2.string().optional(),
+    registration_status: z2.string().optional(),
+    search: z2.string().optional(),
+    limit: z2.number().int().optional()
   },
   annotations: { readOnlyHint: true, openWorldHint: false },
   handler: (input, ctx) => runTool("list_contacts", input, ctx)
@@ -1223,14 +1360,14 @@ var list_contacts_default = defineTool({
 
 // src/lib/mcp/tools/get-contact.ts
 import { defineTool as defineTool2 } from "npm:@lovable.dev/mcp-js@3.0.5";
-import { z as z2 } from "npm:zod@^4.6.7";
+import { z as z3 } from "npm:zod@^4.6.7";
 var get_contact_default = defineTool2({
   name: "get_contact",
   title: "Get contact",
   description: "Get one contact by contact_id or phone_normalized, with the last 10 activities.",
   inputSchema: {
-    contact_id: z2.string().optional(),
-    phone_normalized: z2.string().optional()
+    contact_id: z3.string().optional(),
+    phone_normalized: z3.string().optional()
   },
   annotations: { readOnlyHint: true, openWorldHint: false },
   handler: (input, ctx) => runTool("get_contact", input, ctx)
@@ -1238,26 +1375,26 @@ var get_contact_default = defineTool2({
 
 // src/lib/mcp/tools/create-contact.ts
 import { defineTool as defineTool3 } from "npm:@lovable.dev/mcp-js@3.0.5";
-import { z as z3 } from "npm:zod@^4.6.7";
+import { z as z4 } from "npm:zod@^4.6.7";
 var create_contact_default = defineTool3({
   name: "create_contact",
   title: "Create contact",
   description: "Create a contact; runs the duplicate check on phone/email unless force is true.",
   inputSchema: {
-    full_name: z3.string(),
-    phone_number: z3.string().optional(),
-    email_address: z3.string().optional(),
-    aplgo_id: z3.string().optional(),
-    city: z3.string().optional(),
-    province: z3.string().optional(),
-    country: z3.string().optional(),
-    lead_temperature: z3.string().optional(),
-    communication_status: z3.string().optional(),
-    registration_status: z3.string().optional(),
-    lead_type: z3.string().optional(),
-    sponsor_name: z3.string().optional(),
-    additional_notes: z3.string().optional(),
-    force: z3.boolean().optional()
+    full_name: z4.string(),
+    phone_number: z4.string().optional(),
+    email_address: z4.string().optional(),
+    aplgo_id: z4.string().optional(),
+    city: z4.string().optional(),
+    province: z4.string().optional(),
+    country: z4.string().optional(),
+    lead_temperature: z4.string().optional(),
+    communication_status: z4.string().optional(),
+    registration_status: z4.string().optional(),
+    lead_type: z4.string().optional(),
+    sponsor_name: z4.string().optional(),
+    additional_notes: z4.string().optional(),
+    force: z4.boolean().optional()
   },
   annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   handler: (input, ctx) => runTool("create_contact", input, ctx)
@@ -1265,26 +1402,26 @@ var create_contact_default = defineTool3({
 
 // src/lib/mcp/tools/update-contact.ts
 import { defineTool as defineTool4 } from "npm:@lovable.dev/mcp-js@3.0.5";
-import { z as z4 } from "npm:zod@^4.6.7";
+import { z as z5 } from "npm:zod@^4.6.7";
 var update_contact_default = defineTool4({
   name: "update_contact",
   title: "Update contact",
   description: "Update only the provided fields of a contact. Phone numbers can never be changed.",
   inputSchema: {
-    contact_id: z4.string(),
-    full_name: z4.string().optional(),
-    email_address: z4.string().optional(),
-    aplgo_id: z4.string().optional(),
-    lead_type: z4.string().optional(),
-    lead_temperature: z4.string().optional(),
-    registration_status: z4.string().optional(),
-    communication_status: z4.string().optional(),
-    assigned_to: z4.string().optional(),
-    next_action: z4.string().optional(),
-    sponsor_name: z4.string().optional(),
-    city: z4.string().optional(),
-    province: z4.string().optional(),
-    country: z4.string().optional()
+    contact_id: z5.string(),
+    full_name: z5.string().optional(),
+    email_address: z5.string().optional(),
+    aplgo_id: z5.string().optional(),
+    lead_type: z5.string().optional(),
+    lead_temperature: z5.string().optional(),
+    registration_status: z5.string().optional(),
+    communication_status: z5.string().optional(),
+    assigned_to: z5.string().optional(),
+    next_action: z5.string().optional(),
+    sponsor_name: z5.string().optional(),
+    city: z5.string().optional(),
+    province: z5.string().optional(),
+    country: z5.string().optional()
   },
   annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   handler: (input, ctx) => runTool("update_contact", input, ctx)
@@ -1292,14 +1429,14 @@ var update_contact_default = defineTool4({
 
 // src/lib/mcp/tools/add-contact-note.ts
 import { defineTool as defineTool5 } from "npm:@lovable.dev/mcp-js@3.0.5";
-import { z as z5 } from "npm:zod@^4.6.7";
+import { z as z6 } from "npm:zod@^4.6.7";
 var add_contact_note_default = defineTool5({
   name: "add_contact_note",
   title: "Add contact note",
   description: "Append a note to a contact activity log (append-only, never edits existing entries).",
   inputSchema: {
-    contact_id: z5.string(),
-    note: z5.string()
+    contact_id: z6.string(),
+    note: z6.string()
   },
   annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   handler: (input, ctx) => runTool("add_contact_note", input, ctx)
@@ -1329,15 +1466,15 @@ var get_sponsor_id_audit_default = defineTool7({
 
 // src/lib/mcp/tools/list-orders.ts
 import { defineTool as defineTool8 } from "npm:@lovable.dev/mcp-js@3.0.5";
-import { z as z6 } from "npm:zod@^4.6.7";
+import { z as z7 } from "npm:zod@^4.6.7";
 var list_orders_default = defineTool8({
   name: "list_orders",
   title: "List orders",
   description: "List orders with optional status/contact_id filters (read-only, max 100).",
   inputSchema: {
-    status: z6.string().optional(),
-    contact_id: z6.string().optional(),
-    limit: z6.number().int().optional()
+    status: z7.string().optional(),
+    contact_id: z7.string().optional(),
+    limit: z7.number().int().optional()
   },
   annotations: { readOnlyHint: true, openWorldHint: false },
   handler: (input, ctx) => runTool("list_orders", input, ctx)
@@ -1345,17 +1482,17 @@ var list_orders_default = defineTool8({
 
 // src/lib/mcp/tools/paste-monthly-activity.ts
 import { defineTool as defineTool9 } from "npm:@lovable.dev/mcp-js@3.0.5";
-import { z as z7 } from "npm:zod@^4.6.7";
+import { z as z8 } from "npm:zod@^4.6.7";
 var paste_monthly_activity_default = defineTool9({
   name: "paste_monthly_activity",
   title: "Paste monthly activity",
   description: "Parse a pasted APLGO monthly activity report and match to contacts. dry_run defaults to true; pass dry_run:false to write.",
   inputSchema: {
-    pasted_text: z7.string(),
-    activity_month: z7.string(),
-    period_start: z7.string().optional(),
-    period_end: z7.string().optional(),
-    dry_run: z7.boolean().optional()
+    pasted_text: z8.string(),
+    activity_month: z8.string(),
+    period_start: z8.string().optional(),
+    period_end: z8.string().optional(),
+    dry_run: z8.boolean().optional()
   },
   annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   handler: (input, ctx) => runTool("paste_monthly_activity", input, ctx)
@@ -1374,15 +1511,15 @@ var list_inventory_default = defineTool10({
 
 // src/lib/mcp/tools/update-inventory-stock.ts
 import { defineTool as defineTool11 } from "npm:@lovable.dev/mcp-js@3.0.5";
-import { z as z8 } from "npm:zod@^4.6.7";
+import { z as z9 } from "npm:zod@^4.6.7";
 var update_inventory_stock_default = defineTool11({
   name: "update_inventory_stock",
   title: "Update inventory stock",
   description: "Set an absolute stock quantity by id or product_name (creates the product row if missing).",
   inputSchema: {
-    id: z8.string().optional(),
-    product_name: z8.string().optional(),
-    quantity: z8.number().int()
+    id: z9.string().optional(),
+    product_name: z9.string().optional(),
+    quantity: z9.number().int()
   },
   annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   handler: (input, ctx) => runTool("update_inventory_stock", input, ctx)
@@ -1390,15 +1527,15 @@ var update_inventory_stock_default = defineTool11({
 
 // src/lib/mcp/tools/list-shipments.ts
 import { defineTool as defineTool12 } from "npm:@lovable.dev/mcp-js@3.0.5";
-import { z as z9 } from "npm:zod@^4.6.7";
+import { z as z10 } from "npm:zod@^4.6.7";
 var list_shipments_default = defineTool12({
   name: "list_shipments",
   title: "List shipments",
   description: "List shipments with optional status/contact_id filters (max 200).",
   inputSchema: {
-    status: z9.string().optional(),
-    contact_id: z9.string().optional(),
-    limit: z9.number().int().optional()
+    status: z10.string().optional(),
+    contact_id: z10.string().optional(),
+    limit: z10.number().int().optional()
   },
   annotations: { readOnlyHint: true, openWorldHint: false },
   handler: (input, ctx) => runTool("list_shipments", input, ctx)
@@ -1406,13 +1543,13 @@ var list_shipments_default = defineTool12({
 
 // src/lib/mcp/tools/get-shipment.ts
 import { defineTool as defineTool13 } from "npm:@lovable.dev/mcp-js@3.0.5";
-import { z as z10 } from "npm:zod@^4.6.7";
+import { z as z11 } from "npm:zod@^4.6.7";
 var get_shipment_default = defineTool13({
   name: "get_shipment",
   title: "Get shipment",
   description: "Get a shipment by waybill number.",
   inputSchema: {
-    waybill_number: z10.string()
+    waybill_number: z11.string()
   },
   annotations: { readOnlyHint: true, openWorldHint: false },
   handler: (input, ctx) => runTool("get_shipment", input, ctx)
@@ -1420,22 +1557,22 @@ var get_shipment_default = defineTool13({
 
 // src/lib/mcp/tools/create-shipment.ts
 import { defineTool as defineTool14 } from "npm:@lovable.dev/mcp-js@3.0.5";
-import { z as z11 } from "npm:zod@^4.6.7";
+import { z as z12 } from "npm:zod@^4.6.7";
 var create_shipment_default = defineTool14({
   name: "create_shipment",
   title: "Create shipment",
   description: "Create a shipment record (no sending).",
   inputSchema: {
-    waybill_number: z11.string(),
-    contact_id: z11.string().optional(),
-    order_id: z11.string().optional(),
-    status: z11.string().optional(),
-    product_summary: z11.string().optional(),
-    collection_address: z11.string().optional(),
-    delivery_address: z11.string().optional(),
-    service_level: z11.string().optional(),
-    courier_reference: z11.string().optional(),
-    earliest_delivery_date: z11.string().optional()
+    waybill_number: z12.string(),
+    contact_id: z12.string().optional(),
+    order_id: z12.string().optional(),
+    status: z12.string().optional(),
+    product_summary: z12.string().optional(),
+    collection_address: z12.string().optional(),
+    delivery_address: z12.string().optional(),
+    service_level: z12.string().optional(),
+    courier_reference: z12.string().optional(),
+    earliest_delivery_date: z12.string().optional()
   },
   annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   handler: (input, ctx) => runTool("create_shipment", input, ctx)
@@ -1443,22 +1580,22 @@ var create_shipment_default = defineTool14({
 
 // src/lib/mcp/tools/update-shipment.ts
 import { defineTool as defineTool15 } from "npm:@lovable.dev/mcp-js@3.0.5";
-import { z as z12 } from "npm:zod@^4.6.7";
+import { z as z13 } from "npm:zod@^4.6.7";
 var update_shipment_default = defineTool15({
   name: "update_shipment",
   title: "Update shipment",
   description: "Update provided fields of a shipment by waybill number.",
   inputSchema: {
-    waybill_number: z12.string(),
-    status: z12.string().optional(),
-    product_summary: z12.string().optional(),
-    collection_address: z12.string().optional(),
-    delivery_address: z12.string().optional(),
-    service_level: z12.string().optional(),
-    courier_reference: z12.string().optional(),
-    earliest_delivery_date: z12.string().nullable().optional(),
-    contact_id: z12.string().nullable().optional(),
-    order_id: z12.string().nullable().optional()
+    waybill_number: z13.string(),
+    status: z13.string().optional(),
+    product_summary: z13.string().optional(),
+    collection_address: z13.string().optional(),
+    delivery_address: z13.string().optional(),
+    service_level: z13.string().optional(),
+    courier_reference: z13.string().optional(),
+    earliest_delivery_date: z13.string().nullable().optional(),
+    contact_id: z13.string().nullable().optional(),
+    order_id: z13.string().nullable().optional()
   },
   annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   handler: (input, ctx) => runTool("update_shipment", input, ctx)
@@ -1466,15 +1603,15 @@ var update_shipment_default = defineTool15({
 
 // src/lib/mcp/tools/list-birthdays.ts
 import { defineTool as defineTool16 } from "npm:@lovable.dev/mcp-js@3.0.5";
-import { z as z13 } from "npm:zod@^4.6.7";
+import { z as z14 } from "npm:zod@^4.6.7";
 var list_birthdays_default = defineTool16({
   name: "list_birthdays",
   title: "List birthdays",
   description: "List birthdays for a cycle year with timing buckets (max 200).",
   inputSchema: {
-    status: z13.string().optional(),
-    limit: z13.number().int().optional(),
-    cycle_year: z13.number().int().optional()
+    status: z14.string().optional(),
+    limit: z14.number().int().optional(),
+    cycle_year: z14.number().int().optional()
   },
   annotations: { readOnlyHint: true, openWorldHint: false },
   handler: (input, ctx) => runTool("list_birthdays", input, ctx)
@@ -1482,19 +1619,19 @@ var list_birthdays_default = defineTool16({
 
 // src/lib/mcp/tools/compose-birthday-message.ts
 import { defineTool as defineTool17 } from "npm:@lovable.dev/mcp-js@3.0.5";
-import { z as z14 } from "npm:zod@^4.6.7";
+import { z as z15 } from "npm:zod@^4.6.7";
 var compose_birthday_message_default = defineTool17({
   name: "compose_birthday_message",
   title: "Compose birthday message",
   description: 'Draft a birthday message greeting "Leader {first_name}". Draft only: never sends or marks congratulated.',
   inputSchema: {
-    birthday_id: z14.string().optional(),
-    associate_id: z14.string().optional(),
-    tone: z14.string().optional(),
-    all_tones: z14.boolean().optional(),
-    cycle_year: z14.number().int().optional(),
-    sender_name: z14.string().optional(),
-    sender_email: z14.string().optional()
+    birthday_id: z15.string().optional(),
+    associate_id: z15.string().optional(),
+    tone: z15.string().optional(),
+    all_tones: z15.boolean().optional(),
+    cycle_year: z15.number().int().optional(),
+    sender_name: z15.string().optional(),
+    sender_email: z15.string().optional()
   },
   annotations: { readOnlyHint: true, openWorldHint: false },
   handler: (input, ctx) => runTool("compose_birthday_message", input, ctx)
@@ -1513,13 +1650,13 @@ var list_birthday_message_tones_default = defineTool18({
 
 // src/lib/mcp/tools/list-whatsapp-conversations.ts
 import { defineTool as defineTool19 } from "npm:@lovable.dev/mcp-js@3.0.5";
-import { z as z15 } from "npm:zod@^4.6.7";
+import { z as z16 } from "npm:zod@^4.6.7";
 var list_whatsapp_conversations_default = defineTool19({
   name: "list_whatsapp_conversations",
   title: "List WhatsApp conversations",
   description: "List WhatsApp conversations for matched contacts only (read-only).",
   inputSchema: {
-    limit: z15.number().int().optional()
+    limit: z16.number().int().optional()
   },
   annotations: { readOnlyHint: true, openWorldHint: false },
   handler: (input, ctx) => runTool("list_whatsapp_conversations", input, ctx)
@@ -1527,14 +1664,14 @@ var list_whatsapp_conversations_default = defineTool19({
 
 // src/lib/mcp/tools/get-whatsapp-thread.ts
 import { defineTool as defineTool20 } from "npm:@lovable.dev/mcp-js@3.0.5";
-import { z as z16 } from "npm:zod@^4.6.7";
+import { z as z17 } from "npm:zod@^4.6.7";
 var get_whatsapp_thread_default = defineTool20({
   name: "get_whatsapp_thread",
   title: "Get WhatsApp thread",
   description: "Read-only. The last `limit` WhatsApp messages (default 30) for one contact, oldest to newest, each with direction, date, text, or a media label when there is no text.",
   inputSchema: {
-    contact_id: z16.string(),
-    limit: z16.number().int().optional()
+    contact_id: z17.string(),
+    limit: z17.number().int().optional()
   },
   annotations: { readOnlyHint: true, openWorldHint: false },
   handler: (input, ctx) => runTool("get_whatsapp_thread", input, ctx)
@@ -1553,14 +1690,14 @@ var get_prospector_status_default = defineTool21({
 
 // src/lib/mcp/tools/get-prospector-drafts.ts
 import { defineTool as defineTool22 } from "npm:@lovable.dev/mcp-js@3.0.5";
-import { z as z17 } from "npm:zod@^4.6.7";
+import { z as z18 } from "npm:zod@^4.6.7";
 var get_prospector_drafts_default = defineTool22({
   name: "get_prospector_drafts",
   title: "Prospector drafts",
   description: "Read Prospector drafts in full detail. No approve/reject/send.",
   inputSchema: {
-    status: z17.string().optional(),
-    limit: z17.number().int().optional()
+    status: z18.string().optional(),
+    limit: z18.number().int().optional()
   },
   annotations: { readOnlyHint: true, openWorldHint: false },
   handler: (input, ctx) => runTool("get_prospector_drafts", input, ctx)
@@ -1568,13 +1705,13 @@ var get_prospector_drafts_default = defineTool22({
 
 // src/lib/mcp/tools/get-deals-summary.ts
 import { defineTool as defineTool23 } from "npm:@lovable.dev/mcp-js@3.0.5";
-import { z as z18 } from "npm:zod@^4.6.7";
+import { z as z19 } from "npm:zod@^4.6.7";
 var get_deals_summary_default = defineTool23({
   name: "get_deals_summary",
   title: "Deals summary",
   description: "Read-only deals summary derived from contacts and orders.",
   inputSchema: {
-    limit: z18.number().int().optional()
+    limit: z19.number().int().optional()
   },
   annotations: { readOnlyHint: true, openWorldHint: false },
   handler: (input, ctx) => runTool("get_deals_summary", input, ctx)
@@ -1582,16 +1719,16 @@ var get_deals_summary_default = defineTool23({
 
 // src/lib/mcp/tools/list-call-sheet.ts
 import { defineTool as defineTool24 } from "npm:@lovable.dev/mcp-js@3.0.5";
-import { z as z19 } from "npm:zod@^4.6.7";
+import { z as z20 } from "npm:zod@^4.6.7";
 var list_call_sheet_default = defineTool24({
   name: "list_call_sheet",
   title: "List a call sheet",
   description: "Read-only. Lists the call sheet cards for one level (only people in the latest APLGO export), same fields as the in-app page, plus the last 3 history lines each.",
   inputSchema: {
-    level: z19.number().int().describe("Level number, 1 to 12"),
-    bucket: z19.enum(["open", "new", "steady", "little"]).optional(),
-    not_called_today: z19.boolean().optional(),
-    limit: z19.number().int().positive().max(500).optional()
+    level: z20.number().int().describe("Level number, 1 to 12"),
+    bucket: z20.enum(["open", "new", "steady", "little"]).optional(),
+    not_called_today: z20.boolean().optional(),
+    limit: z20.number().int().positive().max(500).optional()
   },
   annotations: { readOnlyHint: true, openWorldHint: false },
   handler: (input, ctx) => runTool("list_call_sheet", input, ctx)
@@ -1599,15 +1736,15 @@ var list_call_sheet_default = defineTool24({
 
 // src/lib/mcp/tools/get-call-sheet-card.ts
 import { defineTool as defineTool25 } from "npm:@lovable.dev/mcp-js@3.0.5";
-import { z as z20 } from "npm:zod@^4.6.7";
+import { z as z21 } from "npm:zod@^4.6.7";
 var get_call_sheet_card_default = defineTool25({
   name: "get_call_sheet_card",
   title: "Get one call sheet card",
   description: "Read-only. Returns one person's call sheet card, last 10 history lines and last 10 WhatsApp messages, found by contact_id, aplgo_id or phone.",
   inputSchema: {
-    contact_id: z20.string().optional(),
-    aplgo_id: z20.string().optional(),
-    phone: z20.string().optional()
+    contact_id: z21.string().optional(),
+    aplgo_id: z21.string().optional(),
+    phone: z21.string().optional()
   },
   annotations: { readOnlyHint: true, openWorldHint: false },
   handler: (input, ctx) => runTool("get_call_sheet_card", input, ctx)
@@ -1615,17 +1752,17 @@ var get_call_sheet_card_default = defineTool25({
 
 // src/lib/mcp/tools/log-call.ts
 import { defineTool as defineTool26 } from "npm:@lovable.dev/mcp-js@3.0.5";
-import { z as z21 } from "npm:zod@^4.6.7";
+import { z as z22 } from "npm:zod@^4.6.7";
 var log_call_default = defineTool26({
   name: "log_call",
   title: "Log a phone call",
   description: "WRITES: saves one call exactly like 'Save call' on the page (a 'call' note on the contact; updates the contact's next action if given). Returns the new activity id.",
   inputSchema: {
-    contact_id: z21.string(),
-    outcome: z21.enum(["Answered", "No answer", "Call back", "Wrong number", "Not interested"]),
-    notes: z21.string().optional(),
-    next_action: z21.string().optional(),
-    follow_up_on: z21.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD").optional()
+    contact_id: z22.string(),
+    outcome: z22.enum(["Answered", "No answer", "Call back", "Wrong number", "Not interested"]),
+    notes: z22.string().optional(),
+    next_action: z22.string().optional(),
+    follow_up_on: z22.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD").optional()
   },
   annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   handler: (input, ctx) => runTool("log_call", input, ctx)
@@ -1633,16 +1770,16 @@ var log_call_default = defineTool26({
 
 // src/lib/mcp/tools/list-calls.ts
 import { defineTool as defineTool27 } from "npm:@lovable.dev/mcp-js@3.0.5";
-import { z as z22 } from "npm:zod@^4.6.7";
+import { z as z23 } from "npm:zod@^4.6.7";
 var list_calls_default = defineTool27({
   name: "list_calls",
   title: "List logged calls",
   description: "Read-only. Lists calls logged between two dates (default today, SA time) with name, level, outcome, notes, next action and follow-up date.",
   inputSchema: {
-    from: z22.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD").optional(),
-    to: z22.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD").optional(),
-    level: z22.number().int().optional(),
-    outcome: z22.enum(["Answered", "No answer", "Call back", "Wrong number", "Not interested"]).optional()
+    from: z23.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD").optional(),
+    to: z23.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD").optional(),
+    level: z23.number().int().optional(),
+    outcome: z23.enum(["Answered", "No answer", "Call back", "Wrong number", "Not interested"]).optional()
   },
   annotations: { readOnlyHint: true, openWorldHint: false },
   handler: (input, ctx) => runTool("list_calls", input, ctx)
@@ -1650,14 +1787,14 @@ var list_calls_default = defineTool27({
 
 // src/lib/mcp/tools/list-followups-due.ts
 import { defineTool as defineTool28 } from "npm:@lovable.dev/mcp-js@3.0.5";
-import { z as z23 } from "npm:zod@^4.6.7";
+import { z as z24 } from "npm:zod@^4.6.7";
 var list_followups_due_default = defineTool28({
   name: "list_followups_due",
   title: "List follow-ups due",
   description: "Read-only. People whose latest call has a follow-up date on or before the given date (default today).",
   inputSchema: {
-    on_or_before: z23.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD").optional(),
-    level: z23.number().int().optional()
+    on_or_before: z24.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD").optional(),
+    level: z24.number().int().optional()
   },
   annotations: { readOnlyHint: true, openWorldHint: false },
   handler: (input, ctx) => runTool("list_followups_due", input, ctx)
@@ -1676,16 +1813,16 @@ var list_needs_level_default = defineTool29({
 
 // src/lib/mcp/tools/set-contact-level.ts
 import { defineTool as defineTool30 } from "npm:@lovable.dev/mcp-js@3.0.5";
-import { z as z24 } from "npm:zod@^4.6.7";
+import { z as z25 } from "npm:zod@^4.6.7";
 var set_contact_level_default = defineTool30({
   name: "set_contact_level",
   title: "Set a contact's level",
   description: "WRITES: sets level (1 to 12) and optionally leg (L/R) and GO status on one contact, and adds a note 'Level set to N via Claude'.",
   inputSchema: {
-    contact_id: z24.string(),
-    level: z24.number().int().describe("1 to 12"),
-    leg: z24.enum(["L", "R"]).optional(),
-    go_status: z24.string().optional()
+    contact_id: z25.string(),
+    level: z25.number().int().describe("1 to 12"),
+    leg: z25.enum(["L", "R"]).optional(),
+    go_status: z25.string().optional()
   },
   annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   handler: (input, ctx) => runTool("set_contact_level", input, ctx)
@@ -1693,20 +1830,20 @@ var set_contact_level_default = defineTool30({
 
 // src/lib/mcp/tools/bulk-set-levels.ts
 import { defineTool as defineTool31 } from "npm:@lovable.dev/mcp-js@3.0.5";
-import { z as z25 } from "npm:zod@^4.6.7";
+import { z as z26 } from "npm:zod@^4.6.7";
 var bulk_set_levels_default = defineTool31({
   name: "bulk_set_levels",
   title: "Bulk refresh from an APLGO export",
   description: "WRITES: for up to 100 people (matched by aplgo_id, then phone) updates only changed level/leg/GO status/dates, marks each matched person as in the latest export, and adds a note per changed person. Never creates contacts.",
   inputSchema: {
-    items: z25.array(z25.object({
-      aplgo_id: z25.string().optional(),
-      phone: z25.string().optional(),
-      level: z25.number().int().optional(),
-      leg: z25.enum(["L", "R"]).optional(),
-      go_status: z25.string().optional(),
-      enrolled_on: z25.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD").optional(),
-      activated_on: z25.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD").optional()
+    items: z26.array(z26.object({
+      aplgo_id: z26.string().optional(),
+      phone: z26.string().optional(),
+      level: z26.number().int().optional(),
+      leg: z26.enum(["L", "R"]).optional(),
+      go_status: z26.string().optional(),
+      enrolled_on: z26.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD").optional(),
+      activated_on: z26.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD").optional()
     })).min(1).max(100)
   },
   annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
@@ -1726,20 +1863,53 @@ var get_call_sheet_settings_default = defineTool32({
 
 // src/lib/mcp/tools/set-call-sheet-settings.ts
 import { defineTool as defineTool33 } from "npm:@lovable.dev/mcp-js@3.0.5";
-import { z as z26 } from "npm:zod@^4.6.7";
+import { z as z27 } from "npm:zod@^4.6.7";
 var set_call_sheet_settings_default = defineTool33({
   name: "set_call_sheet_settings",
   title: "Change call sheet settings",
   description: "WRITES: changes only the call sheet settings given (levels 1 to 12; day values 1 or more).",
   inputSchema: {
-    min_level: z26.number().int().optional(),
-    max_level: z26.number().int().optional(),
-    new_days: z26.number().int().optional(),
-    steady_days: z26.number().int().optional(),
-    export_fresh_days: z26.number().int().optional()
+    min_level: z27.number().int().optional(),
+    max_level: z27.number().int().optional(),
+    new_days: z27.number().int().optional(),
+    steady_days: z27.number().int().optional(),
+    export_fresh_days: z27.number().int().optional()
   },
   annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
   handler: (input, ctx) => runTool("set_call_sheet_settings", input, ctx)
+});
+
+// src/lib/mcp/tools/get-duplication-scorecard.ts
+import { defineTool as defineTool34 } from "npm:@lovable.dev/mcp-js@3.0.5";
+var get_duplication_scorecard_default = defineTool34({
+  name: "get_duplication_scorecard",
+  title: "Get duplication scorecard",
+  description: "READ ONLY: reads your own weekly scorecard and previous week, with a suggested rating that is never saved.",
+  inputSchema: scorecardGetFields,
+  annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+  handler: (input, ctx) => runTool("get_duplication_scorecard", input, ctx)
+});
+
+// src/lib/mcp/tools/list-duplication-scorecards.ts
+import { defineTool as defineTool35 } from "npm:@lovable.dev/mcp-js@3.0.5";
+var list_duplication_scorecards_default = defineTool35({
+  name: "list_duplication_scorecards",
+  title: "List duplication scorecards",
+  description: "READ ONLY: lists your own saved weekly scorecards with all fields, newest first.",
+  inputSchema: scorecardListFields,
+  annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+  handler: (input, ctx) => runTool("list_duplication_scorecards", input, ctx)
+});
+
+// src/lib/mcp/tools/save-duplication-scorecard.ts
+import { defineTool as defineTool36 } from "npm:@lovable.dev/mcp-js@3.0.5";
+var save_duplication_scorecard_default = defineTool36({
+  name: "save_duplication_scorecard",
+  title: "Save duplication scorecard",
+  description: "WRITES: saves or updates one of your own weekly scorecards, changing only provided fields; dry_run previews without writing, and rating is never auto-set.",
+  inputSchema: scorecardSaveFields,
+  annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  handler: (input, ctx) => runTool("save_duplication_scorecard", input, ctx)
 });
 
 // src/lib/mcp/index.ts
@@ -1747,13 +1917,13 @@ var projectRef = "urfyfuakgabieellbuce";
 var mcp_default = defineMcp({
   name: "get-well-grow",
   title: "Get Well Grow",
-  version: "2.1.0",
-  instructions: "Get Well Grow downline CRM tools: contacts, notes, orders, monthly activity, inventory, shipments, birthdays (draft only), WhatsApp read-only, Prospector read-only, deals, call sheets (read, log calls, set levels, settings). No sending, deleting or merging.",
+  version: "2.2.0",
+  instructions: "Get Well Grow downline CRM tools: contacts, notes, orders, monthly activity, inventory, shipments, birthdays (draft only), WhatsApp read-only, Prospector read-only, deals, call sheets (read, log calls, set levels, settings), duplication scorecard (read and save your own weekly scorecard; dry-run preview; rating is a hint only, you still choose; no delete). No sending, deleting or merging.",
   auth: auth.oauth.issuer({
     issuer: `https://${projectRef}.supabase.co/auth/v1`,
     acceptedAudiences: "authenticated"
   }),
-  tools: [list_contacts_default, get_contact_default, create_contact_default, update_contact_default, add_contact_note_default, find_duplicate_contacts_default, get_sponsor_id_audit_default, list_orders_default, paste_monthly_activity_default, list_inventory_default, update_inventory_stock_default, list_shipments_default, get_shipment_default, create_shipment_default, update_shipment_default, list_birthdays_default, compose_birthday_message_default, list_birthday_message_tones_default, list_whatsapp_conversations_default, get_whatsapp_thread_default, get_prospector_status_default, get_prospector_drafts_default, get_deals_summary_default, list_call_sheet_default, get_call_sheet_card_default, log_call_default, list_calls_default, list_followups_due_default, list_needs_level_default, set_contact_level_default, bulk_set_levels_default, get_call_sheet_settings_default, set_call_sheet_settings_default]
+  tools: [list_contacts_default, get_contact_default, create_contact_default, update_contact_default, add_contact_note_default, find_duplicate_contacts_default, get_sponsor_id_audit_default, list_orders_default, paste_monthly_activity_default, list_inventory_default, update_inventory_stock_default, list_shipments_default, get_shipment_default, create_shipment_default, update_shipment_default, list_birthdays_default, compose_birthday_message_default, list_birthday_message_tones_default, list_whatsapp_conversations_default, get_whatsapp_thread_default, get_prospector_status_default, get_prospector_drafts_default, get_deals_summary_default, list_call_sheet_default, get_call_sheet_card_default, log_call_default, list_calls_default, list_followups_due_default, list_needs_level_default, set_contact_level_default, bulk_set_levels_default, get_call_sheet_settings_default, set_call_sheet_settings_default, get_duplication_scorecard_default, list_duplication_scorecards_default, save_duplication_scorecard_default]
 });
 
 // lovable-mcp-supabase-entry.ts
