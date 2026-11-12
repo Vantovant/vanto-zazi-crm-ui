@@ -12,7 +12,7 @@
   "mcp": {
     "server": {
       "name": "get-well-grow",
-      "version": "2.1.0",
+      "version": "2.2.0",
       "title": "Get Well Grow"
     },
     "tools": [
@@ -1083,6 +1083,174 @@
               "type": "integer",
               "minimum": -9007199254740991,
               "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_duplication_scorecard",
+        "title": "Get duplication scorecard",
+        "description": "READ ONLY: reads your own weekly scorecard and previous week, with a suggested rating that is never saved.",
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "week_start": {
+              "description": "This week / Past week — Monday in YYYY-MM-DD; defaults to the current South African week.",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_duplication_scorecards",
+        "title": "List duplication scorecards",
+        "description": "READ ONLY: lists your own saved weekly scorecards with all fields, newest first.",
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "limit": {
+              "default": 12,
+              "description": "Past weeks — number of weeks to return, newest first (default 12, maximum 52).",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 52
+            }
+          },
+          "additionalProperties": false
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "save_duplication_scorecard",
+        "title": "Save duplication scorecard",
+        "description": "WRITES: saves or updates one of your own weekly scorecards, changing only provided fields; dry_run previews without writing, and rating is never auto-set.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "week_start": {
+              "description": "This week / Past week — Monday in YYYY-MM-DD; defaults to the current South African week.",
+              "type": "string"
+            },
+            "new_introduced": {
+              "description": "New people I introduced this week",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2147483647
+            },
+            "helped_started": {
+              "description": "People I helped to get started",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2147483647
+            },
+            "taught_to_introduce": {
+              "description": "People I taught to introduce others",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2147483647
+            },
+            "team_introduced": {
+              "description": "Team members who introduced someone new",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2147483647
+            },
+            "four_by_four": {
+              "description": "My 4x4: people in place (out of 4)",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4
+            },
+            "team_pv": {
+              "description": "My team's total PV this week",
+              "type": "number",
+              "minimum": 0
+            },
+            "rating": {
+              "description": "This week vs last week — Progressing / Standing still / Declining; you still choose.",
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "progressing",
+                    "standing_still",
+                    "declining"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "gap_type": {
+              "description": "Didn't duplicate this week? — SKILL / ACTIVITY / BELIEF",
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "skill",
+                    "activity",
+                    "belief"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "fix_note": {
+              "description": "My one fix before next Friday",
+              "type": "string"
+            },
+            "commitment_action": {
+              "description": "This week I commit to one action…",
+              "type": "string"
+            },
+            "commitment_person": {
+              "description": "The person I will duplicate into:",
+              "type": "string"
+            },
+            "last_week_done": {
+              "description": "Did I do it? — DONE / PARTLY / NOT YET",
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "done",
+                    "partly",
+                    "not_yet"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "dry_run": {
+              "description": "Preview only: validates and returns what would be saved without writing.",
+              "type": "boolean"
             }
           },
           "additionalProperties": false
